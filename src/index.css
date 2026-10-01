@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+/* Force all code elements, pre, code, syntax blocks to strictly LTR */
+pre,
+code,
+kbd,
+samp,
+textarea.font-mono,
+.code-container,
+.code-block,
+[dir="ltr"] {
+  direction: ltr !important;
+  text-align: left !important;
+  unicode-bidi: isolate !important;
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+}
+
+/* Ensure code lines maintain left-to-right order even with mixed Arabic comments */
+pre code {
+  display: block;
+  direction: ltr !important;
+  text-align: left !important;
+  unicode-bidi: isolate !important;
+  white-space: pre;
+}
+
+/* RTL for explicit Arabic blocks */
+[dir="rtl"] {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* Custom scrollbar for code blocks and sidebars */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(51, 65, 85, 0.6);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.8);
+}
+
+/* Hide scrollbars completely for clean headers and segmented bars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}

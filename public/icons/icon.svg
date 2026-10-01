@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="50%" stop-color="#020617"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="border" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.3"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="url(#bg)"/>
+  <rect x="8" y="8" width="496" height="496" rx="102" fill="none" stroke="url(#border)" stroke-width="8"/>
+  
+  <!-- Outer Code brackets -->
+  <path d="M130 180 L60 256 L130 332" fill="none" stroke="#38bdf8" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M382 180 L452 256 L382 332" fill="none" stroke="#38bdf8" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Center Badge -->
+  <rect x="166" y="156" width="180" height="180" rx="40" fill="url(#gold)"/>
+  <text x="256" y="278" font-family="'Cairo', sans-serif, Arial" font-size="96" font-weight="900" fill="#020617" text-anchor="middle">كود</text>
+  
+  <!-- Subtitle -->
+  <text x="256" y="410" font-family="'Cairo', sans-serif, Arial" font-size="42" font-weight="800" fill="#f8fafc" text-anchor="middle" letter-spacing="2">بالمصري</text>
+</svg>

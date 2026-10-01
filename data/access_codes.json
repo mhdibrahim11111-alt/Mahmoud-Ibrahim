@@ -1,0 +1,228 @@
+[
+  {
+    "id": "code-1790859015003-ut8hh",
+    "code": "STD-3RP7",
+    "studentName": "تجربة جديدة",
+    "createdAt": "2026-10-01T12:50:15.003Z",
+    "expiresAt": null,
+    "status": "active",
+    "usedCount": 0,
+    "lastUsedAt": null,
+    "draftCode": "console.log(\"Hello from student!\");",
+    "savedSnippets": [],
+    "progress": {
+      "completedChapters": [],
+      "completedQuizzes": [],
+      "lastChapterId": 1,
+      "challengeCodes": {
+        "1": "console.log(\"مرحبا من تحدي الفصل 1\");"
+      },
+      "lastUpdated": "2026-10-01T13:03:44.180Z"
+    }
+  },
+  {
+    "id": "code-1790858734304-kwskw",
+    "code": "STD-7FYT",
+    "studentName": "طالب جديد",
+    "createdAt": "2026-10-01T12:45:34.304Z",
+    "expiresAt": null,
+    "status": "active",
+    "usedCount": 6,
+    "lastUsedAt": "2026-10-01T12:58:45.384Z",
+    "progress": {
+      "completedChapters": [],
+      "completedQuizzes": [],
+      "lastChapterId": 1,
+      "lastUpdated": "2026-10-01T13:03:39.188Z"
+    },
+    "draftCode": "// تعليق في سطر لوحده\nconsole.log(\"أهلاً\"); // تعليق بعد الكود\n\n/*\nتعليق على كذا سطر\nconsole.log(\"السطر ده جوه تعليق ومبيظهرش\");\n*/\nconsole.log(\"مع السلامة\");",
+    "savedSnippets": [
+      {
+        "id": "snip-1790859555208-dq96",
+        "title": "مشروع 1 - JS",
+        "code": "// تعليق في سطر لوحده\nconsole.log(\"أهلاً\"); // تعليق بعد الكود\n\n/*\nتعليق على كذا سطر\nconsole.log(\"السطر ده جوه تعليق ومبيظهرش\");\n*/\nconsole.log(\"مع السلامة\");",
+        "language": "javascript",
+        "createdAt": "2026-10-01T12:59:15.208Z",
+        "updatedAt": "2026-10-01T12:59:15.208Z"
+      }
+    ]
+  },
+  {
+    "id": "code-1790858733552-nq9ct",
+    "code": "STD-XZFD",
+    "studentName": "طالب جديد",
+    "createdAt": "2026-10-01T12:45:33.552Z",
+    "expiresAt": null,
+    "status": "active",
+    "usedCount": 0,
+    "lastUsedAt": null,
+    "progress": {
+      "completedChapters": [],
+      "completedQuizzes": [],
+      "lastChapterId": 1,
+      "lastUpdated": "2026-10-01T12:49:54.259Z"
+    }
+  },
+  {
+    "id": "code-1790858733317-icukh",
+    "code": "STD-F833",
+    "studentName": "طالب جديد",
+    "createdAt": "2026-10-01T12:45:33.317Z",
+    "expiresAt": null,
+    "status": "active",
+    "usedCount": 0,
+    "lastUsedAt": null,
+    "progress": {
+      "completedChapters": [],
+      "completedQuizzes": [],
+      "lastChapterId": 1,
+      "lastUpdated": "2026-10-01T12:49:54.259Z"
+    }
+  },
+  {
+    "id": "code-1790858732839-v8qb4",
+    "code": "STD-VBBS",
+    "studentName": "طالب جديد",
+    "createdAt": "2026-10-01T12:45:32.839Z",
+    "expiresAt": null,
+    "status": "active",
+    "usedCount": 0,
+    "lastUsedAt": null,
+    "progress": {
+      "completedChapters": [],
+      "completedQuizzes": [],
+      "lastChapterId": 1,
+      "lastUpdated": "2026-10-01T12:49:54.259Z"
+    }
+  },
+  {
+    "id": "code-1790858732186-zzi0k",
+    "code": "STD-DC2K",
+    "studentName": "طالب جديد",
+    "createdAt": "2026-10-01T12:45:32.186Z",
+    "expiresAt": null,
+    "status": "active",
+    "usedCount": 0,
+    "lastUsedAt": null,
+    "progress": {
+      "completedChapters": [],
+      "completedQuizzes": [],
+      "lastChapterId": 1,
+      "lastUpdated": "2026-10-01T12:49:54.259Z"
+    }
+  },
+  {
+    "id": "code-1790858730922-rfyj8",
+    "code": "STD-C8YQ",
+    "studentName": "طالب جديد",
+    "createdAt": "2026-10-01T12:45:30.922Z",
+    "expiresAt": null,
+    "status": "active",
+    "usedCount": 1,
+    "lastUsedAt": "2026-10-01T12:45:50.174Z",
+    "progress": {
+      "completedChapters": [],
+      "completedQuizzes": [],
+      "lastChapterId": 1,
+      "lastUpdated": "2026-10-01T12:49:54.259Z"
+    }
+  },
+  {
+    "id": "code-1790858689064-425w1",
+    "code": "STD-UV9T",
+    "studentName": "طالب جديد",
+    "createdAt": "2026-10-01T12:44:49.064Z",
+    "expiresAt": null,
+    "status": "active",
+    "usedCount": 3,
+    "lastUsedAt": "2026-10-01T12:50:55.844Z",
+    "progress": {
+      "completedChapters": [
+        1
+      ],
+      "completedQuizzes": [],
+      "lastChapterId": 1,
+      "lastUpdated": "2026-10-01T12:50:59.081Z"
+    }
+  },
+  {
+    "id": "code-1790858493482-34fge",
+    "code": "STD-4P7H",
+    "studentName": "طالب جديد",
+    "createdAt": "2026-10-01T12:41:33.482Z",
+    "expiresAt": null,
+    "status": "active",
+    "usedCount": 2,
+    "lastUsedAt": "2026-10-01T12:51:05.636Z",
+    "progress": {
+      "completedChapters": [],
+      "completedQuizzes": [],
+      "lastChapterId": 1,
+      "lastUpdated": "2026-10-01T12:55:52.759Z"
+    }
+  },
+  {
+    "id": "code-1790858486945-1izsx",
+    "code": "STD-Y8AW",
+    "studentName": "طالب جديد",
+    "createdAt": "2026-10-01T12:41:26.945Z",
+    "expiresAt": null,
+    "status": "active",
+    "usedCount": 0,
+    "lastUsedAt": null,
+    "progress": {
+      "completedChapters": [],
+      "completedQuizzes": [],
+      "lastChapterId": 1,
+      "lastUpdated": "2026-10-01T12:49:54.259Z"
+    }
+  },
+  {
+    "id": "code-1790858413844-oirju",
+    "code": "STD-A2AK",
+    "studentName": "طارق أحمد",
+    "createdAt": "2026-10-01T12:40:13.844Z",
+    "expiresAt": "2026-10-31T12:40:13.844Z",
+    "status": "expired",
+    "usedCount": 1,
+    "lastUsedAt": "2026-10-01T12:40:20.116Z",
+    "progress": {
+      "completedChapters": [],
+      "completedQuizzes": [],
+      "lastChapterId": 1,
+      "lastUpdated": "2026-10-01T12:49:54.259Z"
+    }
+  },
+  {
+    "id": "seed-std-01",
+    "code": "MASR-VIP",
+    "studentName": "مشترك مميز تجريبي",
+    "createdAt": "2026-10-01T12:39:50.707Z",
+    "expiresAt": null,
+    "status": "active",
+    "usedCount": 1,
+    "lastUsedAt": "2026-10-01T12:40:08.648Z",
+    "progress": {
+      "completedChapters": [],
+      "completedQuizzes": [],
+      "lastChapterId": 1,
+      "lastUpdated": "2026-10-01T12:49:54.259Z"
+    }
+  },
+  {
+    "id": "seed-std-02",
+    "code": "STUDENT-2026",
+    "studentName": "دفعة 2026",
+    "createdAt": "2026-10-01T12:39:50.707Z",
+    "expiresAt": "2027-10-01T12:39:50.707Z",
+    "status": "active",
+    "usedCount": 0,
+    "lastUsedAt": null,
+    "progress": {
+      "completedChapters": [],
+      "completedQuizzes": [],
+      "lastChapterId": 1,
+      "lastUpdated": "2026-10-01T12:49:54.259Z"
+    }
+  }
+]
