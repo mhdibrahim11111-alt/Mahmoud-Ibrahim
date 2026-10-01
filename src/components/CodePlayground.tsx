@@ -8,6 +8,7 @@ import {
   saveStudentDraftToServer,
   saveStudentSnippetToServer,
   deleteStudentSnippetFromServer,
+  sessionHeaders,
   StudentSnippet,
 } from '../utils/activation';
 import {
@@ -337,7 +338,7 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
     try {
       const response = await fetch('/api/smart-hint', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: sessionHeaders(true),
         body: JSON.stringify({
           code,
           error: activeError,

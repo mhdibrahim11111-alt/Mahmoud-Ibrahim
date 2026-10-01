@@ -36,11 +36,12 @@ interface SessionClaims {
 
 type SessionRequest = express.Request & { session?: SessionClaims; sessionCode?: string };
 
-function rateLimit(maxAttempts: number, windowMs: number) {
+function rateLimit(maxAttempts: number, windowMs: number, bySession = false) {
   const attempts = new Map<string, { count: number; resetAt: number }>();
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const now = Date.now();
-    const key = `${req.ip}:${req.path}`;
+    const sessionSubject = bySession ? (req as SessionRequest).session?.subject : undefined;
+    const key = `${sessionSubject ? `session:${sessionSubject}` : `ip:${req.ip}`}:${req.path}`;
     let record = attempts.get(key);
     if (!record || record.resetAt <= now) {
       record = { count: 0, resetAt: now + windowMs };
@@ -142,10 +143,11 @@ async function startServer() {
   }
 
   const limitCodeAttempts = rateLimit(10, 15 * 60 * 1000);
-  const limitHintRequests = rateLimit(30, 60 * 1000);
+  const limitHintRequests = rateLimit(60, 60 * 1000);
+  const limitHintRequestsPerSession = rateLimit(12, 60 * 1000, true);
 
   // API endpoint for Smart Hints (التلميحات الذكية)
-  app.post('/api/smart-hint', limitHintRequests, async (req, res) => {
+  app.post('/api/smart-hint', requireSession(), limitHintRequests, limitHintRequestsPerSession, async (req, res) => {
     const { code, error, mode } = req.body;
     if (typeof code !== 'string' || code.length > 30000 || (error !== undefined && (typeof error !== 'string' || error.length > 2000))) {
       return res.status(400).json({ success: false, message: 'حجم الكود أو رسالة الخطأ غير صالح.' });

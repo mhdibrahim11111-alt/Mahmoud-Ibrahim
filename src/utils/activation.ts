@@ -165,7 +165,7 @@ export function lockPlatform(): void {
   }
 }
 
-function sessionHeaders(json = false): HeadersInit {
+export function sessionHeaders(json = false): HeadersInit {
   const token = localStorage.getItem(STORAGE_KEY) || '';
   return {
     ...(json ? { 'Content-Type': 'application/json' } : {}),
