@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { bookParts } from '../data/bookData';
 import {
   CodeRecord,
   fetchAdminCodes,
@@ -27,6 +28,7 @@ import {
   Sparkles,
   Code2,
   FileCode2,
+  Search,
 } from 'lucide-react';
 
 interface OwnerCodeModalProps {
@@ -50,23 +52,32 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
   const [filter, setFilter] = useState<'all' | 'active' | 'expired'>('all');
   const [inspectingStudent, setInspectingStudent] = useState<CodeRecord | null>(null);
   const [copiedAdminSnippetId, setCopiedAdminSnippetId] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [busyCodeId, setBusyCodeId] = useState<string | null>(null);
+  const [recentlyGenerated, setRecentlyGenerated] = useState<CodeRecord | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const loadCodes = async () => {
     setLoading(true);
-    const res = await fetchAdminCodes(adminCode);
-    if (res.success) {
-      setCodes(res.codes);
-    } else {
-      setNotice({ text: res.message || 'فشل تحميل الأكواد', type: 'error' });
+    try {
+      const res = await fetchAdminCodes(adminCode);
+      if (res.success) {
+        setCodes(res.codes);
+      } else {
+        setNotice({ text: res.message || 'فشل تحميل الأكواد', type: 'error' });
+      }
+    } catch {
+      setNotice({ text: 'تعذر الاتصال بالخادم لتحميل الأكواد.', type: 'error' });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
     if (isOpen) {
       loadCodes();
     }
-  }, [isOpen]);
+  }, [isOpen, adminCode]);
 
   if (!isOpen) return null;
 
@@ -76,58 +87,86 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
   };
 
   const handleGenerate = async (useRandom = false) => {
-    const res = await adminGenerateCode(adminCode, {
-      studentName: studentName.trim() || undefined,
-      customCode: useRandom ? undefined : newCustomCode.trim() || undefined,
-      durationDays: durationDays > 0 ? durationDays : null,
-    });
+    if (isGenerating) return;
+    setIsGenerating(true);
+    try {
+      const res = await adminGenerateCode(adminCode, {
+        studentName: studentName.trim() || undefined,
+        customCode: useRandom ? undefined : newCustomCode.trim() || undefined,
+        durationDays,
+      });
 
-    if (res.success) {
-      showNotification(`✓ ${res.message} الكود: ${res.code?.code}`);
-      setNewCustomCode('');
-      setStudentName('');
-      loadCodes();
-    } else {
-      showNotification(res.message, 'error');
+      if (res.success && res.code) {
+        setRecentlyGenerated(res.code);
+        setNewCustomCode('');
+        setStudentName('');
+        showNotification(res.message);
+        await loadCodes();
+      } else {
+        showNotification(res.message || 'تعذر إنشاء الكود.', 'error');
+      }
+    } catch {
+      showNotification('تعذر الاتصال بالخادم لإنشاء الكود.', 'error');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
   const handleExpire = async (codeId: string) => {
-    const res = await adminExpireCode(adminCode, codeId);
-    if (res.success) {
-      showNotification(res.message);
-      loadCodes();
-    } else {
-      showNotification(res.message, 'error');
+    setBusyCodeId(codeId);
+    try {
+      const res = await adminExpireCode(adminCode, codeId);
+      if (res.success) {
+        showNotification(res.message);
+        await loadCodes();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    } finally {
+      setBusyCodeId(null);
     }
   };
 
   const handleReactivate = async (codeId: string, days = 30) => {
-    const res = await adminReactivateCode(adminCode, codeId, days);
-    if (res.success) {
-      showNotification(res.message);
-      loadCodes();
-    } else {
-      showNotification(res.message, 'error');
+    setBusyCodeId(codeId);
+    try {
+      const res = await adminReactivateCode(adminCode, codeId, days);
+      if (res.success) {
+        showNotification(res.message);
+        await loadCodes();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    } finally {
+      setBusyCodeId(null);
     }
   };
 
   const handleDelete = async (codeId: string, codeStr: string) => {
     if (!window.confirm(`هل أنت متأكد من حذف الكود "${codeStr}" نهائياً؟`)) return;
 
-    const res = await adminDeleteCode(adminCode, codeId);
-    if (res.success) {
-      showNotification(res.message);
-      loadCodes();
-    } else {
-      showNotification(res.message, 'error');
+    setBusyCodeId(codeId);
+    try {
+      const res = await adminDeleteCode(adminCode, codeId);
+      if (res.success) {
+        showNotification(res.message);
+        await loadCodes();
+      } else {
+        showNotification(res.message, 'error');
+      }
+    } finally {
+      setBusyCodeId(null);
     }
   };
 
-  const handleCopy = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
+  const handleCopy = async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
+    } catch {
+      showNotification('لم نتمكن من النسخ. تحقق من إذن الحافظة في المتصفح.', 'error');
+    }
   };
 
   const handleCopyInvite = (code: CodeRecord) => {
@@ -136,18 +175,26 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
     handleCopy(msg, `msg-${code.id}`);
   };
 
-  const filteredCodes = codes.filter((c) => {
-    if (filter === 'active') return c.status === 'active';
-    if (filter === 'expired') return c.status === 'expired' || c.status === 'revoked';
-    return true;
-  });
+  const isCurrentlyActive = (code: CodeRecord) =>
+    code.status === 'active' && (!code.expiresAt || Date.parse(code.expiresAt) >= Date.now());
+  const search = searchQuery.trim().toLocaleLowerCase();
+  const filteredCodes = [...codes]
+    .filter((code) => {
+      const active = isCurrentlyActive(code);
+      if (filter === 'active' && !active) return false;
+      if (filter === 'expired' && active) return false;
+      if (!search) return true;
+      return code.code.toLocaleLowerCase().includes(search) || (code.studentName || '').toLocaleLowerCase().includes(search);
+    })
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 
-  const activeCount = codes.filter((c) => c.status === 'active').length;
-  const expiredCount = codes.filter((c) => c.status === 'expired' || c.status === 'revoked').length;
+  const activeCount = codes.filter(isCurrentlyActive).length;
+  const expiredCount = codes.length - activeCount;
+  const totalChapterCount = bookParts.reduce((total, part) => total + part.chapters.length, 0);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl text-slate-100 overflow-hidden">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl text-slate-100 overflow-hidden">
         {/* Modal Header */}
         <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-950/50">
           <div className="flex items-center gap-3">
@@ -163,9 +210,7 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
                   صلاحية كاملة
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
-                أنت مسجل كمدير بالرمز: <span className="font-mono text-amber-300 font-bold">{adminCode}</span>
-              </p>
+              <p className="text-xs text-slate-400">إدارة الاشتراكات ومتابعة تقدم الطلاب</p>
             </div>
           </div>
 
@@ -238,6 +283,7 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
                 <div className="relative">
                   <input
                     type="text"
+                    maxLength={100}
                     value={studentName}
                     onChange={(e) => setStudentName(e.target.value)}
                     placeholder="مثال: أحمد إبراهيم"
@@ -274,8 +320,15 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
             <div className="flex flex-col sm:flex-row gap-2 pt-1">
               <input
                 type="text"
+                maxLength={32}
                 value={newCustomCode}
                 onChange={(e) => setNewCustomCode(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newCustomCode.trim() && !isGenerating) {
+                    e.preventDefault();
+                    void handleGenerate(false);
+                  }
+                }}
                 placeholder="كود مخصص يدوي (مثال: AHMED-2026)"
                 className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-amber-300 font-mono font-bold uppercase focus:outline-none focus:border-amber-500"
               />
@@ -283,23 +336,57 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
               <button
                 type="button"
                 onClick={() => handleGenerate(false)}
-                disabled={!newCustomCode.trim()}
+                disabled={isGenerating || !newCustomCode.trim()}
                 className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-40"
               >
                 <Check className="w-4 h-4" />
-                <span>حفظ الكود المخصص</span>
+                <span>{isGenerating ? 'جاري الإنشاء...' : 'إنشاء الكود المخصص'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleGenerate(true)}
+                disabled={isGenerating}
                 className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow"
               >
                 <Dices className="w-4 h-4" />
-                <span>توليد كود عشوائي 🎲</span>
+                <span>{isGenerating ? 'جاري الإنشاء...' : 'توليد كود آمن 🎲'}</span>
               </button>
             </div>
           </div>
+
+          {recentlyGenerated && (
+            <div className="bg-emerald-950/40 border border-emerald-700/60 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold text-emerald-300">تم إنشاء الاشتراك وحفظه. أرسل هذا الكود للطالب:</p>
+                <p dir="ltr" className="mt-1 text-xl font-black font-mono tracking-[0.18em] text-white">
+                  {recentlyGenerated.code}
+                </p>
+                <p className="mt-1 text-[11px] text-emerald-200/70">
+                  {recentlyGenerated.studentName} · {recentlyGenerated.expiresAt
+                    ? `ينتهي ${new Date(recentlyGenerated.expiresAt).toLocaleDateString('ar-EG')}`
+                    : 'بدون انتهاء'}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleCopy(recentlyGenerated.code, 'recent-code')}
+                  className="px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5"
+                >
+                  {copiedKey === 'recent-code' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copiedKey === 'recent-code' ? 'تم النسخ' : 'نسخ الكود'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleCopyInvite(recentlyGenerated)}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold flex items-center gap-1.5"
+                >
+                  <Share2 className="w-4 h-4" /> دعوة الطالب
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Codes List Section */}
           <div className="space-y-3">
@@ -310,7 +397,19 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
               </div>
 
               {/* Filters */}
-              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <label className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="ابحث بالاسم أو الكود"
+                    className="w-full sm:w-52 bg-slate-950 border border-slate-800 rounded-xl pr-8 pl-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
+                    aria-label="ابحث عن طالب أو كود"
+                  />
+                </label>
+                <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
                 <button
                   type="button"
                   onClick={() => setFilter('all')}
@@ -338,19 +437,24 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
                 >
                   منتهي ({expiredCount})
                 </button>
+                </div>
               </div>
             </div>
 
             {/* List */}
-            {filteredCodes.length === 0 ? (
+            {loading ? (
+              <div className="text-center py-8 bg-slate-950 rounded-2xl border border-slate-800 text-slate-400 text-xs flex items-center justify-center gap-2">
+                <RefreshCw className="w-4 h-4 animate-spin" /> جاري تحميل لوحة الطلاب...
+              </div>
+            ) : filteredCodes.length === 0 ? (
               <div className="text-center py-8 bg-slate-950 rounded-2xl border border-slate-800 text-slate-500 text-xs">
-                لا توجد أكواد في هذا التصنيف حالياً.
+                {searchQuery.trim() ? 'لا توجد نتائج تطابق البحث.' : 'لا توجد أكواد في هذا التصنيف حالياً.'}
               </div>
             ) : (
               <div className="space-y-2">
                 {filteredCodes.map((c) => {
-                  const isActive = c.status === 'active';
-                  const isExpired = c.status === 'expired';
+                  const isActive = isCurrentlyActive(c);
+                  const isExpired = c.status === 'expired' || (c.status === 'active' && !isActive);
                   const isRevoked = c.status === 'revoked';
 
                   return (
@@ -407,9 +511,9 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
 
                       {/* Student Progress Track */}
                       {(() => {
-                        const completedChs = c.progress?.completedChapters?.length || 0;
-                        const completedQz = c.progress?.completedQuizzes?.length || 0;
-                        const percent = Math.min(100, Math.round(((completedChs + completedQz) / (25 + 5)) * 100));
+                        const completedChs = Math.min(totalChapterCount, new Set(c.progress?.completedChapters || []).size);
+                        const completedQz = Math.min(bookParts.length, new Set(c.progress?.completedQuizzes || []).size);
+                        const percent = Math.round(((completedChs + completedQz) / (totalChapterCount + bookParts.length)) * 100);
 
                         return (
                           <div className="bg-slate-900/90 rounded-xl p-2.5 border border-slate-800/80 text-[11px] space-y-1.5">
@@ -417,10 +521,8 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
                               <span className="text-slate-300 font-medium flex items-center gap-1.5">
                                 <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                                 <span>إنجاز هذا الطالب:</span>
-                                <strong className="text-amber-300 font-bold">{completedChs} من 25 فصل</strong>
-                                {completedQz > 0 && (
-                                  <span className="text-emerald-400 text-[10px]">({completedQz} اختبارات مجتازة)</span>
-                                )}
+                                <strong className="text-amber-300 font-bold">{completedChs} من {totalChapterCount} فصل</strong>
+                                <span className="text-emerald-400 text-[10px]">({completedQz} من {bookParts.length} اختبارات)</span>
                               </span>
                               <span className="font-mono font-bold text-white text-xs">{percent}%</span>
                             </div>
@@ -498,6 +600,7 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
                             <button
                               type="button"
                               onClick={() => handleExpire(c.id)}
+                              disabled={busyCodeId === c.id}
                               className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-950/40 hover:bg-amber-900/60 border border-amber-900/50 text-amber-300 text-[11px] font-semibold transition"
                               title="إنهاء صلاحية هذا الكود فوراً"
                             >
@@ -508,6 +611,7 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
                             <button
                               type="button"
                               onClick={() => handleReactivate(c.id, 30)}
+                              disabled={busyCodeId === c.id}
                               className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-900/50 text-emerald-300 text-[11px] font-semibold transition"
                               title="إعادة تفعيل الكود لمدة 30 يوماً"
                             >
@@ -519,6 +623,7 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
                           <button
                             type="button"
                             onClick={() => handleDelete(c.id, c.code)}
+                            disabled={busyCodeId === c.id}
                             className="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 hover:text-rose-400 text-slate-500 border border-slate-800 transition"
                             title="حذف نهائي من قاعدة البيانات"
                           >

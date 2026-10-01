@@ -32,7 +32,7 @@ export const ActivationGate: React.FC<ActivationGateProps> = ({ onActivated }) =
       if (result.success) {
         setSuccess(result.message);
         setTimeout(() => {
-          onActivated(code.trim().toUpperCase(), result.role, result.studentName);
+          onActivated(result.code || code.trim().toUpperCase(), result.role, result.studentName);
         }, 500);
       } else {
         setError(result.message);

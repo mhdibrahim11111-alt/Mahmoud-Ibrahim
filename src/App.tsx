@@ -12,6 +12,7 @@ import {
   isDeviceActivated,
   lockPlatform,
   ActivationState,
+  validateSavedSession,
   fetchCodeProgress,
   syncCodeProgress,
 } from './utils/activation';
@@ -326,6 +327,20 @@ export default function App() {
   const [activationState, setActivationState] = useState<ActivationState>(() =>
     isDeviceActivated()
   );
+  const [isCheckingSession, setIsCheckingSession] = useState(() => isDeviceActivated().activated);
+
+  useEffect(() => {
+    if (!isDeviceActivated().activated) return;
+    let isSubscribed = true;
+    validateSavedSession().then((state) => {
+      if (!isSubscribed) return;
+      setActivationState(state);
+      setIsCheckingSession(false);
+    });
+    return () => {
+      isSubscribed = false;
+    };
+  }, []);
 
   const handleActivated = (code: string, role: 'admin' | 'student', studentName?: string) => {
     setActivationState({ activated: true, role, code, studentName });
@@ -337,6 +352,14 @@ export default function App() {
   };
 
   // If user is not logged in, show the Activation Gate
+  if (isCheckingSession) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-['Cairo',sans-serif]">
+        جاري التحقق من الجلسة...
+      </div>
+    );
+  }
+
   if (!activationState.activated || !activationState.code) {
     return <ActivationGate onActivated={handleActivated} />;
   }

@@ -9,48 +9,9 @@ export async function runJavaScript(
   userInputs: string[] = ['أحمد', '42', '5', '85']
 ): Promise<ExecutionResult> {
   const startTime = performance.now();
-  const logs: string[] = [];
-  const errors: string[] = [];
-
-  let inputIndex = 0;
-  const mockPrompt = (msg?: string) => {
-    const val = userInputs[inputIndex] ?? '25';
-    inputIndex++;
-    logs.push(`[سؤال النظام - prompt]: "${msg || ''}" -> تم إدخال: "${val}"`);
-    return val;
-  };
-
-  // Safe console capture
-  const customConsole = {
-    log: (...args: unknown[]) => {
-      const formatted = args
-        .map((arg) => {
-          if (typeof arg === 'object' && arg !== null) {
-            try {
-              return JSON.stringify(arg, null, 2);
-            } catch {
-              return String(arg);
-            }
-          }
-          return String(arg);
-        })
-        .join(' ');
-      logs.push(formatted);
-    },
-    error: (...args: unknown[]) => {
-      const formatted = args.map((a) => String(a)).join(' ');
-      errors.push(formatted);
-    },
-    warn: (...args: unknown[]) => {
-      logs.push(`[تحذير]: ${args.map((a) => String(a)).join(' ')}`);
-    },
-  };
 
   try {
-    // Check for potential infinite loop signatures and inject a guard if possible, or execute with worker/timeout
-    // Basic protection: wrap execution in a Web Worker or timed Function
-    // Since workers require Blob URLs in Vite, Blob URL worker is clean and prevents tab freeze!
-    const result = await runInWorkerWithTimeout(code, customConsole, mockPrompt, 2500);
+    const result = await runInSandboxedIframe(code, userInputs, 2500);
     const endTime = performance.now();
     return {
       logs: result.logs,
@@ -61,156 +22,91 @@ export async function runJavaScript(
   } catch (err: unknown) {
     const endTime = performance.now();
     const errorMsg = err instanceof Error ? err.message : String(err);
-    errors.push(translateErrorToArabic(errorMsg));
     return {
-      logs,
-      errors,
+      logs: [],
+      errors: [translateErrorToArabic(errorMsg)],
       executionTimeMs: Math.round(endTime - startTime),
       success: false,
     };
   }
 }
 
-async function runInWorkerWithTimeout(
+function runInSandboxedIframe(
   code: string,
-  customConsole: { log: (...args: unknown[]) => void; error: (...args: unknown[]) => void },
-  mockPrompt: (msg?: string) => string,
+  inputs: string[],
   timeoutMs: number
 ): Promise<{ logs: string[]; errors: string[] }> {
-  // If web worker is supported:
-  if (typeof Worker !== 'undefined') {
-    return new Promise((resolve) => {
-      const logs: string[] = [];
-      const errors: string[] = [];
-
-      const workerCode = `
-        self.onmessage = function(e) {
-          const userCode = e.data.code;
-          const capturedLogs = [];
-          const capturedErrors = [];
-
-          let promptIndex = 0;
-          const inputs = e.data.inputs || ['50', 'أحمد', '42'];
-          const prompt = function(msg) {
-            const val = inputs[promptIndex] || '25';
-            promptIndex++;
-            capturedLogs.push('[prompt]: ' + (msg || '') + ' -> ' + val);
-            return val;
-          };
-
-          const console = {
-            log: function(...args) {
-              const str = args.map(a => {
-                if (typeof a === 'object' && a !== null) {
-                  try { return JSON.stringify(a); } catch(e) { return String(a); }
-                }
-                return String(a);
-              }).join(' ');
-              capturedLogs.push(str);
-            },
-            error: function(...args) {
-              capturedErrors.push(args.map(a => String(a)).join(' '));
-            }
-          };
-
-          try {
-            const runner = new Function('console', 'prompt', userCode);
-            runner(console, prompt);
-            self.postMessage({ type: 'success', logs: capturedLogs, errors: capturedErrors });
-          } catch (err) {
-            self.postMessage({ type: 'error', logs: capturedLogs, errors: [err.name + ': ' + err.message] });
-          }
+  return new Promise((resolve) => {
+    const frame = document.createElement('iframe');
+    const runId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random()}`;
+    frame.setAttribute('sandbox', 'allow-scripts');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.cssText = 'position:fixed;width:1px;height:1px;left:-10px;top:-10px;border:0';
+    frame.srcdoc = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; img-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'; navigate-to 'none'"><script>
+      addEventListener('message', function receive(event) {
+        if (event.source !== parent || !event.data || event.data.type !== 'run') return;
+        removeEventListener('message', receive);
+        const { code, inputs, runId } = event.data;
+        const logs = [];
+        const errors = [];
+        let promptIndex = 0;
+        const prompt = (message) => {
+          const value = inputs[promptIndex] ?? '25';
+          promptIndex += 1;
+          logs.push('[prompt]: ' + (message || '') + ' -> ' + value);
+          return value;
         };
-      `;
-
-      let blob: Blob;
-      let workerUrl: string;
-      try {
-        blob = new Blob([workerCode], { type: 'application/javascript' });
-        workerUrl = URL.createObjectURL(blob);
-      } catch {
-        // Fallback to inline runner
-        return resolve(runInline(code, customConsole, mockPrompt));
-      }
-
-      const worker = new Worker(workerUrl);
-      let isDone = false;
-
-      const timer = setTimeout(() => {
-        if (!isDone) {
-          isDone = true;
-          worker.terminate();
-          URL.revokeObjectURL(workerUrl);
-          resolve({
-            logs,
-            errors: [
-              'خطأ: توقف البرنامج بسبب حلقة تكرار لانهائية (Infinite Loop) استغرقت وقتاً طويلاً!',
-              'تأكد من أن عداد الحلقة (مثل i++ أو n++) يتغير في كل دورة ويصل لشرط التوقف.',
-            ],
-          });
+        const safeConsole = {
+          log: (...args) => logs.push(args.map((value) => {
+            if (typeof value === 'object' && value !== null) {
+              try { return JSON.stringify(value); } catch { return String(value); }
+            }
+            return String(value);
+          }).join(' ')),
+          error: (...args) => errors.push(args.map(String).join(' ')),
+          warn: (...args) => logs.push('[تحذير]: ' + args.map(String).join(' ')),
+        };
+        try {
+          new Function('console', 'prompt', code)(safeConsole, prompt);
+          parent.postMessage({ type: 'result', runId, logs, errors }, '*');
+        } catch (error) {
+          errors.push(error instanceof Error ? error.name + ': ' + error.message : String(error));
+          parent.postMessage({ type: 'result', runId, logs, errors }, '*');
         }
-      }, timeoutMs);
+      });
+    </script>`;
 
-      worker.onmessage = (e) => {
-        if (isDone) return;
-        isDone = true;
-        clearTimeout(timer);
-        worker.terminate();
-        URL.revokeObjectURL(workerUrl);
-
-        if (e.data.type === 'success') {
-          resolve({ logs: e.data.logs, errors: e.data.errors });
-        } else {
-          const translatedErrors = (e.data.errors as string[]).map(translateErrorToArabic);
-          resolve({ logs: e.data.logs, errors: translatedErrors });
-        }
-      };
-
-      worker.onerror = (err) => {
-        if (isDone) return;
-        isDone = true;
-        clearTimeout(timer);
-        worker.terminate();
-        URL.revokeObjectURL(workerUrl);
-        resolve({
-          logs,
-          errors: [translateErrorToArabic(err.message || 'حدث خطأ في تشغيل الكود')],
-        });
-      };
-
-      worker.postMessage({ code, inputs: ['25', 'أحمد', '42', '5', '85'] });
-    });
-  }
-
-  return runInline(code, customConsole, mockPrompt);
-}
-
-function runInline(
-  code: string,
-  customConsole: { log: (...args: unknown[]) => void; error: (...args: unknown[]) => void },
-  mockPrompt: (msg?: string) => string
-): { logs: string[]; errors: string[] } {
-  const logs: string[] = [];
-  const errors: string[] = [];
-
-  const localConsole = {
-    log: (...args: unknown[]) => {
-      logs.push(args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
-    },
-    error: (...args: unknown[]) => {
-      errors.push(args.map((a) => String(a)).join(' '));
-    },
-  };
-
-  try {
-    const fn = new Function('console', 'prompt', code);
-    fn(localConsole, mockPrompt);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-    errors.push(translateErrorToArabic(msg));
-  }
-
-  return { logs, errors };
+    let isDone = false;
+    const finish = (result: { logs: string[]; errors: string[] }) => {
+      if (isDone) return;
+      isDone = true;
+      clearTimeout(timer);
+      window.removeEventListener('message', handleMessage);
+      frame.remove();
+      resolve(result);
+    };
+    const handleMessage = (event: MessageEvent) => {
+      if (event.source !== frame.contentWindow || event.data?.type !== 'result' || event.data.runId !== runId) return;
+      finish({
+        logs: Array.isArray(event.data.logs) ? event.data.logs.map(String) : [],
+        errors: Array.isArray(event.data.errors) ? event.data.errors.map(translateErrorToArabic) : [],
+      });
+    };
+    const timer = window.setTimeout(() => finish({
+      logs: [],
+      errors: [
+        'خطأ: توقف البرنامج بسبب حلقة تكرار لانهائية (Infinite Loop) استغرقت وقتاً طويلاً!',
+        'تأكد من أن عداد الحلقة (مثل i++ أو n++) يتغير في كل دورة ويصل لشرط التوقف.',
+      ],
+    }), timeoutMs);
+    window.addEventListener('message', handleMessage);
+    frame.addEventListener('load', () => {
+      frame.contentWindow?.postMessage({ type: 'run', runId, code, inputs }, '*');
+    }, { once: true });
+    document.body.appendChild(frame);
+  });
 }
 
 /**

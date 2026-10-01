@@ -52,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Main Bar */}
       <div className="max-w-7xl mx-auto px-3 sm:px-5">
         <div className="h-16 flex items-center justify-between gap-2 sm:gap-4">
-          
+
           {/* Brand Logo & Title */}
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-orange-500 to-yellow-400 flex items-center justify-center shadow-md shadow-amber-500/25 text-slate-950 font-black text-base sm:text-lg select-none">

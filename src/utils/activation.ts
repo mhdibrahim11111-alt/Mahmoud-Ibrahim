@@ -3,7 +3,8 @@
  * Connects to the backend server to verify codes, check expiration, and manage codes.
  */
 
-const STORAGE_KEY = 'codemasr_activation_token';
+const STORAGE_KEY = 'codemasr_session_token';
+const CODE_KEY = 'codemasr_active_code';
 const ROLE_KEY = 'codemasr_user_role';
 const STUDENT_NAME_KEY = 'codemasr_student_name';
 
@@ -41,23 +42,52 @@ export interface ActivationState {
  */
 export function isDeviceActivated(): ActivationState {
   try {
+    // Remove the legacy value, which stored the raw activation code as a token.
+    localStorage.removeItem('codemasr_activation_token');
     const savedToken = localStorage.getItem(STORAGE_KEY);
+    const savedCode = localStorage.getItem(CODE_KEY);
     const savedRole = (localStorage.getItem(ROLE_KEY) as 'admin' | 'student') || 'student';
     const studentName = localStorage.getItem(STUDENT_NAME_KEY) || undefined;
 
-    if (!savedToken) {
+    if (!savedToken || !savedCode) {
       return { activated: false, role: 'student' };
     }
 
     return {
       activated: true,
       role: savedRole,
-      code: savedToken.trim().toUpperCase(),
+      code: savedCode.trim().toUpperCase(),
       studentName,
     };
   } catch {
     return { activated: false, role: 'student' };
   }
+}
+
+export async function validateSavedSession(): Promise<ActivationState> {
+  const saved = isDeviceActivated();
+  if (!saved.activated) return saved;
+  try {
+    const token = localStorage.getItem(STORAGE_KEY) || '';
+    const res = await fetch('/api/auth/session', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (res.ok && data.valid) {
+      localStorage.setItem(ROLE_KEY, data.role);
+      if (data.studentName) localStorage.setItem(STUDENT_NAME_KEY, data.studentName);
+      return {
+        activated: true,
+        role: data.role,
+        code: data.code,
+        studentName: data.studentName,
+      };
+    }
+  } catch {
+    // Treat an unreachable server as signed out so stale credentials are not trusted.
+  }
+  lockPlatform();
+  return { activated: false, role: 'student' };
 }
 
 /**
@@ -66,6 +96,7 @@ export function isDeviceActivated(): ActivationState {
 export async function activateWithCode(inputCode: string): Promise<{
   success: boolean;
   role: 'admin' | 'student';
+  code?: string;
   message: string;
   studentName?: string;
 }> {
@@ -83,8 +114,10 @@ export async function activateWithCode(inputCode: string): Promise<{
 
     const data = await res.json();
 
-    if (data.valid) {
-      localStorage.setItem(STORAGE_KEY, clean);
+    if (data.valid && data.sessionToken) {
+      localStorage.setItem(STORAGE_KEY, data.sessionToken);
+      const sessionCode = data.code || clean;
+      localStorage.setItem(CODE_KEY, sessionCode);
       localStorage.setItem(ROLE_KEY, data.role);
       if (data.studentName) {
         localStorage.setItem(STUDENT_NAME_KEY, data.studentName);
@@ -95,6 +128,7 @@ export async function activateWithCode(inputCode: string): Promise<{
       return {
         success: true,
         role: data.role,
+        code: sessionCode,
         message: data.message,
         studentName: data.studentName,
       };
@@ -121,6 +155,7 @@ export async function activateWithCode(inputCode: string): Promise<{
 export function lockPlatform(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(CODE_KEY);
     localStorage.removeItem(ROLE_KEY);
     localStorage.removeItem(STUDENT_NAME_KEY);
     localStorage.removeItem('codemasr_completed_chapters');
@@ -130,18 +165,26 @@ export function lockPlatform(): void {
   }
 }
 
+function sessionHeaders(json = false): HeadersInit {
+  const token = localStorage.getItem(STORAGE_KEY) || '';
+  return {
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 // ==========================================
 // Admin APIs (Only called when role is admin)
 // ==========================================
 
-export async function fetchAdminCodes(adminCode: string): Promise<{
+export async function fetchAdminCodes(_adminCode: string): Promise<{
   success: boolean;
   codes: CodeRecord[];
   message?: string;
 }> {
   try {
     const res = await fetch('/api/admin/codes', {
-      headers: { 'x-admin-code': adminCode },
+      headers: sessionHeaders(),
     });
     if (!res.ok) {
       return { success: false, codes: [], message: 'غير مصرح للوصول' };
@@ -154,7 +197,7 @@ export async function fetchAdminCodes(adminCode: string): Promise<{
 }
 
 export async function adminGenerateCode(
-  adminCode: string,
+  _adminCode: string,
   options: {
     studentName?: string;
     customCode?: string;
@@ -165,8 +208,7 @@ export async function adminGenerateCode(
     const res = await fetch('/api/admin/codes/generate', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-admin-code': adminCode,
+        ...sessionHeaders(true),
       },
       body: JSON.stringify(options),
     });
@@ -177,15 +219,14 @@ export async function adminGenerateCode(
 }
 
 export async function adminExpireCode(
-  adminCode: string,
+  _adminCode: string,
   codeId: string
 ): Promise<{ success: boolean; message: string }> {
   try {
     const res = await fetch('/api/admin/codes/expire', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-admin-code': adminCode,
+        ...sessionHeaders(true),
       },
       body: JSON.stringify({ codeId }),
     });
@@ -196,7 +237,7 @@ export async function adminExpireCode(
 }
 
 export async function adminReactivateCode(
-  adminCode: string,
+  _adminCode: string,
   codeId: string,
   extraDays?: number
 ): Promise<{ success: boolean; message: string }> {
@@ -204,8 +245,7 @@ export async function adminReactivateCode(
     const res = await fetch('/api/admin/codes/reactivate', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-admin-code': adminCode,
+        ...sessionHeaders(true),
       },
       body: JSON.stringify({ codeId, extraDays }),
     });
@@ -216,15 +256,14 @@ export async function adminReactivateCode(
 }
 
 export async function adminDeleteCode(
-  adminCode: string,
+  _adminCode: string,
   codeId: string
 ): Promise<{ success: boolean; message: string }> {
   try {
     const res = await fetch('/api/admin/codes/delete', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-admin-code': adminCode,
+        ...sessionHeaders(true),
       },
       body: JSON.stringify({ codeId }),
     });
@@ -238,10 +277,9 @@ export async function adminDeleteCode(
 // Code-Specific Progress Sync
 // ==========================================
 
-export async function fetchCodeProgress(code: string): Promise<CodeProgress | null> {
-  const clean = code.trim().toUpperCase();
+export async function fetchCodeProgress(_code: string): Promise<CodeProgress | null> {
   try {
-    const res = await fetch(`/api/progress/${encodeURIComponent(clean)}`);
+    const res = await fetch('/api/progress', { headers: sessionHeaders() });
     if (res.ok) {
       const data = await res.json();
       return data.progress;
@@ -253,7 +291,7 @@ export async function fetchCodeProgress(code: string): Promise<CodeProgress | nu
 }
 
 export async function syncCodeProgress(
-  code: string,
+  _code: string,
   progress: {
     completedChapters: number[];
     completedQuizzes: string[];
@@ -261,14 +299,13 @@ export async function syncCodeProgress(
     challengeCodes?: Record<string, string>;
   }
 ): Promise<boolean> {
-  const clean = code.trim().toUpperCase();
   try {
-    await fetch(`/api/progress/${encodeURIComponent(clean)}`, {
+    const res = await fetch('/api/progress', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: sessionHeaders(true),
       body: JSON.stringify(progress),
     });
-    return true;
+    return res.ok;
   } catch {
     return false;
   }
@@ -288,11 +325,10 @@ export interface StudentSnippet {
 }
 
 export async function fetchStudentWork(
-  code: string
+  _code: string
 ): Promise<{ draftCode: string; snippets: StudentSnippet[] }> {
-  const clean = code.trim().toUpperCase();
   try {
-    const res = await fetch(`/api/student-work/${encodeURIComponent(clean)}`);
+    const res = await fetch('/api/student-work', { headers: sessionHeaders() });
     if (res.ok) {
       const data = await res.json();
       return {
@@ -306,12 +342,11 @@ export async function fetchStudentWork(
   return { draftCode: '', snippets: [] };
 }
 
-export async function saveStudentDraftToServer(code: string, draftCode: string): Promise<void> {
-  const clean = code.trim().toUpperCase();
+export async function saveStudentDraftToServer(_code: string, draftCode: string): Promise<void> {
   try {
-    await fetch(`/api/student-work/${encodeURIComponent(clean)}/draft`, {
+    await fetch('/api/student-work/draft', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: sessionHeaders(true),
       body: JSON.stringify({ draftCode }),
     });
   } catch (err) {
@@ -320,17 +355,16 @@ export async function saveStudentDraftToServer(code: string, draftCode: string):
 }
 
 export async function saveStudentSnippetToServer(
-  code: string,
+  _code: string,
   title: string,
   snippetCode: string,
   language: string = 'javascript',
   snippetId?: string
 ): Promise<{ success: boolean; snippet?: StudentSnippet; message: string }> {
-  const clean = code.trim().toUpperCase();
   try {
-    const res = await fetch(`/api/student-work/${encodeURIComponent(clean)}/snippet`, {
+    const res = await fetch('/api/student-work/snippet', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: sessionHeaders(true),
       body: JSON.stringify({ title, code: snippetCode, language, snippetId }),
     });
     return await res.json();
@@ -340,15 +374,15 @@ export async function saveStudentSnippetToServer(
 }
 
 export async function deleteStudentSnippetFromServer(
-  code: string,
+  _code: string,
   snippetId: string
 ): Promise<boolean> {
-  const clean = code.trim().toUpperCase();
   try {
     const res = await fetch(
-      `/api/student-work/${encodeURIComponent(clean)}/snippet/${encodeURIComponent(snippetId)}`,
+      `/api/student-work/snippet/${encodeURIComponent(snippetId)}`,
       {
         method: 'DELETE',
+        headers: sessionHeaders(),
       }
     );
     return res.ok;

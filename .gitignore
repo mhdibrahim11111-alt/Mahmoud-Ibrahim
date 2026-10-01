@@ -1,4 +1,5 @@
 node_modules/
+data/access_codes.json
 build/
 dist/
 coverage/

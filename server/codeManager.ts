@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { randomInt, randomUUID } from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -8,11 +9,13 @@ const __dirname = path.dirname(__filename);
 const DATA_DIR = path.resolve(__dirname, '../data');
 const CODES_FILE = path.join(DATA_DIR, 'access_codes.json');
 
-// Exactly 2 Admin Codes for the owner / platform admin
-export const ADMIN_CODES = [
-  'ADMIN-MASR-2026',
-  'OWNER-MASR-77',
-];
+// Admin credentials are supplied through deployment secrets, never source code.
+export function getAdminCodes(): string[] {
+  return (process.env.ADMIN_CODES || '')
+    .split(',')
+    .map((code) => code.trim().toUpperCase())
+    .filter(Boolean);
+}
 
 export interface StudentSnippet {
   id: string;
@@ -53,29 +56,7 @@ export function initCodesStorage(): void {
     }
 
     if (!fs.existsSync(CODES_FILE)) {
-      const initialCodes: AccessCodeRecord[] = [
-        {
-          id: 'seed-std-01',
-          code: 'MASR-VIP',
-          studentName: 'مشترك مميز تجريبي',
-          createdAt: new Date().toISOString(),
-          expiresAt: null,
-          status: 'active',
-          usedCount: 0,
-          lastUsedAt: null,
-        },
-        {
-          id: 'seed-std-02',
-          code: 'STUDENT-2026',
-          studentName: 'دفعة 2026',
-          createdAt: new Date().toISOString(),
-          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-          status: 'active',
-          usedCount: 0,
-          lastUsedAt: null,
-        },
-      ];
-      fs.writeFileSync(CODES_FILE, JSON.stringify(initialCodes, null, 2), 'utf8');
+      fs.writeFileSync(CODES_FILE, JSON.stringify([], null, 2), 'utf8');
     }
   } catch (err) {
     console.error('Failed to init codes storage:', err);
@@ -118,7 +99,7 @@ export function verifyCode(inputCode: string): {
   }
 
   // 1. Check if it's one of the 2 Admin Codes
-  if (ADMIN_CODES.includes(clean)) {
+  if (getAdminCodes().includes(clean)) {
     return {
       valid: true,
       role: 'admin',
@@ -200,7 +181,7 @@ export function generateCode(
   }
 ): { success: boolean; code?: AccessCodeRecord; message: string } {
   const cleanAdmin = adminCode.trim().toUpperCase();
-  if (!ADMIN_CODES.includes(cleanAdmin)) {
+  if (!getAdminCodes().includes(cleanAdmin)) {
     return { success: false, message: 'غير مصرح لك بتوليد الأكواد (يتطلب صلاحية المدير).' };
   }
 
@@ -209,32 +190,48 @@ export function generateCode(
 
   if (options.customCode && options.customCode.trim()) {
     codeStr = options.customCode.trim().toUpperCase();
-    if (codeStr.length < 3) {
-      return { success: false, message: 'يجب أن يكون الكود 3 أحرف على الأقل.' };
+    if (codeStr.length < 3 || codeStr.length > 32 || !/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(codeStr)) {
+      return { success: false, message: 'استخدم من 3 إلى 32 حرفاً أو رقماً، ويمكن الفصل بشرطة واحدة.' };
     }
-    if (ADMIN_CODES.includes(codeStr) || codes.some((c) => c.code.toUpperCase() === codeStr)) {
+    if (getAdminCodes().includes(codeStr) || codes.some((c) => c.code.toUpperCase() === codeStr)) {
       return { success: false, message: 'هذا الكود مستخدم بالفعل، اختر كوداً آخر.' };
     }
   } else {
-    // Generate random code
-    const prefix = 'STD';
+    // Use a cryptographically secure, collision-checked code.
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-    let rand = '';
-    for (let i = 0; i < 4; i++) {
-      rand += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    codeStr = `${prefix}-${rand}`;
+    let attempts = 0;
+    do {
+      let rand = '';
+      for (let i = 0; i < 6; i++) {
+        rand += chars[randomInt(chars.length)];
+      }
+      codeStr = `STD-${rand}`;
+      attempts += 1;
+      if (attempts >= 100) {
+        return { success: false, message: 'تعذر إنشاء كود فريد الآن. حاول مرة أخرى.' };
+      }
+    } while (getAdminCodes().includes(codeStr) || codes.some((c) => c.code.toUpperCase() === codeStr));
+  }
+
+  const durationDays = options.durationDays ?? 0;
+  if (!Number.isInteger(durationDays) || durationDays < 0 || durationDays > 3650) {
+    return { success: false, message: 'مدة الصلاحية يجب أن تكون من 0 إلى 3650 يوماً.' };
+  }
+
+  const cleanStudentName = options.studentName?.trim() || 'طالب جديد';
+  if (cleanStudentName.length > 100) {
+    return { success: false, message: 'اسم الطالب يجب ألا يتجاوز 100 حرف.' };
   }
 
   let expiresAt: string | null = null;
-  if (options.durationDays && options.durationDays > 0) {
-    expiresAt = new Date(Date.now() + options.durationDays * 24 * 60 * 60 * 1000).toISOString();
+  if (durationDays > 0) {
+    expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
   }
 
   const newRecord: AccessCodeRecord = {
-    id: `code-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    id: `code-${randomUUID()}`,
     code: codeStr,
-    studentName: options.studentName?.trim() || 'طالب جديد',
+    studentName: cleanStudentName,
     createdAt: new Date().toISOString(),
     expiresAt,
     status: 'active',
@@ -243,9 +240,11 @@ export function generateCode(
   };
 
   codes.unshift(newRecord);
-  saveStoredCodes(codes);
+  if (!saveStoredCodes(codes)) {
+    return { success: false, message: 'لم يتم حفظ الكود بسبب مشكلة في التخزين. حاول مرة أخرى.' };
+  }
 
-  return { success: true, code: newRecord, message: 'تم توليد الكود بنجاح!' };
+  return { success: true, code: newRecord, message: 'تم إنشاء كود الطالب وحفظه بنجاح.' };
 }
 
 export function expireCode(
@@ -253,7 +252,7 @@ export function expireCode(
   codeId: string
 ): { success: boolean; message: string } {
   const cleanAdmin = adminCode.trim().toUpperCase();
-  if (!ADMIN_CODES.includes(cleanAdmin)) {
+  if (!getAdminCodes().includes(cleanAdmin)) {
     return { success: false, message: 'غير مصرح لك بهذا الإجراء.' };
   }
 
@@ -264,7 +263,9 @@ export function expireCode(
   }
 
   target.status = 'expired';
-  saveStoredCodes(codes);
+  if (!saveStoredCodes(codes)) {
+    return { success: false, message: 'تعذر حفظ التغيير. حاول مرة أخرى.' };
+  }
   return { success: true, message: `تم إنهاء صلاحية الكود ${target.code} بنجاح.` };
 }
 
@@ -274,7 +275,7 @@ export function reactivateCode(
   extraDays?: number
 ): { success: boolean; message: string } {
   const cleanAdmin = adminCode.trim().toUpperCase();
-  if (!ADMIN_CODES.includes(cleanAdmin)) {
+  if (!getAdminCodes().includes(cleanAdmin)) {
     return { success: false, message: 'غير مصرح لك بهذا الإجراء.' };
   }
 
@@ -290,7 +291,9 @@ export function reactivateCode(
   } else if (extraDays === 0) {
     target.expiresAt = null;
   }
-  saveStoredCodes(codes);
+  if (!saveStoredCodes(codes)) {
+    return { success: false, message: 'تعذر حفظ التغيير. حاول مرة أخرى.' };
+  }
   return { success: true, message: `تمت إعادة تفعيل الكود ${target.code} بنجاح.` };
 }
 
@@ -299,7 +302,7 @@ export function deleteCode(
   codeId: string
 ): { success: boolean; message: string } {
   const cleanAdmin = adminCode.trim().toUpperCase();
-  if (!ADMIN_CODES.includes(cleanAdmin)) {
+  if (!getAdminCodes().includes(cleanAdmin)) {
     return { success: false, message: 'غير مصرح لك بهذا الإجراء.' };
   }
 
@@ -309,7 +312,9 @@ export function deleteCode(
     return { success: false, message: 'الكود غير موجود.' };
   }
 
-  saveStoredCodes(filtered);
+  if (!saveStoredCodes(filtered)) {
+    return { success: false, message: 'تعذر حذف الكود بسبب مشكلة في التخزين.' };
+  }
   return { success: true, message: 'تم حذف الكود نهائياً من قاعدة البيانات.' };
 }
 
@@ -451,5 +456,3 @@ export function deleteStudentSnippet(
   saveStoredCodes(codes);
   return { success: true, message: 'تم حذف الكود بنجاح.' };
 }
-
-
