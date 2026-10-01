@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { bookParts } from '../data/bookData';
 import {
   CodeRecord,
@@ -56,6 +57,8 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
   const [busyCodeId, setBusyCodeId] = useState<string | null>(null);
   const [recentlyGenerated, setRecentlyGenerated] = useState<CodeRecord | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 8;
 
   const loadCodes = async () => {
     setLoading(true);
@@ -187,14 +190,18 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
       return code.code.toLocaleLowerCase().includes(search) || (code.studentName || '').toLocaleLowerCase().includes(search);
     })
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const totalPages = Math.max(1, Math.ceil(filteredCodes.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageStart = (safePage - 1) * pageSize;
+  const paginatedCodes = filteredCodes.slice(pageStart, pageStart + pageSize);
 
   const activeCount = codes.filter(isCurrentlyActive).length;
   const expiredCount = codes.length - activeCount;
   const totalChapterCount = bookParts.reduce((total, part) => total + part.chapters.length, 0);
 
-  return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl text-slate-100 overflow-hidden">
+  return createPortal(
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center overflow-y-auto p-3 sm:p-4 animate-fadeIn">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-5xl w-full h-[calc(100dvh-1.5rem)] sm:h-[calc(100dvh-2rem)] max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] min-h-0 shrink-0 flex flex-col shadow-2xl text-slate-100 overflow-hidden">
         {/* Modal Header */}
         <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-950/50">
           <div className="flex items-center gap-3">
@@ -247,7 +254,7 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
         )}
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 custom-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-5 custom-scrollbar">
           {/* Quick Stats Bar */}
           <div className="grid grid-cols-3 gap-2.5 sm:gap-3 text-center">
             <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800">
@@ -403,7 +410,10 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
                   <input
                     type="search"
                     value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onChange={(event) => {
+                      setSearchQuery(event.target.value);
+                      setCurrentPage(1);
+                    }}
                     placeholder="ابحث بالاسم أو الكود"
                     className="w-full sm:w-52 bg-slate-950 border border-slate-800 rounded-xl pr-8 pl-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
                     aria-label="ابحث عن طالب أو كود"
@@ -412,7 +422,10 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
                 <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
                 <button
                   type="button"
-                  onClick={() => setFilter('all')}
+                  onClick={() => {
+                    setFilter('all');
+                    setCurrentPage(1);
+                  }}
                   className={`px-2.5 py-1 rounded-lg transition ${
                     filter === 'all' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
                   }`}
@@ -421,7 +434,10 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFilter('active')}
+                  onClick={() => {
+                    setFilter('active');
+                    setCurrentPage(1);
+                  }}
                   className={`px-2.5 py-1 rounded-lg transition ${
                     filter === 'active' ? 'bg-emerald-950 text-emerald-300 font-bold border border-emerald-800' : 'text-slate-400 hover:text-white'
                   }`}
@@ -430,7 +446,10 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFilter('expired')}
+                  onClick={() => {
+                    setFilter('expired');
+                    setCurrentPage(1);
+                  }}
                   className={`px-2.5 py-1 rounded-lg transition ${
                     filter === 'expired' ? 'bg-rose-950 text-rose-300 font-bold border border-rose-800' : 'text-slate-400 hover:text-white'
                   }`}
@@ -452,7 +471,7 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
               </div>
             ) : (
               <div className="space-y-2">
-                {filteredCodes.map((c) => {
+                {paginatedCodes.map((c) => {
                   const isActive = isCurrentlyActive(c);
                   const isExpired = c.status === 'expired' || (c.status === 'active' && !isActive);
                   const isRevoked = c.status === 'revoked';
@@ -636,6 +655,35 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
                 })}
               </div>
             )}
+
+            {!loading && filteredCodes.length > pageSize && (
+              <div className="flex flex-col gap-2 border-t border-slate-800 pt-3 sm:flex-row sm:items-center sm:justify-between" dir="rtl">
+                <span className="text-[11px] text-slate-400">
+                  عرض {pageStart + 1}–{Math.min(pageStart + pageSize, filteredCodes.length)} من {filteredCodes.length}
+                </span>
+                <div className="flex items-center justify-between gap-2 sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(Math.max(1, safePage - 1))}
+                    disabled={safePage === 1}
+                    className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    السابق
+                  </button>
+                  <span className="min-w-20 text-center text-xs text-slate-400">
+                    صفحة {safePage} من {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
+                    disabled={safePage === totalPages}
+                    className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    التالي
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -788,6 +836,7 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 };
