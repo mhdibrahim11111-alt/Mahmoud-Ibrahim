@@ -255,12 +255,24 @@ ${error || 'المستخدم يطلب تلميحاً ذكياً لفهم أو ت
   app.post('/api/admin/codes/generate', requireAdmin, (req, res) => {
     const adminCode = (req as SessionRequest).sessionCode!;
     const { studentName, customCode, durationDays } = req.body;
+    if (studentName !== undefined && typeof studentName !== 'string') {
+      return res.status(400).json({ success: false, message: 'اسم الطالب غير صالح.' });
+    }
+    if (customCode !== undefined && customCode !== null && typeof customCode !== 'string') {
+      return res.status(400).json({ success: false, message: 'الكود المخصص غير صالح.' });
+    }
+    const parsedDuration = durationDays === undefined || durationDays === null || durationDays === ''
+      ? 0
+      : Number(durationDays);
+    if (!Number.isInteger(parsedDuration) || parsedDuration < 0 || parsedDuration > 3650) {
+      return res.status(400).json({ success: false, message: 'مدة الصلاحية يجب أن تكون من 0 إلى 3650 يوماً.' });
+    }
     const result = generateCode(adminCode, {
       studentName,
       customCode,
-      durationDays: durationDays !== undefined ? Number(durationDays) : null,
+      durationDays: parsedDuration,
     });
-    return res.json(result);
+    return res.status(result.success ? 200 : 400).json(result);
   });
 
   // 4. Expire a code (Admin only)

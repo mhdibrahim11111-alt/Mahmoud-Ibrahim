@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { randomInt, randomUUID } from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -189,32 +190,48 @@ export function generateCode(
 
   if (options.customCode && options.customCode.trim()) {
     codeStr = options.customCode.trim().toUpperCase();
-    if (codeStr.length < 3) {
-      return { success: false, message: 'يجب أن يكون الكود 3 أحرف على الأقل.' };
+    if (codeStr.length < 3 || codeStr.length > 32 || !/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(codeStr)) {
+      return { success: false, message: 'استخدم من 3 إلى 32 حرفاً أو رقماً، ويمكن الفصل بشرطة واحدة.' };
     }
     if (getAdminCodes().includes(codeStr) || codes.some((c) => c.code.toUpperCase() === codeStr)) {
       return { success: false, message: 'هذا الكود مستخدم بالفعل، اختر كوداً آخر.' };
     }
   } else {
-    // Generate random code
-    const prefix = 'STD';
+    // Use a cryptographically secure, collision-checked code.
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-    let rand = '';
-    for (let i = 0; i < 4; i++) {
-      rand += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    codeStr = `${prefix}-${rand}`;
+    let attempts = 0;
+    do {
+      let rand = '';
+      for (let i = 0; i < 6; i++) {
+        rand += chars[randomInt(chars.length)];
+      }
+      codeStr = `STD-${rand}`;
+      attempts += 1;
+      if (attempts >= 100) {
+        return { success: false, message: 'تعذر إنشاء كود فريد الآن. حاول مرة أخرى.' };
+      }
+    } while (getAdminCodes().includes(codeStr) || codes.some((c) => c.code.toUpperCase() === codeStr));
+  }
+
+  const durationDays = options.durationDays ?? 0;
+  if (!Number.isInteger(durationDays) || durationDays < 0 || durationDays > 3650) {
+    return { success: false, message: 'مدة الصلاحية يجب أن تكون من 0 إلى 3650 يوماً.' };
+  }
+
+  const cleanStudentName = options.studentName?.trim() || 'طالب جديد';
+  if (cleanStudentName.length > 100) {
+    return { success: false, message: 'اسم الطالب يجب ألا يتجاوز 100 حرف.' };
   }
 
   let expiresAt: string | null = null;
-  if (options.durationDays && options.durationDays > 0) {
-    expiresAt = new Date(Date.now() + options.durationDays * 24 * 60 * 60 * 1000).toISOString();
+  if (durationDays > 0) {
+    expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
   }
 
   const newRecord: AccessCodeRecord = {
-    id: `code-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    id: `code-${randomUUID()}`,
     code: codeStr,
-    studentName: options.studentName?.trim() || 'طالب جديد',
+    studentName: cleanStudentName,
     createdAt: new Date().toISOString(),
     expiresAt,
     status: 'active',
@@ -223,9 +240,11 @@ export function generateCode(
   };
 
   codes.unshift(newRecord);
-  saveStoredCodes(codes);
+  if (!saveStoredCodes(codes)) {
+    return { success: false, message: 'لم يتم حفظ الكود بسبب مشكلة في التخزين. حاول مرة أخرى.' };
+  }
 
-  return { success: true, code: newRecord, message: 'تم توليد الكود بنجاح!' };
+  return { success: true, code: newRecord, message: 'تم إنشاء كود الطالب وحفظه بنجاح.' };
 }
 
 export function expireCode(
@@ -244,7 +263,9 @@ export function expireCode(
   }
 
   target.status = 'expired';
-  saveStoredCodes(codes);
+  if (!saveStoredCodes(codes)) {
+    return { success: false, message: 'تعذر حفظ التغيير. حاول مرة أخرى.' };
+  }
   return { success: true, message: `تم إنهاء صلاحية الكود ${target.code} بنجاح.` };
 }
 
@@ -270,7 +291,9 @@ export function reactivateCode(
   } else if (extraDays === 0) {
     target.expiresAt = null;
   }
-  saveStoredCodes(codes);
+  if (!saveStoredCodes(codes)) {
+    return { success: false, message: 'تعذر حفظ التغيير. حاول مرة أخرى.' };
+  }
   return { success: true, message: `تمت إعادة تفعيل الكود ${target.code} بنجاح.` };
 }
 
@@ -289,7 +312,9 @@ export function deleteCode(
     return { success: false, message: 'الكود غير موجود.' };
   }
 
-  saveStoredCodes(filtered);
+  if (!saveStoredCodes(filtered)) {
+    return { success: false, message: 'تعذر حذف الكود بسبب مشكلة في التخزين.' };
+  }
   return { success: true, message: 'تم حذف الكود نهائياً من قاعدة البيانات.' };
 }
 
