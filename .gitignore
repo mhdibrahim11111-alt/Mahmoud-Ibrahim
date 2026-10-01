@@ -1,0 +1,9 @@
+node_modules/
+data/access_codes.json
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
