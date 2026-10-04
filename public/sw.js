@@ -1,4 +1,4 @@
-const CACHE_NAME = 'codemasr-pwa-v1';
+const CACHE_NAME = 'codemasr-pwa-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -11,8 +11,19 @@ const STATIC_ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      await cache.addAll(STATIC_ASSETS);
+
+      // Precache the hashed entry module and stylesheet so the app shell can
+      // start when the user loses connectivity immediately after installing.
+      const shell = await cache.match('/index.html');
+      const html = shell ? await shell.text() : '';
+      const assets = [...html.matchAll(/(?:src|href)=["']([^"']+\.(?:js|css)(?:\?[^"']*)?)["']/g)]
+        .map((match) => new URL(match[1], self.location.origin))
+        .filter((url) => url.origin === self.location.origin)
+        .map((url) => `${url.pathname}${url.search}`);
+
+      if (assets.length) await cache.addAll(assets);
     })
   );
   self.skipWaiting();

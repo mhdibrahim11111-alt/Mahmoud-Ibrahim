@@ -90,13 +90,15 @@ export const ActivationGate: React.FC<ActivationGateProps> = ({ onActivated }) =
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block">
+              <label htmlFor="activation-code" className="text-xs font-semibold text-slate-300 block">
                 كود التفعيل (Activation Code):
               </label>
               <div className="relative">
                 {/* 2. Fixed input with placeholder:tracking-normal to ensure natural connected Arabic script */}
                 <input
+                  id="activation-code"
                   type="text"
+                  dir="ltr"
                   value={code}
                   onChange={(e) => {
                     setCode(e.target.value.toUpperCase());
@@ -110,6 +112,8 @@ export const ActivationGate: React.FC<ActivationGateProps> = ({ onActivated }) =
                   }`}
                   autoFocus
                   required
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? 'activation-error' : undefined}
                 />
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500">
                   <Lock className="w-4 h-4 text-orange-400/60" />
@@ -118,14 +122,14 @@ export const ActivationGate: React.FC<ActivationGateProps> = ({ onActivated }) =
             </div>
 
             {error && (
-              <div className="p-3 bg-rose-950/30 border border-rose-900/50 rounded-xl text-rose-300 text-xs flex items-center gap-2 animate-fadeIn">
+              <div id="activation-error" role="alert" className="p-3 bg-rose-950/30 border border-rose-900/50 rounded-xl text-rose-300 text-xs flex items-center gap-2 animate-fadeIn">
                 <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
                 <span>{error}</span>
               </div>
             )}
 
             {success && (
-              <div className="p-3 bg-emerald-950/30 border border-emerald-900/50 rounded-xl text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
+              <div role="status" aria-live="polite" className="p-3 bg-emerald-950/30 border border-emerald-900/50 rounded-xl text-emerald-300 text-xs flex items-center gap-2 animate-fadeIn">
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
                 <span>{success}</span>
               </div>
@@ -138,7 +142,7 @@ export const ActivationGate: React.FC<ActivationGateProps> = ({ onActivated }) =
               className="w-full py-3.5 px-6 rounded-2xl font-black text-sm sm:text-base bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500 hover:from-orange-400 hover:to-amber-400 text-slate-950 shadow-xl shadow-orange-500/25 hover:shadow-orange-500/35 hover:brightness-105 transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isLoading ? (
-                <span>جاري التحقق من الكود...</span>
+                <span role="status" aria-live="polite">جاري التحقق من الكود...</span>
               ) : (
                 <>
                   <span>دخول المنصة</span>
