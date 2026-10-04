@@ -19,7 +19,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
   const navItems: { view: ViewMode; label: string; icon: React.ReactNode }[] = [
     { view: 'reader', label: 'الكتاب', icon: <BookOpen className="w-5 h-5" /> },
-    { view: 'playground', label: 'الملعب', icon: <Terminal className="w-5 h-5" /> },
+    { view: 'playground', label: 'المحرّر', icon: <Terminal className="w-5 h-5" /> },
     { view: 'bughunter', label: 'صياد الأخطاء', icon: <Bug className="w-5 h-5" /> },
     { view: 'challenges', label: 'التحديات', icon: <Code2 className="w-5 h-5" /> },
     ...(isStaff ? [{ view: 'admin' as ViewMode, label: isMaster ? 'الإدارة 👑' : 'الفصل 👨‍🏫', icon: <KeyRound className="w-5 h-5" /> }] : []),
