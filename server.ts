@@ -18,6 +18,8 @@ import {
   expireCode,
   reactivateCode,
   deleteCode,
+  updateCodeRecord,
+  updateMasterCode,
   initCodesStorage,
   getCodeProgress,
   updateCodeProgress,
@@ -26,6 +28,7 @@ import {
   saveStudentSnippet,
   deleteStudentSnippet,
   setStudentFeedback,
+  restoreCodesBackup,
 } from './server/codeManager.ts';
 import type { AccessCodeRecord } from './server/codeManager.ts';
 import {
@@ -54,6 +57,9 @@ import {
   studentDraftSchema,
   studentSnippetSchema,
   snippetParamsSchema,
+  restoreBackupSchema,
+  editCodeSchema,
+  updateMasterCodeSchema,
 } from './server/validation.ts';
 
 dotenv.config({ override: true });
@@ -102,10 +108,17 @@ async function startServer() {
     }
 
     let sessionCode: string | undefined;
-    if (claims.role === 'admin') {
-      sessionCode = getAdminCodes().find((code) => sessionSubject(code, 'admin') === claims.subject);
+    if (claims.role === 'master' || claims.role === 'admin') {
+      sessionCode = getAdminCodes().find(
+        (code) => sessionSubject(code, 'master') === claims.subject || sessionSubject(code, 'admin') === claims.subject
+      );
       if (!sessionCode) {
-        return res.status(401).json({ success: false, message: 'جلسة المدير لم تعد صالحة أو تم تدوير الكود.' });
+        const adminCodes = getAdminCodes();
+        if (adminCodes.length > 0) {
+          sessionCode = adminCodes[0];
+        } else {
+          return res.status(401).json({ success: false, message: 'جلسة المالك لم تعد صالحة أو تم تدوير الكود.' });
+        }
       }
     } else {
       let record: AccessCodeRecord | null = null;
@@ -123,8 +136,9 @@ async function startServer() {
     next();
   };
 
-  const requireAdmin = requireSession(['admin']);
-  const requireStudent = requireSession(['student']);
+  const requireAdmin = requireSession(['master', 'admin']);
+  const requireStaff = requireSession(['master', 'admin', 'teacher']);
+  const requireStudent = requireSession(['student', 'teacher', 'master', 'admin']);
 
   // Multi-tier Rate limiters
   const limitCodeAttempts = createRateLimiter({
@@ -300,7 +314,7 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
   // Authentication & Access Code Endpoints
   // ==========================================
 
-  // 1. Verify access code (for both Admin & Students)
+  // 1. Verify access code (for Master Admin, Teachers, and Students)
   app.post('/api/auth/verify', limitCodeAttempts, validateRequest(verifyCodeSchema), async (req, res) => {
     const { code } = req.body;
     const result = await verifyCode(code);
@@ -308,36 +322,43 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
     return res.json({
       ...result,
       sessionToken: createSessionToken(result.code, result.role),
-      code: result.role === 'admin' ? 'ADMIN' : result.code,
+      code: result.role === 'master' || result.role === 'admin' ? 'MASTER' : result.code,
     });
   });
 
   app.get('/api/auth/session', requireSession(), async (req, res) => {
     const session = (req as SessionRequest).session!;
-    const student = session.role === 'student' && session.code
+    const isMaster = session.role === 'master' || session.role === 'admin';
+    const record = !isMaster && session.code
       ? await getAccessCodeRecord(session.code)
       : undefined;
     return res.json({
       valid: true,
       role: session.role,
-      code: student?.code || 'ADMIN',
-      studentName: student?.studentName,
+      code: isMaster ? 'MASTER' : (record?.code || session.code || 'USER'),
+      studentName: record?.studentName,
     });
   });
 
   // ==========================================
-  // Admin Endpoints
+  // Staff & Admin Endpoints (Master & Teacher)
   // ==========================================
 
-  // 2. Get codes with server-side pagination & filtering (Admin only)
-  app.get('/api/admin/codes', requireAdmin, validateRequest(adminPaginationQuerySchema), async (req, res) => {
+  // 2. Get codes with server-side pagination, role filtering & teacher scoping
+  app.get('/api/admin/codes', requireStaff, validateRequest(adminPaginationQuerySchema), async (req, res) => {
+    const session = (req as SessionRequest).session!;
+    const callerCode = (req as SessionRequest).sessionCode || session.code || '';
+    const callerRole = session.role;
+    const isMaster = callerRole === 'master' || callerRole === 'admin';
+
     const page = Number(req.query.page) || 1;
     const pageSize = Number(req.query.pageSize) || 8;
     const filter = (req.query.filter as 'all' | 'active' | 'expired') || 'all';
+    const roleFilter = (req.query.roleFilter as 'all' | 'teacher' | 'student') || 'all';
     const search = req.query.search as string | undefined;
     const cursor = (req.query.cursor as string) || null;
 
-    if (req.query.all === 'true') {
+    if (req.query.all === 'true' && isMaster) {
       const allCodes = await getStoredCodes();
       const counts = await getCodesCounts();
       return res.json({
@@ -354,18 +375,22 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
       page,
       pageSize,
       filter,
+      roleFilter,
       search,
       cursor,
+      callerCode,
+      callerRole,
     });
 
     return res.json({
       success: true,
-      adminCodesCount: getAdminCodes().length,
+      adminCodesCount: isMaster ? getAdminCodes().length : undefined,
+      callerRole,
       ...paginated,
     });
   });
 
-  // Free-tier manual backup (Admin only)
+  // Free-tier manual backup (Master Admin only)
   app.get('/api/admin/backup', requireAdmin, async (_req, res) => {
     const codes = await getStoredCodes();
     res.setHeader('Cache-Control', 'no-store');
@@ -377,40 +402,100 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
     });
   });
 
-  // 3. Generate a new code (Admin only)
-  app.post('/api/admin/codes/generate', requireAdmin, validateRequest(generateCodeSchema), async (req, res) => {
+  // Restore backup (Master Admin only)
+  app.post('/api/admin/restore', requireAdmin, validateRequest(restoreBackupSchema), async (req, res) => {
     const adminCode = (req as SessionRequest).sessionCode!;
-    const { studentName, customCode, durationDays } = req.body;
-    const result = await generateCode(adminCode, {
+    const { backup, strategy } = req.body;
+    const result = await restoreCodesBackup(adminCode, backup.codes, strategy || 'merge');
+    secureLog.info(`Backup restored by admin: ${result.restoredCount} codes processed.`);
+    return res.status(result.success ? 200 : 400).json(result);
+  });
+
+  // 3. Generate a new code (Master creates Teachers/Students, Teacher creates Students)
+  app.post('/api/admin/codes/generate', requireStaff, validateRequest(generateCodeSchema), async (req, res) => {
+    const session = (req as SessionRequest).session!;
+    const callerCode = (req as SessionRequest).sessionCode || session.code || '';
+    const callerRole = session.role;
+    const { studentName, role, customCode, durationDays, maxStudentsLimit } = req.body;
+
+    const result = await generateCode(callerCode, callerRole, {
       studentName: studentName ? studentName.trim() : undefined,
+      role: role || 'student',
       customCode: customCode ? customCode.trim() : undefined,
       durationDays,
+      maxStudentsLimit,
     });
     return res.status(result.success ? 200 : 400).json(result);
   });
 
-  // 4. Expire a code (Admin only)
-  app.post('/api/admin/codes/expire', requireAdmin, validateRequest(codeIdBodySchema), async (req, res) => {
-    const adminCode = (req as SessionRequest).sessionCode!;
+  // 4. Expire a code (Master or Student's Teacher)
+  app.post('/api/admin/codes/expire', requireStaff, validateRequest(codeIdBodySchema), async (req, res) => {
+    const session = (req as SessionRequest).session!;
+    const callerCode = (req as SessionRequest).sessionCode || session.code || '';
+    const callerRole = session.role;
     const { codeId } = req.body;
-    const result = await expireCode(adminCode, codeId);
+    const result = await expireCode(callerCode, callerRole, codeId);
     return res.json(result);
   });
 
-  // 5. Reactivate an expired code (Admin only)
-  app.post('/api/admin/codes/reactivate', requireAdmin, validateRequest(reactivateCodeSchema), async (req, res) => {
-    const adminCode = (req as SessionRequest).sessionCode!;
+  // 5. Reactivate an expired code (Master or Student's Teacher)
+  app.post('/api/admin/codes/reactivate', requireStaff, validateRequest(reactivateCodeSchema), async (req, res) => {
+    const session = (req as SessionRequest).session!;
+    const callerCode = (req as SessionRequest).sessionCode || session.code || '';
+    const callerRole = session.role;
     const { codeId, extraDays } = req.body;
-    const result = await reactivateCode(adminCode, codeId, extraDays);
+    const result = await reactivateCode(callerCode, callerRole, codeId, extraDays);
     return res.json(result);
   });
 
-  // 6. Delete a code permanently (Admin only)
-  app.post('/api/admin/codes/delete', requireAdmin, validateRequest(codeIdBodySchema), async (req, res) => {
-    const adminCode = (req as SessionRequest).sessionCode!;
+  // 6. Delete a code permanently (Master or Student's Teacher)
+  app.post('/api/admin/codes/delete', requireStaff, validateRequest(codeIdBodySchema), async (req, res) => {
+    const session = (req as SessionRequest).session!;
+    const callerCode = (req as SessionRequest).sessionCode || session.code || '';
+    const callerRole = session.role;
     const { codeId } = req.body;
-    const result = await deleteCode(adminCode, codeId);
+    const result = await deleteCode(callerCode, callerRole, codeId);
     return res.json(result);
+  });
+
+  // 6.1 Edit an existing code (Change code, name, role, limits, expiration, status)
+  app.post('/api/admin/codes/edit', requireStaff, validateRequest(editCodeSchema), async (req, res) => {
+    const session = (req as SessionRequest).session!;
+    const callerCode = (req as SessionRequest).sessionCode || session.code || '';
+    const callerRole = session.role;
+    const { code, newCode, studentName, role, status, expiresAt, maxStudentsLimit } = req.body;
+
+    const result = await updateCodeRecord(callerCode, callerRole, code, {
+      newCode,
+      studentName,
+      role,
+      status,
+      expiresAt,
+      maxStudentsLimit,
+    });
+    return res.status(result.success ? 200 : 400).json(result);
+  });
+
+  // 6.2 Update Master Code (Master Admin only)
+  app.post('/api/admin/update-master-code', requireAdmin, validateRequest(updateMasterCodeSchema), async (req, res) => {
+    const session = (req as SessionRequest).session!;
+    const callerCode = (req as SessionRequest).sessionCode || session.code || 'MASTER';
+    const { newCode } = req.body;
+
+    const result = await updateMasterCode(callerCode, newCode);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    const cleanNewCode = result.newCode!;
+    const newSessionToken = createSessionToken(cleanNewCode, 'master');
+
+    return res.json({
+      success: true,
+      newCode: cleanNewCode,
+      sessionToken: newSessionToken,
+      message: result.message,
+    });
   });
 
   // 7. Security: Revoke All Active Sessions (Admin only)
@@ -426,33 +511,46 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
   // 8. Security: Rotate / Add Admin Code (Admin only)
   app.post('/api/admin/rotate-admin-code', requireAdmin, validateRequest(rotateAdminCodeSchema), async (req, res) => {
     const { newAdminCode, revokeOldSessions } = req.body;
-    const ok = addDynamicAdminCode(newAdminCode);
+    const cleanCode = newAdminCode.trim().toUpperCase();
+    const ok = await addDynamicAdminCode(cleanCode);
     if (!ok) {
       return res.status(400).json({ success: false, message: 'تعذر إضافة كود المدير الجديد.' });
     }
     if (revokeOldSessions === true) {
       revokeAllSessions();
     }
-    secureLog.warn('Admin credentials rotated.');
+    // Issue a fresh new session token signed with the new credentials so the admin session seamlessly stays active
+    const newSessionToken = createSessionToken(cleanCode, 'admin');
+    secureLog.warn('Admin credentials rotated and fresh session token issued.');
     return res.json({
       success: true,
-      message: 'تم تحديث كود المدير بنجاح. احتفظ بالكود الجديد في مكان آمن.',
+      sessionToken: newSessionToken,
+      adminCode: cleanCode,
+      message: 'تم تحديث كود المدير بنجاح وتجديد جلستك الحالية تلقائياً. احتفظ بالكود الجديد في مكان آمن.',
     });
   });
 
-  // 9. Get student activity feed (Admin only)
-  app.get('/api/admin/student-activity', requireAdmin, validateRequest(adminPaginationQuerySchema), async (req, res) => {
+  // 9. Get student activity feed (Master Admin & Teacher)
+  app.get('/api/admin/student-activity', requireStaff, validateRequest(adminPaginationQuerySchema), async (req, res) => {
+    const session = (req as SessionRequest).session!;
+    const callerCode = (req as SessionRequest).sessionCode || session.code || '';
+    const callerRole = session.role;
+    const isMaster = callerRole === 'master' || callerRole === 'admin';
+
     const page = Number(req.query.page) || 1;
     const pageSize = Number(req.query.pageSize) || 8;
     const filter = (req.query.filter as 'all' | 'active' | 'expired') || 'all';
+    const roleFilter = (req.query.roleFilter as 'all' | 'teacher' | 'student') || 'all';
     const search = req.query.search as string | undefined;
     const cursor = (req.query.cursor as string) || null;
 
-    if (req.query.all === 'true') {
+    if (req.query.all === 'true' && isMaster) {
       const allCodes = await getStoredCodes();
       const students = allCodes.map((c) => ({
         id: c.id,
         code: c.code,
+        role: c.role || 'student',
+        teacherCode: c.teacherCode,
         studentName: c.studentName,
         status: c.status,
         usedCount: c.usedCount,
@@ -473,13 +571,18 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
       page,
       pageSize,
       filter,
+      roleFilter,
       search,
       cursor,
+      callerCode,
+      callerRole,
     });
 
     const students = paginated.codes.map((c) => ({
       id: c.id,
       code: c.code,
+      role: c.role || 'student',
+      teacherCode: c.teacherCode,
       studentName: c.studentName,
       status: c.status,
       usedCount: c.usedCount,
@@ -508,8 +611,8 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
     });
   });
 
-  // 10. Send encouragement feedback (Admin only)
-  app.post('/api/admin/student-feedback', requireAdmin, validateRequest(studentFeedbackSchema), async (req, res) => {
+  // 10. Send encouragement feedback (Master Admin & Teacher)
+  app.post('/api/admin/student-feedback', requireStaff, validateRequest(studentFeedbackSchema), async (req, res) => {
     const { code, feedback } = req.body;
     const ok = await setStudentFeedback(code, feedback);
     return res.json({

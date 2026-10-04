@@ -128,17 +128,30 @@ export function getAdminCodes(): string[] {
   return [];
 }
 
-export function addDynamicAdminCode(newAdminCode: string): boolean {
+export async function addDynamicAdminCode(newAdminCode: string): Promise<boolean> {
   const clean = newAdminCode.trim().toUpperCase();
   if (clean.length < 6 || clean.length > 64 || !/^[A-Z0-9_-]+$/.test(clean)) {
     return false;
   }
   dynamicAdminCodes.add(clean);
+  try {
+    const configDoc = doc(db, 'system_config', 'admin_settings');
+    await setDoc(configDoc, { dynamicCodes: Array.from(dynamicAdminCodes), updatedAt: new Date().toISOString() }, { merge: true });
+  } catch (err) {
+    console.warn('Could not persist dynamic admin code to Firestore:', err);
+  }
   return true;
 }
 
-export function removeDynamicAdminCode(oldAdminCode: string): void {
-  dynamicAdminCodes.delete(oldAdminCode.trim().toUpperCase());
+export async function removeDynamicAdminCode(oldAdminCode: string): Promise<void> {
+  const clean = oldAdminCode.trim().toUpperCase();
+  dynamicAdminCodes.delete(clean);
+  try {
+    const configDoc = doc(db, 'system_config', 'admin_settings');
+    await setDoc(configDoc, { dynamicCodes: Array.from(dynamicAdminCodes), updatedAt: new Date().toISOString() }, { merge: true });
+  } catch (err) {
+    console.warn('Could not update dynamic admin codes in Firestore:', err);
+  }
 }
 
 export interface StudentSnippet {
@@ -173,6 +186,7 @@ export type ProgressEntries = Record<string, ProgressEntry>;
 export interface AccessCodeRecord {
   id: string;
   code: string;
+  role?: 'master' | 'admin' | 'teacher' | 'student';
   studentName: string;
   createdAt: string;
   expiresAt: string | null; // ISO string or null
@@ -183,10 +197,56 @@ export interface AccessCodeRecord {
   draftCode?: string;
   savedSnippets?: StudentSnippet[];
   feedback?: string;
+  createdBy?: string;
+  teacherCode?: string;
+  maxStudentsLimit?: number;
 }
 
 export async function initCodesStorage(): Promise<void> {
   await testConnection();
+  try {
+    const configDoc = doc(db, 'system_config', 'admin_settings');
+    const snap = await getDoc(configDoc);
+    if (snap.exists) {
+      const data = snap.data();
+      if (Array.isArray(data?.dynamicCodes)) {
+        data.dynamicCodes.forEach((code: string) => {
+          if (typeof code === 'string' && code.length >= 6) {
+            dynamicAdminCodes.add(code.trim().toUpperCase());
+          }
+        });
+      }
+    }
+
+    // Clean up any master admin codes mistakenly saved in access_codes collection
+    const adminCodesList = getAdminCodes();
+    for (const code of adminCodesList) {
+      try {
+        const adminDoc = doc(db, 'access_codes', code.trim().toUpperCase());
+        const snap = await getDoc(adminDoc);
+        if (snap.exists) {
+          await deleteDoc(adminDoc);
+        }
+      } catch {}
+    }
+  } catch (e) {
+    console.warn('Could not load dynamic admin codes from Firestore:', e);
+  }
+}
+
+export function sanitizeAccessCodeRecord(raw: any): AccessCodeRecord {
+  let used = 0;
+  if (typeof raw.usedCount === 'number' && Number.isFinite(raw.usedCount)) {
+    used = raw.usedCount;
+  } else if (raw.usedCount && typeof raw.usedCount._operand === 'number') {
+    used = raw.usedCount._operand;
+  }
+  return {
+    ...raw,
+    usedCount: used,
+    studentName: typeof raw.studentName === 'string' ? raw.studentName : 'طالب جديد',
+    feedback: typeof raw.feedback === 'string' ? raw.feedback : '',
+  };
 }
 
 export async function getStoredCodes(): Promise<AccessCodeRecord[]> {
@@ -194,8 +254,12 @@ export async function getStoredCodes(): Promise<AccessCodeRecord[]> {
     const colRef = collection(db, 'access_codes');
     const snap = await getDocs(colRef);
     const records: AccessCodeRecord[] = [];
+    const adminCodes = getAdminCodes();
     snap.forEach((d) => {
-      records.push(d.data() as AccessCodeRecord);
+      const rec = sanitizeAccessCodeRecord(d.data());
+      if (rec.code && !adminCodes.includes(rec.code.toUpperCase()) && rec.role !== 'master' && rec.role !== 'admin') {
+        records.push(rec);
+      }
     });
     records.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return records;
@@ -208,8 +272,11 @@ export interface GetCodesPaginatedOptions {
   page?: number;
   pageSize?: number;
   filter?: 'all' | 'active' | 'expired';
+  roleFilter?: 'all' | 'teacher' | 'student';
   search?: string;
   cursor?: string | null;
+  callerCode?: string;
+  callerRole?: 'master' | 'admin' | 'teacher' | 'student';
 }
 
 export interface PaginatedCodesResult {
@@ -217,6 +284,8 @@ export interface PaginatedCodesResult {
   totalCount: number;
   activeCount: number;
   expiredCount: number;
+  teachersCount?: number;
+  studentsCount?: number;
   page: number;
   pageSize: number;
   totalPages: number;
@@ -232,20 +301,27 @@ let cachedCounts: {
   cachedAt: number;
 } | null = null;
 
-export async function getCodesCounts(): Promise<{ total: number; active: number; expired: number }> {
+export async function getCodesCounts(callerTeacherCode?: string): Promise<{ total: number; active: number; expired: number }> {
   const now = Date.now();
-  if (cachedCounts && now - cachedCounts.cachedAt < 15000) {
+  if (!callerTeacherCode && cachedCounts && now - cachedCounts.cachedAt < 15000) {
     return cachedCounts;
   }
   try {
     const colRef = collection(db, 'access_codes');
-    const totalSnap = await getCountFromServer(colRef);
-    const activeSnap = await getCountFromServer(query(colRef, where('status', '==', 'active')));
+    const baseConstraints: QueryConstraint[] = [];
+    if (callerTeacherCode) {
+      baseConstraints.push(where('teacherCode', '==', callerTeacherCode.trim().toUpperCase()));
+    }
+    const totalSnap = await getCountFromServer(query(colRef, ...baseConstraints));
+    const activeSnap = await getCountFromServer(query(colRef, ...baseConstraints, where('status', '==', 'active')));
     const total = totalSnap.data().count;
     const active = activeSnap.data().count;
     const expired = Math.max(0, total - active);
-    cachedCounts = { total, active, expired, cachedAt: now };
-    return cachedCounts;
+    const result = { total, active, expired };
+    if (!callerTeacherCode) {
+      cachedCounts = { ...result, cachedAt: now };
+    }
+    return result;
   } catch (err) {
     console.warn('Failed to get counts from server, using fallback:', err);
     return cachedCounts || { total: 0, active: 0, expired: 0 };
@@ -257,9 +333,8 @@ export function invalidateCodesCountCache(): void {
 }
 
 /**
- * Server-side pagination query for student access codes.
- * Uses Firestore `limit(pageSize)` and `startAfter` cursor to fetch only the requested page of 8 codes.
- * Never reads the entire collection, preventing expensive scans when there are hundreds of students.
+ * Server-side pagination query for student and teacher access codes.
+ * Uses Firestore queries and cursors to fetch page items efficiently.
  */
 export async function getStoredCodesPaginated(
   options: GetCodesPaginatedOptions = {}
@@ -267,24 +342,30 @@ export async function getStoredCodesPaginated(
   const page = Math.max(1, Number(options.page) || 1);
   const pageSize = Math.min(50, Math.max(1, Number(options.pageSize) || 8));
   const filter = options.filter || 'all';
+  const roleFilter = options.roleFilter || 'all';
   const search = (options.search || '').trim();
   const cursor = options.cursor || null;
+  const isTeacher = options.callerRole === 'teacher';
+  const callerTeacherCode = isTeacher && options.callerCode ? options.callerCode.trim().toUpperCase() : undefined;
 
-  const counts = await getCodesCounts();
+  const counts = await getCodesCounts(callerTeacherCode);
 
-  // 1. Search Query branch (Performs targeted server-side prefix queries with strict limit)
+  // 1. Search Query branch (Performs targeted server-side queries)
   if (search) {
     try {
       const colRef = collection(db, 'access_codes');
       const searchUpper = search.toUpperCase();
       const resultsMap = new Map<string, AccessCodeRecord>();
 
-      // A. Try exact match by code (1 document read)
+      // A. Try exact match by code
       try {
         const exactDoc = await getDoc(doc(db, 'access_codes', searchUpper));
         if (exactDoc.exists) {
           const rec = exactDoc.data() as AccessCodeRecord;
-          if (filter === 'all' || rec.status === filter) {
+          const matchesTeacher = !callerTeacherCode || rec.teacherCode === callerTeacherCode || rec.createdBy === callerTeacherCode;
+          const matchesFilter = filter === 'all' || rec.status === filter;
+          const matchesRole = roleFilter === 'all' || (rec.role || 'student') === roleFilter;
+          if (matchesTeacher && matchesFilter && matchesRole) {
             resultsMap.set(rec.code, rec);
           }
         }
@@ -292,22 +373,22 @@ export async function getStoredCodesPaginated(
         // ignore
       }
 
-      // B. Prefix search by code on Firestore (reads at most pageSize documents)
+      // B. Prefix search by code on Firestore
       if (resultsMap.size < pageSize) {
         try {
           const codeConstraints: QueryConstraint[] = [];
-          if (filter === 'active') {
-            codeConstraints.push(where('status', '==', 'active'));
-          } else if (filter === 'expired') {
-            codeConstraints.push(where('status', '==', 'expired'));
-          }
+          if (callerTeacherCode) codeConstraints.push(where('teacherCode', '==', callerTeacherCode));
+          if (filter === 'active') codeConstraints.push(where('status', '==', 'active'));
+          else if (filter === 'expired') codeConstraints.push(where('status', '==', 'expired'));
+          if (roleFilter !== 'all') codeConstraints.push(where('role', '==', roleFilter));
+
           codeConstraints.push(where('code', '>=', searchUpper));
           codeConstraints.push(where('code', '<=', searchUpper + '\uf8ff'));
           codeConstraints.push(limit(pageSize));
 
           const snapCode = await getDocs(query(colRef, ...codeConstraints));
           snapCode.forEach((d) => {
-            const rec = d.data() as AccessCodeRecord;
+            const rec = sanitizeAccessCodeRecord(d.data());
             resultsMap.set(rec.code, rec);
           });
         } catch (e) {
@@ -315,22 +396,22 @@ export async function getStoredCodesPaginated(
         }
       }
 
-      // C. Prefix search by studentName on Firestore (reads at most remaining pageSize documents)
+      // C. Prefix search by studentName on Firestore
       if (resultsMap.size < pageSize) {
         try {
           const nameConstraints: QueryConstraint[] = [];
-          if (filter === 'active') {
-            nameConstraints.push(where('status', '==', 'active'));
-          } else if (filter === 'expired') {
-            nameConstraints.push(where('status', '==', 'expired'));
-          }
+          if (callerTeacherCode) nameConstraints.push(where('teacherCode', '==', callerTeacherCode));
+          if (filter === 'active') nameConstraints.push(where('status', '==', 'active'));
+          else if (filter === 'expired') nameConstraints.push(where('status', '==', 'expired'));
+          if (roleFilter !== 'all') nameConstraints.push(where('role', '==', roleFilter));
+
           nameConstraints.push(where('studentName', '>=', search));
           nameConstraints.push(where('studentName', '<=', search + '\uf8ff'));
           nameConstraints.push(limit(pageSize - resultsMap.size));
 
           const snapName = await getDocs(query(colRef, ...nameConstraints));
           snapName.forEach((d) => {
-            const rec = d.data() as AccessCodeRecord;
+            const rec = sanitizeAccessCodeRecord(d.data());
             resultsMap.set(rec.code, rec);
           });
         } catch (e) {
@@ -338,7 +419,10 @@ export async function getStoredCodesPaginated(
         }
       }
 
-      const matchingRecords = Array.from(resultsMap.values());
+      const adminCodes = getAdminCodes();
+      const matchingRecords = Array.from(resultsMap.values()).filter(
+        (r) => !adminCodes.includes(r.code.toUpperCase()) && r.role !== 'master' && r.role !== 'admin'
+      );
       const totalMatching = matchingRecords.length;
 
       return {
@@ -357,15 +441,21 @@ export async function getStoredCodesPaginated(
     }
   }
 
-  // 2. Direct Firestore Cursor Query (EXACTLY pageSize document reads!)
+  // 2. Direct Firestore Cursor Query
   try {
     const colRef = collection(db, 'access_codes');
     const constraints: QueryConstraint[] = [];
 
+    if (callerTeacherCode) {
+      constraints.push(where('teacherCode', '==', callerTeacherCode));
+    }
     if (filter === 'active') {
       constraints.push(where('status', '==', 'active'));
     } else if (filter === 'expired') {
       constraints.push(where('status', '==', 'expired'));
+    }
+    if (roleFilter !== 'all') {
+      constraints.push(where('role', '==', roleFilter));
     }
 
     constraints.push(orderBy('createdAt', 'desc'));
@@ -373,7 +463,6 @@ export async function getStoredCodesPaginated(
     if (cursor) {
       constraints.push(startAfter(cursor));
     } else if (page > 1) {
-      // If cursor not passed by client for page > 1, obtain cursor with minimal query
       try {
         const offsetSnap = await getDocs(
           query(colRef, ...constraints, limit((page - 1) * pageSize))
@@ -392,9 +481,13 @@ export async function getStoredCodesPaginated(
     const q = query(colRef, ...constraints);
     const snap = await getDocs(q);
 
+    const adminCodes = getAdminCodes();
     const records: AccessCodeRecord[] = [];
     snap.forEach((d) => {
-      records.push(d.data() as AccessCodeRecord);
+      const rec = sanitizeAccessCodeRecord(d.data());
+      if (rec.code && !adminCodes.includes(rec.code.toUpperCase()) && rec.role !== 'master' && rec.role !== 'admin') {
+        records.push(rec);
+      }
     });
 
     const relevantTotal =
@@ -426,14 +519,14 @@ export async function getAccessCodeRecord(codeOrId: string): Promise<AccessCodeR
     const directDoc = doc(db, 'access_codes', clean);
     const snap = await getDoc(directDoc);
     if (snap.exists) {
-      return snap.data() as AccessCodeRecord;
+      return sanitizeAccessCodeRecord(snap.data());
     }
 
     // 2. Fallback query by ID
     const q = query(collection(db, 'access_codes'), where('id', '==', codeOrId.trim()));
     const querySnap = await getDocs(q);
     if (!querySnap.empty) {
-      return querySnap.docs[0].data() as AccessCodeRecord;
+      return sanitizeAccessCodeRecord(querySnap.docs[0].data());
     }
 
     return null;
@@ -444,7 +537,7 @@ export async function getAccessCodeRecord(codeOrId: string): Promise<AccessCodeR
 
 export async function verifyCode(inputCode: string): Promise<{
   valid: boolean;
-  role: 'admin' | 'student';
+  role: 'master' | 'admin' | 'teacher' | 'student';
   code: string;
   studentName?: string;
   expiresAt?: string | null;
@@ -455,17 +548,17 @@ export async function verifyCode(inputCode: string): Promise<{
     return { valid: false, role: 'student', code: '', message: 'من فضلك اكتب الكود أولاً.' };
   }
 
-  // 1. Check if it's an Admin Code
+  // 1. Check if it's a Master Admin Code
   if (getAdminCodes().includes(clean)) {
     return {
       valid: true,
-      role: 'admin',
+      role: 'master',
       code: clean,
-      message: 'أهلاً بك يا مدير المنصة 👑',
+      message: 'أهلاً بك يا مالك المنصة 👑',
     };
   }
 
-  // 2. Check student codes directly in Firestore
+  // 2. Check codes in Firestore (Teachers & Students)
   const docRef = doc(db, 'access_codes', clean);
   const snap = await getDoc(docRef);
 
@@ -478,22 +571,23 @@ export async function verifyCode(inputCode: string): Promise<{
     };
   }
 
-  const record = snap.data() as AccessCodeRecord;
+  const record = sanitizeAccessCodeRecord(snap.data());
+  const userRole = record.role === 'teacher' ? 'teacher' : 'student';
 
   // Check if status is revoked or expired
   if (record.status === 'revoked') {
     return {
       valid: false,
-      role: 'student',
+      role: userRole,
       code: clean,
-      message: 'عذراً، هذا الكود تم إلغاء تفعيله من قبل الإدارة.',
+      message: 'عذراً، هذا الحساب تم إلغاء تفعيله من قبل الإدارة.',
     };
   }
 
   if (record.status === 'expired') {
     return {
       valid: false,
-      role: 'student',
+      role: userRole,
       code: clean,
       message: 'عذراً، هذا الكود منتهي الصلاحية.',
     };
@@ -508,44 +602,70 @@ export async function verifyCode(inputCode: string): Promise<{
     }
     return {
       valid: false,
-      role: 'student',
+      role: userRole,
       code: clean,
       message: 'عذراً، انتهت فترة صلاحية هذا الكود.',
     };
   }
 
-  // Mark usage safely with atomic increment
+  // Mark usage safely with clean numeric count
   const now = new Date().toISOString();
   try {
+    const currentCount = typeof record.usedCount === 'number' ? record.usedCount : 0;
     await updateDoc(docRef, {
-      usedCount: increment(1),
+      usedCount: currentCount + 1,
       lastUsedAt: now,
     });
   } catch (e) {
     console.warn('Failed to update usedCount:', e);
   }
 
+  const welcomeMessage = userRole === 'teacher'
+    ? `أهلاً بك يا أستاذ ${record.studentName || ''} 👨‍🏫! تم فتح بوابة المعلم بنجاح.`
+    : `أهلاً بك يا بطل ${record.studentName || ''}! تم التفعيل بنجاح 🎉`;
+
   return {
     valid: true,
-    role: 'student',
+    role: userRole,
     code: record.code,
     studentName: record.studentName,
     expiresAt: record.expiresAt,
-    message: `أهلاً بك ${record.studentName || ''}! تم التفعيل بنجاح 🎉`,
+    message: welcomeMessage,
   };
 }
 
 export async function generateCode(
-  adminCode: string,
+  callerCode: string,
+  callerRole: 'master' | 'admin' | 'teacher' | 'student',
   options: {
     studentName?: string;
+    role?: 'teacher' | 'student';
     customCode?: string;
     durationDays?: number | null; // null or 0 for forever
+    maxStudentsLimit?: number;
   }
 ): Promise<{ success: boolean; code?: AccessCodeRecord; message: string }> {
-  const cleanAdmin = adminCode.trim().toUpperCase();
-  if (!getAdminCodes().includes(cleanAdmin)) {
-    return { success: false, message: 'غير مصرح لك بتوليد الأكواد (يتطلب صلاحية المدير).' };
+  const cleanCaller = callerCode.trim().toUpperCase();
+  const isMaster = callerRole === 'master' || callerRole === 'admin' || getAdminCodes().includes(cleanCaller);
+  const isTeacher = callerRole === 'teacher';
+
+  if (!isMaster && !isTeacher) {
+    return { success: false, message: 'غير مصرح لك بتوليد الأكواد (يتطلب صلاحية المعلم أو المالك).' };
+  }
+
+  // Teachers can only generate Student accounts
+  const targetRole: 'teacher' | 'student' = isTeacher ? 'student' : (options.role === 'teacher' ? 'teacher' : 'student');
+  const teacherCode = isTeacher ? cleanCaller : undefined;
+
+  // If teacher, check quota limit
+  if (isTeacher) {
+    const teacherDoc = await getAccessCodeRecord(cleanCaller);
+    if (teacherDoc?.maxStudentsLimit && teacherDoc.maxStudentsLimit > 0) {
+      const currentCount = await getCodesCounts(cleanCaller);
+      if (currentCount.total >= teacherDoc.maxStudentsLimit) {
+        return { success: false, message: `لقد بلغت الحد الأقصى المسموح لطلابك (${teacherDoc.maxStudentsLimit} طالب). تواصل مع مالك المنصة لزيادة الحد.` };
+      }
+    }
   }
 
   const durationDays = options.durationDays ?? 0;
@@ -553,9 +673,9 @@ export async function generateCode(
     return { success: false, message: 'مدة الصلاحية يجب أن تكون من 0 إلى 3650 يوماً.' };
   }
 
-  const cleanStudentName = options.studentName?.trim() || 'طالب جديد';
-  if (cleanStudentName.length > 100) {
-    return { success: false, message: 'اسم الطالب يجب ألا يتجاوز 100 حرف.' };
+  const cleanName = options.studentName?.trim() || (targetRole === 'teacher' ? 'معلم جديد' : 'طالب جديد');
+  if (cleanName.length > 100) {
+    return { success: false, message: 'الاسم يجب ألا يتجاوز 100 حرف.' };
   }
 
   let expiresAt: string | null = null;
@@ -584,9 +704,11 @@ export async function generateCode(
         const newRecord: AccessCodeRecord = {
           id: `code-${randomUUID()}`,
           code: codeStr,
-          studentName: cleanStudentName,
+          role: targetRole,
+          studentName: cleanName,
+          createdBy: cleanCaller,
           createdAt: new Date().toISOString(),
-          expiresAt,
+          expiresAt: expiresAt || null,
           status: 'active',
           usedCount: 0,
           lastUsedAt: null,
@@ -601,9 +723,16 @@ export async function generateCode(
           savedSnippets: [],
         };
 
+        if (teacherCode) {
+          newRecord.teacherCode = teacherCode;
+        }
+        if (targetRole === 'teacher') {
+          newRecord.maxStudentsLimit = options.maxStudentsLimit || 50;
+        }
+
         transaction.set(docRef, newRecord);
         invalidateCodesCountCache();
-        return { success: true, code: newRecord, message: 'تم إنشاء كود الطالب وحفظه بنجاح.' };
+        return { success: true, code: newRecord, message: `تم إنشاء كود ${targetRole === 'teacher' ? 'المعلم' : 'الطالب'} وحفظه بنجاح.` };
       });
     } catch (err) {
       console.error('Failed to create custom code:', err);
@@ -611,14 +740,15 @@ export async function generateCode(
     }
   }
 
-  // Auto-generate unique code using cryptographically secure random values and atomic transactions
+  // Auto-generate unique code with prefix (TCH- for Teacher, STD- for Student)
+  const prefix = targetRole === 'teacher' ? 'TCH' : 'STD';
   const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
   for (let attempt = 0; attempt < 20; attempt++) {
     let rand = '';
     for (let i = 0; i < 6; i++) {
       rand += chars[randomInt(chars.length)];
     }
-    const codeStr = `STD-${rand}`;
+    const codeStr = `${prefix}-${rand}`;
     if (getAdminCodes().includes(codeStr)) continue;
 
     try {
@@ -632,9 +762,11 @@ export async function generateCode(
         const newRecord: AccessCodeRecord = {
           id: `code-${randomUUID()}`,
           code: codeStr,
-          studentName: cleanStudentName,
+          role: targetRole,
+          studentName: cleanName,
+          createdBy: cleanCaller,
           createdAt: new Date().toISOString(),
-          expiresAt,
+          expiresAt: expiresAt || null,
           status: 'active',
           usedCount: 0,
           lastUsedAt: null,
@@ -649,13 +781,20 @@ export async function generateCode(
           savedSnippets: [],
         };
 
+        if (teacherCode) {
+          newRecord.teacherCode = teacherCode;
+        }
+        if (targetRole === 'teacher') {
+          newRecord.maxStudentsLimit = options.maxStudentsLimit || 50;
+        }
+
         transaction.set(docRef, newRecord);
         invalidateCodesCountCache();
         return newRecord;
       });
 
       if (res) {
-        return { success: true, code: res, message: 'تم إنشاء كود الطالب وحفظه بنجاح.' };
+        return { success: true, code: res, message: `تم إنشاء كود ${targetRole === 'teacher' ? 'المعلم' : 'الطالب'} وحفظه بنجاح.` };
       }
     } catch (err) {
       console.error('Error generating code in transaction:', err);
@@ -666,17 +805,25 @@ export async function generateCode(
 }
 
 export async function expireCode(
-  adminCode: string,
+  callerCode: string,
+  callerRole: 'master' | 'admin' | 'teacher' | 'student',
   codeId: string
 ): Promise<{ success: boolean; message: string }> {
-  const cleanAdmin = adminCode.trim().toUpperCase();
-  if (!getAdminCodes().includes(cleanAdmin)) {
+  const cleanCaller = callerCode.trim().toUpperCase();
+  const isMaster = callerRole === 'master' || callerRole === 'admin' || getAdminCodes().includes(cleanCaller);
+  const isTeacher = callerRole === 'teacher';
+
+  if (!isMaster && !isTeacher) {
     return { success: false, message: 'غير مصرح لك بهذا الإجراء.' };
   }
 
   const record = await getAccessCodeRecord(codeId);
   if (!record) {
     return { success: false, message: 'الكود غير موجود.' };
+  }
+
+  if (isTeacher && record.teacherCode !== cleanCaller && record.createdBy !== cleanCaller) {
+    return { success: false, message: 'غير مصرح لك بتعديل كود طالب لا يتبع فصلك.' };
   }
 
   try {
@@ -691,18 +838,26 @@ export async function expireCode(
 }
 
 export async function reactivateCode(
-  adminCode: string,
+  callerCode: string,
+  callerRole: 'master' | 'admin' | 'teacher' | 'student',
   codeId: string,
   extraDays?: number
 ): Promise<{ success: boolean; message: string }> {
-  const cleanAdmin = adminCode.trim().toUpperCase();
-  if (!getAdminCodes().includes(cleanAdmin)) {
+  const cleanCaller = callerCode.trim().toUpperCase();
+  const isMaster = callerRole === 'master' || callerRole === 'admin' || getAdminCodes().includes(cleanCaller);
+  const isTeacher = callerRole === 'teacher';
+
+  if (!isMaster && !isTeacher) {
     return { success: false, message: 'غير مصرح لك بهذا الإجراء.' };
   }
 
   const record = await getAccessCodeRecord(codeId);
   if (!record) {
     return { success: false, message: 'الكود غير موجود.' };
+  }
+
+  if (isTeacher && record.teacherCode !== cleanCaller && record.createdBy !== cleanCaller) {
+    return { success: false, message: 'غير مصرح لك بتعديل كود طالب لا يتبع فصلك.' };
   }
 
   let expiresAt: string | null = record.expiresAt;
@@ -724,17 +879,25 @@ export async function reactivateCode(
 }
 
 export async function deleteCode(
-  adminCode: string,
+  callerCode: string,
+  callerRole: 'master' | 'admin' | 'teacher' | 'student',
   codeId: string
 ): Promise<{ success: boolean; message: string }> {
-  const cleanAdmin = adminCode.trim().toUpperCase();
-  if (!getAdminCodes().includes(cleanAdmin)) {
+  const cleanCaller = callerCode.trim().toUpperCase();
+  const isMaster = callerRole === 'master' || callerRole === 'admin' || getAdminCodes().includes(cleanCaller);
+  const isTeacher = callerRole === 'teacher';
+
+  if (!isMaster && !isTeacher) {
     return { success: false, message: 'غير مصرح لك بهذا الإجراء.' };
   }
 
   const record = await getAccessCodeRecord(codeId);
   if (!record) {
     return { success: false, message: 'الكود غير موجود.' };
+  }
+
+  if (isTeacher && record.teacherCode !== cleanCaller && record.createdBy !== cleanCaller) {
+    return { success: false, message: 'غير مصرح لك بحذف كود طالب لا يتبع فصلك.' };
   }
 
   try {
@@ -748,7 +911,180 @@ export async function deleteCode(
   }
 }
 
+export async function updateCodeRecord(
+  callerCode: string,
+  callerRole: 'master' | 'admin' | 'teacher' | 'student',
+  currentCodeOrId: string,
+  updates: {
+    newCode?: string;
+    studentName?: string;
+    role?: 'teacher' | 'student';
+    status?: 'active' | 'expired' | 'revoked';
+    expiresAt?: string | null;
+    maxStudentsLimit?: number;
+  }
+): Promise<{ success: boolean; code?: AccessCodeRecord; message: string }> {
+  const cleanCaller = callerCode.trim().toUpperCase();
+  const isMaster = callerRole === 'master' || callerRole === 'admin' || getAdminCodes().includes(cleanCaller);
+  const isTeacher = callerRole === 'teacher';
+
+  if (!isMaster && !isTeacher) {
+    return { success: false, message: 'غير مصرح لك بتعديل بيانات هذا الكود.' };
+  }
+
+  const record = await getAccessCodeRecord(currentCodeOrId);
+  if (!record) {
+    return { success: false, message: 'الكود المراد تعديله غير موجود في النظام.' };
+  }
+
+  // Teacher permission check: can only edit students belonging to their classroom
+  if (isTeacher) {
+    if (record.teacherCode !== cleanCaller && record.createdBy !== cleanCaller) {
+      return { success: false, message: 'غير مصرح لك بتعديل كود لا يتبع فصلك الدراسي.' };
+    }
+    if (updates.role && updates.role !== 'student') {
+      return { success: false, message: 'المعلم لا يمكنه تغيير رتبة الكود إلى معلم.' };
+    }
+    if (updates.maxStudentsLimit !== undefined) {
+      return { success: false, message: 'تغيير حد الطلاب متاح فقط لمالك المنصة.' };
+    }
+  }
+
+  const oldCode = record.code.toUpperCase();
+  const targetRole = (isMaster && updates.role) ? updates.role : (record.role || 'student');
+  const targetName = updates.studentName !== undefined ? updates.studentName.trim() : record.studentName;
+  const targetStatus = updates.status !== undefined ? updates.status : record.status;
+  const targetExpiresAt = updates.expiresAt !== undefined ? updates.expiresAt : record.expiresAt;
+  const targetLimit = (targetRole === 'teacher' && updates.maxStudentsLimit !== undefined)
+    ? updates.maxStudentsLimit
+    : record.maxStudentsLimit;
+
+  // Case 1: Code string is changing
+  if (updates.newCode && updates.newCode.trim().toUpperCase() !== oldCode) {
+    const newCode = updates.newCode.trim().toUpperCase();
+    if (newCode.length < 3 || newCode.length > 32 || !/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(newCode)) {
+      return { success: false, message: 'صيغة الكود الجديد غير صالحة. استخدم من 3 إلى 32 حرفاً أو رقماً وبدون مسافات.' };
+    }
+    if (getAdminCodes().includes(newCode)) {
+      return { success: false, message: 'هذا الكود محجوز لمالك المنصة، اختر كوداً آخر.' };
+    }
+
+    try {
+      const updated = await runTransaction(db, async (transaction) => {
+        const newDocRef = doc(db, 'access_codes', newCode);
+        const newSnap = await transaction.get(newDocRef);
+        if (newSnap.exists) {
+          throw new Error('COLLISION');
+        }
+
+        const oldDocRef = doc(db, 'access_codes', oldCode);
+        const oldSnap = await transaction.get(oldDocRef);
+        const existingData = oldSnap.exists ? oldSnap.data() : record;
+
+        const updatedData: AccessCodeRecord = {
+          ...existingData,
+          code: newCode,
+          studentName: targetName,
+          role: targetRole,
+          status: targetStatus,
+          expiresAt: targetExpiresAt,
+          maxStudentsLimit: targetLimit,
+        };
+
+        transaction.set(newDocRef, updatedData);
+        transaction.delete(oldDocRef);
+        return updatedData;
+      });
+
+      // If this was a teacher code that changed, update all student records that reference this teacherCode
+      if (record.role === 'teacher') {
+        try {
+          const studentQuery = query(collection(db, 'access_codes'), where('teacherCode', '==', oldCode));
+          const studentSnap = await getDocs(studentQuery);
+          for (const sDoc of studentSnap.docs) {
+            await updateDoc(sDoc.ref, { teacherCode: newCode });
+          }
+        } catch (e) {
+          console.warn('Could not cascade update student teacherCode:', e);
+        }
+      }
+
+      invalidateCodesCountCache();
+      return { success: true, code: updated, message: 'تم تحديث الكود وتغيير رمزه بنجاح.' };
+    } catch (err: any) {
+      if (err?.message === 'COLLISION') {
+        return { success: false, message: 'الكود الجديد مستخدم بالفعل في النظام، يرجى اختيار كود آخر.' };
+      }
+      console.error('Error renaming code:', err);
+      return { success: false, message: 'تعذر تعديل الكود بسبب خطأ في الخادم.' };
+    }
+  }
+
+  // Case 2: Code string is unchanged, only metadata updated
+  try {
+    const docRef = doc(db, 'access_codes', oldCode);
+    const patch: Partial<AccessCodeRecord> = {
+      studentName: targetName,
+      role: targetRole,
+      status: targetStatus,
+      expiresAt: targetExpiresAt,
+    };
+    if (targetRole === 'teacher' && targetLimit !== undefined) {
+      patch.maxStudentsLimit = targetLimit;
+    }
+
+    await updateDoc(docRef, patch);
+    invalidateCodesCountCache();
+    const updatedRecord: AccessCodeRecord = {
+      ...record,
+      ...patch,
+    };
+    return { success: true, code: updatedRecord, message: 'تم حفظ التعديلات على الكود بنجاح.' };
+  } catch (err) {
+    console.error('Error updating code record:', err);
+    return { success: false, message: 'تعذر حفظ التعديلات. يرجى المحاولة لاحقاً.' };
+  }
+}
+
+export async function updateMasterCode(
+  callerCode: string,
+  newMasterCode: string
+): Promise<{ success: boolean; newCode?: string; message: string }> {
+  const cleanCaller = callerCode.trim().toUpperCase();
+  const isMaster = getAdminCodes().includes(cleanCaller) || cleanCaller === 'MASTER';
+
+  if (!isMaster) {
+    return { success: false, message: 'غير مصرح لك بتعديل كود المالك.' };
+  }
+
+  const cleanNew = newMasterCode.trim().toUpperCase();
+  if (cleanNew.length < 6 || cleanNew.length > 64 || !/^[A-Z0-9_-]+$/.test(cleanNew)) {
+    return { success: false, message: 'كود المالك الجديد يجب أن يحتوي على 6 أحرف/أرقام على الأقل، وبدون مسافات.' };
+  }
+
+  const added = await addDynamicAdminCode(cleanNew);
+  if (!added) {
+    return { success: false, message: 'تعذر حفظ كود المالك الجديد.' };
+  }
+
+  return {
+    success: true,
+    newCode: cleanNew,
+    message: 'تم تعيين وحفظ كود المالك الجديد بنجاح في النظام 👑',
+  };
+}
+
 export async function getCodeProgress(code: string): Promise<CodeProgress> {
+  const clean = code.trim().toUpperCase();
+  if (getAdminCodes().includes(clean)) {
+    try {
+      const adminSnap = await getDoc(doc(db, 'admin_progress', clean));
+      if (adminSnap.exists && adminSnap.data()?.progress) {
+        return adminSnap.data().progress as CodeProgress;
+      }
+    } catch {}
+  }
+
   const record = await getAccessCodeRecord(code);
   if (record && record.progress) {
     return {
@@ -813,7 +1149,9 @@ export async function updateCodeProgress(
   progress: Partial<CodeProgress>
 ): Promise<boolean> {
   const clean = code.trim().toUpperCase();
-  const docRef = doc(db, 'access_codes', clean);
+  const isAdmin = getAdminCodes().includes(clean);
+  const targetCollection = isAdmin ? 'admin_progress' : 'access_codes';
+  const docRef = doc(db, targetCollection, clean);
   try {
     return await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(docRef);
@@ -849,7 +1187,8 @@ export async function updateCodeProgress(
       const recordBase = snap.exists ? {} : {
         id: randomUUID(),
         code: clean,
-        studentName: getAdminCodes().includes(clean) ? 'مدير المنصة' : 'طالب كود بالمصري',
+        role: isAdmin ? 'master' : 'student',
+        studentName: isAdmin ? 'مالك المنصة' : 'طالب كود بالمصري',
         createdAt: now,
         expiresAt: null,
         status: 'active',
@@ -884,7 +1223,9 @@ export async function syncStudentChallenges(
   challengeCodes: Record<string, string>;
 }> {
   const clean = code.trim().toUpperCase();
-  const docRef = doc(db, 'access_codes', clean);
+  const isAdmin = getAdminCodes().includes(clean);
+  const targetCollection = isAdmin ? 'admin_progress' : 'access_codes';
+  const docRef = doc(db, targetCollection, clean);
   const snap = await getDoc(docRef);
 
   let existingProgress: CodeProgress = {
@@ -903,11 +1244,11 @@ export async function syncStudentChallenges(
       existingProgress = docData.progress as CodeProgress;
     }
   } else {
-    const isAdmin = getAdminCodes().includes(clean);
     recordBase = {
       id: randomUUID(),
       code: clean,
-      studentName: isAdmin ? 'مدير المنصة' : 'طالب كود بالمصري',
+      role: isAdmin ? 'master' : 'student',
+      studentName: isAdmin ? 'مالك المنصة' : 'طالب كود بالمصري',
       createdAt: new Date().toISOString(),
       expiresAt: null,
       status: 'active',
@@ -1072,3 +1413,79 @@ export async function deleteStudentSnippet(
     return { success: false, message: 'تعذر حذف الكود.' };
   }
 }
+
+/**
+ * Restores student access codes and progress from a verified backup.
+ * Supports merging with existing records or replacing/upserting them.
+ */
+export async function restoreCodesBackup(
+  adminCode: string,
+  incomingCodes: AccessCodeRecord[],
+  strategy: 'merge' | 'overwrite' = 'merge'
+): Promise<{ success: boolean; restoredCount: number; message: string }> {
+  const cleanAdmin = adminCode.trim().toUpperCase();
+  if (!getAdminCodes().includes(cleanAdmin)) {
+    return { success: false, restoredCount: 0, message: 'غير مصرح لك باستعادة النسخ الاحتياطية (يتطلب صلاحية المدير).' };
+  }
+
+  if (!Array.isArray(incomingCodes) || incomingCodes.length === 0) {
+    return { success: false, restoredCount: 0, message: 'ملف النسخة الاحتياطية لا يحتوي على أي أكواد صالحة.' };
+  }
+
+  let successCount = 0;
+  const errors: string[] = [];
+
+  for (const item of incomingCodes) {
+    if (!item.code || typeof item.code !== 'string') continue;
+    const cleanCode = item.code.trim().toUpperCase();
+    if (cleanCode.length < 3 || cleanCode.length > 64) continue;
+
+    const docRef = doc(db, 'access_codes', cleanCode);
+    const now = new Date().toISOString();
+
+    const sanitizedRecord: AccessCodeRecord = {
+      id: item.id || `code-${randomUUID()}`,
+      code: cleanCode,
+      studentName: (item.studentName || 'طالب كود بالمصري').slice(0, 120),
+      createdAt: item.createdAt || now,
+      expiresAt: item.expiresAt || null,
+      status: ['active', 'expired', 'revoked'].includes(item.status) ? item.status : 'active',
+      usedCount: Number.isInteger(item.usedCount) && item.usedCount >= 0 ? item.usedCount : 0,
+      lastUsedAt: item.lastUsedAt || null,
+      draftCode: typeof item.draftCode === 'string' ? item.draftCode.slice(0, 100000) : '',
+      feedback: typeof item.feedback === 'string' ? item.feedback.slice(0, 2000) : '',
+      progress: item.progress || {
+        completedChapters: [],
+        completedQuizzes: [],
+        lastChapterId: 1,
+        lastUpdated: now,
+        challengeCodes: {},
+      },
+      savedSnippets: Array.isArray(item.savedSnippets) ? item.savedSnippets.slice(0, 100) : [],
+    };
+
+    try {
+      if (strategy === 'merge') {
+        await setDoc(docRef, sanitizedRecord, { merge: true });
+      } else {
+        await setDoc(docRef, sanitizedRecord);
+      }
+      successCount++;
+    } catch (err) {
+      errors.push(`فشل حفظ الكود ${cleanCode}`);
+    }
+  }
+
+  invalidateCodesCountCache();
+
+  if (successCount === 0) {
+    return { success: false, restoredCount: 0, message: 'تعذر استعادة أي كود من النسخة الاحتياطية.' };
+  }
+
+  return {
+    success: true,
+    restoredCount: successCount,
+    message: `تمت استعادة ${successCount} كود طالب بنجاح ومزامنتها في قاعدة البيانات! 🎉`,
+  };
+}
+

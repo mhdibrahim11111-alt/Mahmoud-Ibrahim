@@ -23,10 +23,12 @@ export function getSessionSecret(): string {
 
 export const SESSION_TTL_SECONDS = 14 * 24 * 60 * 60; // 14 days
 
+export type UserRole = 'master' | 'admin' | 'teacher' | 'student';
+
 export interface SessionClaims {
   subject: string;
   code?: string;
-  role: 'admin' | 'student';
+  role: UserRole;
   exp: number;
   iat: number;
 }
@@ -39,10 +41,11 @@ export function sessionSubject(code: string, role: SessionClaims['role']): strin
 
 export function createSessionToken(code: string, role: SessionClaims['role']): string {
   const now = Math.floor(Date.now() / 1000);
+  const normalizedRole: UserRole = role === 'admin' ? 'master' : role;
   const claims: SessionClaims = {
-    subject: sessionSubject(code, role),
-    code: role === 'student' ? code.trim().toUpperCase() : undefined,
-    role,
+    subject: sessionSubject(code, normalizedRole),
+    code: normalizedRole !== 'master' ? code.trim().toUpperCase() : undefined,
+    role: normalizedRole,
     iat: now,
     exp: now + SESSION_TTL_SECONDS,
   };
@@ -71,7 +74,7 @@ export function readSessionToken(token: string): SessionClaims | null {
   try {
     const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as SessionClaims;
     const now = Math.floor(Date.now() / 1000);
-    if (!claims.subject || !['admin', 'student'].includes(claims.role) || claims.exp <= now) {
+    if (!claims.subject || !['master', 'admin', 'teacher', 'student'].includes(claims.role) || claims.exp <= now) {
       return null;
     }
     // Check global revocation epoch

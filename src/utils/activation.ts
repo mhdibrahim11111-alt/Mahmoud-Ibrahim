@@ -27,20 +27,24 @@ export interface CodeProgress {
 export interface CodeRecord {
   id: string;
   code: string;
+  role?: 'master' | 'admin' | 'teacher' | 'student';
   studentName: string;
   createdAt: string;
   expiresAt: string | null;
   status: 'active' | 'expired' | 'revoked';
   usedCount: number;
   lastUsedAt: string | null;
+  teacherCode?: string;
+  maxStudentsLimit?: number;
   progress?: CodeProgress;
   draftCode?: string;
   savedSnippets?: StudentSnippet[];
+  feedback?: string;
 }
 
 export interface ActivationState {
   activated: boolean;
-  role: 'admin' | 'student';
+  role: 'master' | 'admin' | 'teacher' | 'student';
   code?: string;
   studentName?: string;
 }
@@ -54,7 +58,7 @@ export function isDeviceActivated(): ActivationState {
     localStorage.removeItem('codemasr_activation_token');
     const savedToken = localStorage.getItem(STORAGE_KEY);
     const savedCode = localStorage.getItem(CODE_KEY);
-    const savedRole = (localStorage.getItem(ROLE_KEY) as 'admin' | 'student') || 'student';
+    const savedRole = (localStorage.getItem(ROLE_KEY) as 'master' | 'admin' | 'teacher' | 'student') || 'student';
     const studentName = localStorage.getItem(STUDENT_NAME_KEY) || undefined;
 
     if (!savedToken || !savedCode) {
@@ -77,25 +81,54 @@ export async function validateSavedSession(): Promise<ActivationState> {
   if (!saved.activated) return saved;
   try {
     const token = localStorage.getItem(STORAGE_KEY) || '';
+    if (!token) {
+      lockPlatform();
+      return { activated: false, role: 'student' };
+    }
+
     const res = await fetch('/api/auth/session', {
       headers: { Authorization: `Bearer ${token}` },
     });
+
+    if (res.status === 401 || res.status === 403) {
+      lockPlatform();
+      return { activated: false, role: 'student' };
+    }
+
     const data = await res.json();
     if (res.ok && data.valid) {
-      localStorage.setItem(ROLE_KEY, data.role);
-      if (data.studentName) localStorage.setItem(STUDENT_NAME_KEY, data.studentName);
+      const resolvedRole: 'master' | 'admin' | 'teacher' | 'student' =
+        data.role || saved.role || 'student';
+      const resolvedCode: string = (data.code || saved.code || '').trim().toUpperCase();
+      const resolvedStudentName: string | undefined = data.studentName || saved.studentName || undefined;
+
+      localStorage.setItem(ROLE_KEY, resolvedRole);
+      if (resolvedCode) {
+        localStorage.setItem(CODE_KEY, resolvedCode);
+      }
+      if (resolvedStudentName) {
+        localStorage.setItem(STUDENT_NAME_KEY, resolvedStudentName);
+      }
+
       return {
         activated: true,
-        role: data.role,
-        code: data.code,
-        studentName: data.studentName,
+        role: resolvedRole,
+        code: resolvedCode,
+        studentName: resolvedStudentName,
       };
     }
-  } catch {
-    // Treat an unreachable server as signed out so stale credentials are not trusted.
+
+    if (data && data.valid === false) {
+      lockPlatform();
+      return { activated: false, role: 'student' };
+    }
+  } catch (err) {
+    // On transient network failure, preserve the existing saved credentials so the user is not abruptly logged out
+    console.warn('Session validation network error, falling back to cached session:', err);
+    return saved;
   }
-  lockPlatform();
-  return { activated: false, role: 'student' };
+
+  return saved;
 }
 
 /**
@@ -103,7 +136,7 @@ export async function validateSavedSession(): Promise<ActivationState> {
  */
 export async function activateWithCode(inputCode: string): Promise<{
   success: boolean;
-  role: 'admin' | 'student';
+  role: 'master' | 'admin' | 'teacher' | 'student';
   code?: string;
   message: string;
   studentName?: string;
@@ -200,6 +233,7 @@ export interface FetchCodesOptions {
   page?: number;
   pageSize?: number;
   filter?: 'all' | 'active' | 'expired';
+  roleFilter?: 'all' | 'teacher' | 'student';
   search?: string;
   cursor?: string | null;
   all?: boolean;
@@ -228,6 +262,7 @@ export async function fetchAdminCodes(
     if (options?.page) params.set('page', String(options.page));
     if (options?.pageSize) params.set('pageSize', String(options.pageSize));
     if (options?.filter) params.set('filter', options.filter);
+    if (options?.roleFilter) params.set('roleFilter', options.roleFilter);
     if (options?.search) params.set('search', options.search);
     if (options?.cursor) params.set('cursor', options.cursor);
     if (options?.all) params.set('all', 'true');
@@ -236,10 +271,14 @@ export async function fetchAdminCodes(
     const res = await fetch(`/api/admin/codes${qs ? `?${qs}` : ''}`, {
       headers: sessionHeaders(),
     });
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return { success: false, codes: [], message: 'غير مصرح للوصول' };
+      return {
+        success: false,
+        codes: [],
+        message: data.message || (res.status === 401 ? 'انتهت صلاحية الجلسة أو تم تغيير كود المدير. يرجى تسجيل الخروج والدخول مجدداً.' : 'غير مصرح للوصول'),
+      };
     }
-    const data = await res.json();
     return {
       success: true,
       codes: data.codes || [],
@@ -284,12 +323,42 @@ export async function fetchAdminBackup(): Promise<{
   }
 }
 
+export async function restoreAdminBackup(
+  backup: { schemaVersion?: number; createdAt?: string; codes: CodeRecord[] },
+  strategy: 'merge' | 'overwrite' = 'merge'
+): Promise<{ success: boolean; restoredCount?: number; message: string }> {
+  try {
+    const res = await fetch('/api/admin/restore', {
+      method: 'POST',
+      headers: sessionHeaders(true),
+      body: JSON.stringify({ backup, strategy }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      return {
+        success: false,
+        message: data.message || (res.status === 401 ? 'انتهت الجلسة. يرجى تسجيل الدخول مجدداً.' : 'تعذر استعادة النسخة الاحتياطية.'),
+      };
+    }
+    return {
+      success: true,
+      restoredCount: data.restoredCount,
+      message: data.message || 'تمت استعادة النسخة الاحتياطية بنجاح!',
+    };
+  } catch {
+    return { success: false, message: 'تعذر الاتصال بالخادم لاستعادة النسخة الاحتياطية.' };
+  }
+}
+
+
 export async function adminGenerateCode(
   _adminCode: string,
   options: {
     studentName?: string;
+    role?: 'teacher' | 'student';
     customCode?: string;
     durationDays?: number | null;
+    maxStudentsLimit?: number;
   }
 ): Promise<{ success: boolean; code?: CodeRecord; message: string }> {
   try {
@@ -358,6 +427,53 @@ export async function adminDeleteCode(
     return await res.json();
   } catch (err) {
     return { success: false, message: 'فشل في الاتصال بالخادم' };
+  }
+}
+
+export async function adminEditCode(
+  _adminCode: string,
+  payload: {
+    code: string;
+    newCode?: string;
+    studentName?: string;
+    role?: 'teacher' | 'student';
+    status?: 'active' | 'expired' | 'revoked';
+    expiresAt?: string | null;
+    maxStudentsLimit?: number;
+  }
+): Promise<{ success: boolean; code?: CodeRecord; message: string }> {
+  try {
+    const res = await fetch('/api/admin/codes/edit', {
+      method: 'POST',
+      headers: sessionHeaders(true),
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err) {
+    return { success: false, message: 'فشل في الاتصال بالخادم لحفظ التعديلات' };
+  }
+}
+
+export async function adminUpdateMasterCode(
+  newMasterCode: string
+): Promise<{ success: boolean; newCode?: string; message: string }> {
+  try {
+    const res = await fetch('/api/admin/update-master-code', {
+      method: 'POST',
+      headers: sessionHeaders(true),
+      body: JSON.stringify({ newCode: newMasterCode }),
+    });
+    const data = await res.json();
+    if (res.ok && data.success && data.sessionToken) {
+      localStorage.setItem(STORAGE_KEY, data.sessionToken);
+      if (data.newCode) {
+        localStorage.setItem(CODE_KEY, data.newCode);
+      }
+      return { success: true, newCode: data.newCode, message: data.message };
+    }
+    return { success: false, message: data.message || 'تعذر تحديث كود المالك.' };
+  } catch (err) {
+    return { success: false, message: 'فشل في الاتصال بالخادم لتحديث كود المالك' };
   }
 }
 
@@ -508,17 +624,35 @@ export async function adminRevokeAllSessions(): Promise<{ success: boolean; mess
 export async function adminRotateAdminCode(
   newAdminCode: string,
   revokeOldSessions: boolean = true
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; sessionToken?: string }> {
   try {
     const res = await fetch('/api/admin/rotate-admin-code', {
       method: 'POST',
       headers: sessionHeaders(true),
       body: JSON.stringify({ newAdminCode, revokeOldSessions }),
     });
-    return await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success) {
+      if (data.sessionToken) {
+        localStorage.setItem(STORAGE_KEY, data.sessionToken);
+      }
+      if (data.adminCode) {
+        localStorage.setItem(CODE_KEY, data.adminCode);
+      }
+      return {
+        success: true,
+        sessionToken: data.sessionToken,
+        message: data.message || 'تم تحديث كود المدير بنجاح وتحديث جلستك الحالية.',
+      };
+    }
+    return {
+      success: false,
+      message: data.message || 'تعذر تحديث كود المدير.',
+    };
   } catch {
     return { success: false, message: 'تعذر الاتصال بالخادم لتحديث كود المدير.' };
   }
 }
+
 
 

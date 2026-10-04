@@ -43,7 +43,7 @@ function ViewLoadingState() {
 
 interface PlatformAppProps {
   activeCode: string;
-  role: 'admin' | 'student';
+  role: 'master' | 'admin' | 'teacher' | 'student';
   studentName?: string;
   onLockPlatform: () => void;
 }

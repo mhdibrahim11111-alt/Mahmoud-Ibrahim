@@ -23,7 +23,7 @@ interface HeaderProps {
   totalChaptersCount: number;
   completedQuizzesCount: number;
   totalQuizzesCount: number;
-  role: 'admin' | 'student';
+  role: 'master' | 'admin' | 'teacher' | 'student';
   activeCode?: string;
   studentName?: string;
   onLockPlatform?: () => void;
@@ -54,7 +54,9 @@ export const Header: React.FC<HeaderProps> = ({
       ? Math.round(((completedChaptersCount + completedQuizzesCount) / totalItems) * 100)
       : 0;
 
-  const isAdmin = role === 'admin';
+  const isMaster = role === 'master' || role === 'admin';
+  const isTeacher = role === 'teacher';
+  const isStaff = isMaster || isTeacher;
 
   return (
     <header className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 text-slate-100 shadow-md shadow-black/30 font-['Cairo',sans-serif]">
@@ -181,16 +183,29 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Admin Key Manager Modal Trigger */}
-            {isAdmin && (
+            {/* Master Admin / Teacher Manager Modal Trigger */}
+            {isStaff && (
               <button
                 onClick={() => setShowOwnerModal(true)}
-                aria-label="إدارة أكواد الطلاب"
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/30 font-bold transition text-[11px]"
-                title="إدارة وتوليد أكواد الطلاب"
+                aria-label={isMaster ? 'إدارة أكواد المنصة' : 'لوحة إدارة طلاب فصلي'}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold transition text-[11px] shadow-sm active:scale-95 ${
+                  isMaster
+                    ? 'bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/30'
+                    : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30'
+                }`}
+                title={isMaster ? 'لوحة تحكم مالك المنصة 👑' : 'لوحة المعلم وإدارة الطلاب 👨‍🏫'}
               >
-                <KeyRound className="w-3.5 h-3.5 text-orange-400" strokeWidth={2.3} />
-                <span className="hidden sm:inline">الأكواد</span>
+                {isMaster ? (
+                  <>
+                    <KeyRound className="w-3.5 h-3.5 text-orange-400" strokeWidth={2.3} />
+                    <span className="hidden sm:inline">لوحة المالك</span>
+                  </>
+                ) : (
+                  <>
+                    <User className="w-3.5 h-3.5 text-emerald-400" strokeWidth={2.3} />
+                    <span className="hidden sm:inline">لوحة المعلم</span>
+                  </>
+                )}
               </button>
             )}
 
@@ -228,12 +243,14 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Admin Codes Modal */}
-      {isAdmin && (
+      {/* Staff Codes Modal */}
+      {isStaff && (
         <Suspense fallback={null}>
           {showOwnerModal && (
             <OwnerCodeModal
               adminCode={activeCode || ''}
+              role={role}
+              studentName={studentName}
               isOpen={showOwnerModal}
               onClose={() => setShowOwnerModal(false)}
             />

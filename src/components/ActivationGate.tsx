@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 interface ActivationGateProps {
-  onActivated: (code: string, role: 'admin' | 'student', studentName?: string) => void;
+  onActivated: (code: string, role: 'master' | 'admin' | 'teacher' | 'student', studentName?: string) => void;
 }
 
 export const ActivationGate: React.FC<ActivationGateProps> = ({ onActivated }) => {

@@ -90,8 +90,12 @@ export const generateCodeSchema = {
     studentName: z
       .string()
       .trim()
-      .max(120, 'اسم الطالب يجب ألا يتجاوز 120 حرفاً')
+      .max(120, 'اسم المستخدم يجب ألا يتجاوز 120 حرفاً')
       .optional(),
+    role: z
+      .enum(['teacher', 'student'])
+      .optional()
+      .default('student'),
     customCode: z
       .string()
       .trim()
@@ -107,6 +111,14 @@ export const generateCodeSchema = {
       .max(3650, 'الحد الأقصى للصلاحية هو 3650 يوماً')
       .optional()
       .default(0),
+    maxStudentsLimit: z
+      .coerce
+      .number()
+      .int('حد الطلاب يجب أن يكون عدداً صحيحاً')
+      .min(1, 'حد الطلاب يجب أن يكون 1 على الأقل')
+      .max(2000, 'الحد الأقصى لطلاب المعلم هو 2000 طالب')
+      .optional()
+      .default(50),
   }),
 };
 
@@ -154,6 +166,7 @@ export const adminPaginationQuerySchema = {
     page: z.coerce.number().int().min(1).optional().default(1),
     pageSize: z.coerce.number().int().min(1).max(50).optional().default(8),
     filter: z.enum(['all', 'active', 'expired']).optional().default('all'),
+    roleFilter: z.enum(['all', 'teacher', 'student']).optional().default('all'),
     search: z.string().trim().max(100).optional(),
     cursor: z.string().trim().max(128).nullable().optional(),
     all: z.enum(['true', 'false']).optional(),
@@ -266,4 +279,53 @@ export const snippetParamsSchema = {
       .max(128, 'معرف المشروع طويل جداً'),
   }),
 };
+
+export const restoreBackupSchema = {
+  body: z.object({
+    backup: z.object({
+      schemaVersion: z.number().optional(),
+      createdAt: z.string().optional(),
+      codes: z.array(z.any()).min(1, 'ملف النسخة الاحتياطية فارغ ولا يحتوي على أكواد').max(5000, 'الحد الأقصى للاستعادة دفعة واحدة هو 5000 كود'),
+    }),
+    strategy: z.enum(['merge', 'overwrite']).optional().default('merge'),
+  }),
+};
+
+export const editCodeSchema = {
+  body: z.object({
+    code: z
+      .string()
+      .trim()
+      .min(1, 'الكود الحالي مطلوب')
+      .max(64),
+    newCode: z
+      .string()
+      .trim()
+      .min(3, 'الكود الجديد يجب أن يتكون من 3 أحرف على الأقل')
+      .max(32, 'الكود الجديد يجب ألا يتجاوز 32 حرفاً')
+      .regex(/^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/, 'صيغة الكود غير صالحة')
+      .optional(),
+    studentName: z
+      .string()
+      .trim()
+      .max(120, 'الاسم يجب ألا يتجاوز 120 حرفاً')
+      .optional(),
+    role: z.enum(['teacher', 'student']).optional(),
+    status: z.enum(['active', 'expired', 'revoked']).optional(),
+    expiresAt: z.string().nullable().optional(),
+    maxStudentsLimit: z.number().int().min(1).max(1000).optional(),
+  }),
+};
+
+export const updateMasterCodeSchema = {
+  body: z.object({
+    newCode: z
+      .string()
+      .trim()
+      .min(6, 'كود المالك يجب أن يتكون من 6 أحرف على الأقل')
+      .max(64, 'كود المالك طويل جداً')
+      .regex(/^[A-Za-z0-9_-]+$/, 'الكود يحتوي على رموز غير مدعومة'),
+  }),
+};
+
 

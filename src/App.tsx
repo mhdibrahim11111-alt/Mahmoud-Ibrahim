@@ -1,5 +1,6 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { ActivationGate } from './components/ActivationGate';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import {
   isDeviceActivated,
   lockPlatform,
@@ -24,12 +25,18 @@ export function App() {
   const [activation, setActivation] = useState<ActivationState>(() => isDeviceActivated());
 
   useEffect(() => {
+    let isMounted = true;
     validateSavedSession().then((updated) => {
-      setActivation(updated);
+      if (isMounted) {
+        setActivation(updated);
+      }
     });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const handleActivationSuccess = (code: string, role: 'admin' | 'student', studentName?: string) => {
+  const handleActivationSuccess = (code: string, role: 'master' | 'admin' | 'teacher' | 'student', studentName?: string) => {
     setActivation({ activated: true, code, role, studentName });
   };
 
@@ -39,18 +46,25 @@ export function App() {
   };
 
   if (!activation.activated || !activation.code) {
-    return <ActivationGate onActivated={handleActivationSuccess} />;
+    return (
+      <ErrorBoundary onReset={() => setActivation(isDeviceActivated())}>
+        <ActivationGate onActivated={handleActivationSuccess} />
+      </ErrorBoundary>
+    );
   }
 
   return (
-    <Suspense fallback={<AppLoadingState />}>
-      <PlatformApp
-        activeCode={activation.code}
-        role={activation.role || 'student'}
-        studentName={activation.studentName}
-        onLockPlatform={handleLockPlatform}
-      />
-    </Suspense>
+    <ErrorBoundary onReset={() => setActivation(isDeviceActivated())}>
+      <Suspense fallback={<AppLoadingState />}>
+        <PlatformApp
+          key={`platform-${activation.code}`}
+          activeCode={activation.code}
+          role={activation.role || 'student'}
+          studentName={activation.studentName}
+          onLockPlatform={handleLockPlatform}
+        />
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 

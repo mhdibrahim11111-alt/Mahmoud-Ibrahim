@@ -55,16 +55,30 @@ export async function getDocs(reference: CollectionReference | Query) {
   return firestoreGetDocs(reference);
 }
 
+function cleanUndefined(obj: any): any {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(cleanUndefined);
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      result[key] = cleanUndefined(value);
+    }
+  }
+  return result;
+}
+
 export async function setDoc(
   reference: DocumentReference,
   data: DocumentData,
   options?: { merge?: boolean },
 ) {
-  return options ? firestoreSetDoc(reference, data, options) : firestoreSetDoc(reference, data);
+  const sanitized = cleanUndefined(data);
+  return options ? firestoreSetDoc(reference, sanitized, options) : firestoreSetDoc(reference, sanitized);
 }
 
 export async function updateDoc(reference: DocumentReference, data: DocumentData) {
-  return firestoreUpdateDoc(reference, data);
+  const sanitized = cleanUndefined(data);
+  return firestoreUpdateDoc(reference, sanitized);
 }
 
 export async function deleteDoc(reference: DocumentReference) {
@@ -87,10 +101,14 @@ export function runTransaction<T>(
         return wrapSnapshot(s);
       },
       set: (docRef: DocumentReference, data: any, options?: any) => {
-        if (options) txn.set(docRef, data, options);
-        else txn.set(docRef, data);
+        const sanitized = cleanUndefined(data);
+        if (options) txn.set(docRef, sanitized, options);
+        else txn.set(docRef, sanitized);
       },
-      update: (docRef: DocumentReference, data: any) => txn.update(docRef, data),
+      update: (docRef: DocumentReference, data: any) => {
+        const sanitized = cleanUndefined(data);
+        txn.update(docRef, sanitized);
+      },
       delete: (docRef: DocumentReference) => txn.delete(docRef),
     });
   });
