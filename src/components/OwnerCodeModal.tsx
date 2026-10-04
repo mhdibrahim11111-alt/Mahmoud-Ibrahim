@@ -8,6 +8,7 @@ import {
   adminExpireCode,
   adminReactivateCode,
   adminDeleteCode,
+  fetchAdminBackup,
 } from '../utils/activation';
 import {
   KeyRound,
@@ -33,6 +34,7 @@ import {
   MessageSquareHeart,
   Trophy,
   GraduationCap,
+  Download,
 } from 'lucide-react';
 import { sendStudentFeedback } from '../utils/challengesAndTts';
 
@@ -74,6 +76,7 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
   const [feedbackTarget, setFeedbackTarget] = useState<{ code: string; studentName: string } | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
+  const [isExportingBackup, setIsExportingBackup] = useState(false);
 
   // Custom delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; code: string; studentName?: string } | null>(null);
@@ -91,6 +94,30 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
       await loadCodes(currentPage);
     } else {
       showNotification('تعذر إرسال الرسالة، حاول مرة أخرى.', 'error');
+    }
+  };
+
+  const handleDownloadBackup = async () => {
+    if (isExportingBackup) return;
+    setIsExportingBackup(true);
+    try {
+      const result = await fetchAdminBackup();
+      if (!result.success || !result.backup) {
+        showNotification(result.message || 'تعذر إنشاء النسخة الاحتياطية.', 'error');
+        return;
+      }
+      const blob = new Blob([JSON.stringify(result.backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `zaki-code-backup-${new Date(result.backup.createdAt).toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showNotification('تم تنزيل النسخة. احتفظ بها في مكان آمن.');
+    } finally {
+      setIsExportingBackup(false);
     }
   };
 
@@ -309,6 +336,16 @@ const msg = `أهلاً بك يا بطل! 🚀\nتم تفعيل اشتراكك �
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleDownloadBackup()}
+              disabled={isExportingBackup}
+              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-emerald-300 hover:text-white hover:bg-emerald-900/40 disabled:opacity-50 transition"
+              title="تنزيل نسخة يدوية من بيانات الطلاب"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">{isExportingBackup ? 'جارٍ تجهيز النسخة…' : 'نسخة احتياطية'}</span>
+            </button>
             <button
               onClick={() => void loadCodes(currentPage)}
               disabled={loading}

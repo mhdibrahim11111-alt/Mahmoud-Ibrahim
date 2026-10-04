@@ -21,6 +21,15 @@ import {
   fetchCodeProgress,
   syncCodeProgress,
 } from './utils/activation';
+import {
+  getStringProgressMap,
+  getTrueProgressIds,
+  mergeProgressEntries,
+  progressEntriesFromLegacy,
+  readLocalProgressEntries,
+  saveLocalProgressEntries,
+  updateProgressEntry,
+} from './utils/progressSync';
 import { Menu, X } from 'lucide-react';
 
 interface PlatformAppProps {
@@ -83,72 +92,14 @@ function PlatformApp({ activeCode, role, studentName, onLockPlatform }: Platform
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
 
-  // Initialize strictly for THIS specific code from localStorage or empty []
-  const [completedChapterIds, setCompletedChapterIds] = useState<number[]>(() => {
-    try {
-      const saved = localStorage.getItem(`codemasr_progress_chapters_${codeKey}`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [completedQuizIds, setCompletedQuizIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(`codemasr_progress_quizzes_${codeKey}`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [completedExamPartIds, setCompletedExamPartIds] = useState<number[]>(() => {
-    try {
-      const saved = localStorage.getItem(`codemasr_progress_exams_${codeKey}`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [completedChallengeIds, setCompletedChallengeIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(`codemasr_completed_challenges_${codeKey}`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  // Bookmarks
-  const [bookmarkedChapterIds, setBookmarkedChapterIds] = useState<number[]>(() => {
-    try {
-      const saved = localStorage.getItem(`codemasr_bookmarks_${codeKey}`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  // Personal Notes per chapter
-  const [chapterNotes, setChapterNotes] = useState<Record<string, string>>(() => {
-    try {
-      const saved = localStorage.getItem(`codemasr_notes_${codeKey}`);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-
-  // Student's written solution for each chapter challenge: { "1": "console.log(...)", ... }
-  const [challengeCodes, setChallengeCodes] = useState<Record<string, string>>(() => {
-    try {
-      const saved = localStorage.getItem(`codemasr_challenges_${codeKey}`);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
+  // Per-item timestamps let multiple devices merge edits and removals safely.
+  const [progressEntries, setProgressEntries] = useState(() => readLocalProgressEntries(codeKey));
+  const completedChapterIds = getTrueProgressIds(progressEntries, 'completedChapter').map(Number);
+  const completedQuizIds = getTrueProgressIds(progressEntries, 'completedQuiz').map(String);
+  const completedExamPartIds = getTrueProgressIds(progressEntries, 'completedExam').map(Number);
+  const bookmarkedChapterIds = getTrueProgressIds(progressEntries, 'bookmarkedChapter').map(Number);
+  const chapterNotes = getStringProgressMap(progressEntries, 'chapterNote');
+  const challengeCodes = getStringProgressMap(progressEntries, 'chapterChallengeCode');
 
   // Guard to prevent saving to server before initial fetch finishes
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
@@ -161,30 +112,11 @@ function PlatformApp({ activeCode, role, studentName, onLockPlatform }: Platform
       if (!isSubscribed) return;
 
       if (prog) {
-        if (Array.isArray(prog.completedChapters)) {
-          setCompletedChapterIds(prog.completedChapters);
-          localStorage.setItem(
-            `codemasr_progress_chapters_${codeKey}`,
-            JSON.stringify(prog.completedChapters)
-          );
-        }
-        if (Array.isArray(prog.completedQuizzes)) {
-          setCompletedQuizIds(prog.completedQuizzes);
-          localStorage.setItem(
-            `codemasr_progress_quizzes_${codeKey}`,
-            JSON.stringify(prog.completedQuizzes)
-          );
-        }
-        if (Array.isArray(prog.completedChallenges)) {
-          setCompletedChallengeIds((prev) => {
-            const merged = Array.from(new Set([...prev, ...prog.completedChallenges!]));
-            localStorage.setItem(
-              `codemasr_completed_challenges_${codeKey}`,
-              JSON.stringify(merged)
-            );
-            return merged;
-          });
-        }
+        const hasVersionedEntries = Boolean(prog.stateEntries && Object.keys(prog.stateEntries).length);
+        const remoteEntries = hasVersionedEntries
+          ? prog.stateEntries!
+          : progressEntriesFromLegacy(prog as unknown as Record<string, unknown>);
+        setProgressEntries((local) => mergeProgressEntries(local, remoteEntries, hasVersionedEntries));
         if (prog.lastChapterId && !localStorage.getItem(`codemasr_active_chapter_${codeKey}`)) {
           setSelectedChapterId(prog.lastChapterId);
         }
@@ -195,6 +127,24 @@ function PlatformApp({ activeCode, role, studentName, onLockPlatform }: Platform
     return () => {
       isSubscribed = false;
     };
+  }, [codeKey]);
+
+  useEffect(() => {
+    const handleLocalProgressEntry = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        codeKey?: string;
+        key?: string;
+        entry?: { value: boolean | string; updatedAt: number };
+      }>).detail;
+      if (detail?.codeKey !== codeKey || !detail.key || !detail.entry) return;
+      setProgressEntries((current) => mergeProgressEntries(
+        current,
+        { [detail.key!]: detail.entry! },
+        true,
+      ));
+    };
+    window.addEventListener('codemasr:progress-entry', handleLocalProgressEntry);
+    return () => window.removeEventListener('codemasr:progress-entry', handleLocalProgressEntry);
   }, [codeKey]);
 
   // Global Keyboard Shortcut: Ctrl+K or Cmd+K for Global Search
@@ -258,32 +208,17 @@ function PlatformApp({ activeCode, role, studentName, onLockPlatform }: Platform
   // Sync to Cloud whenever progress changes, ONLY after initial load is complete
   useEffect(() => {
     if (!isInitialLoadDone) return;
+    saveLocalProgressEntries(codeKey, progressEntries);
 
-    localStorage.setItem(
-      `codemasr_progress_chapters_${codeKey}`,
-      JSON.stringify(completedChapterIds)
-    );
-    localStorage.setItem(
-      `codemasr_progress_quizzes_${codeKey}`,
-      JSON.stringify(completedQuizIds)
-    );
-    localStorage.setItem(
-      `codemasr_progress_exams_${codeKey}`,
-      JSON.stringify(completedExamPartIds)
-    );
-    localStorage.setItem(
-      `codemasr_completed_challenges_${codeKey}`,
-      JSON.stringify(completedChallengeIds)
-    );
-
-    // Save to Firestore in background
-    syncCodeProgress(codeKey, {
-      completedChapters: completedChapterIds,
-      completedQuizzes: completedQuizIds,
-      completedChallenges: completedChallengeIds,
-      lastChapterId: selectedChapterId,
-    });
-  }, [completedChapterIds, completedQuizIds, completedExamPartIds, completedChallengeIds, isInitialLoadDone, codeKey, selectedChapterId]);
+    // Keep local changes immediate, but coalesce rapid actions into one cloud write.
+    const timer = window.setTimeout(() => {
+      void syncCodeProgress(codeKey, {
+        lastChapterId: selectedChapterId,
+        stateEntries: progressEntries,
+      });
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [progressEntries, isInitialLoadDone, codeKey, selectedChapterId]);
 
   // Helper to find all chapters flat
   const allChapters = bookParts.flatMap((p) => p.chapters);
@@ -320,45 +255,19 @@ function PlatformApp({ activeCode, role, studentName, onLockPlatform }: Platform
   };
 
   const toggleChapterCompleted = (chapterId: number) => {
-    setCompletedChapterIds((prev) =>
-      prev.includes(chapterId)
-        ? prev.filter((id) => id !== chapterId)
-        : [...prev, chapterId]
-    );
+    setProgressEntries((prev) => updateProgressEntry(prev, `completedChapter:${chapterId}`, !completedChapterIds.includes(chapterId)));
   };
 
   const toggleExamPartCompleted = (partId: number) => {
-    setCompletedExamPartIds((prev) =>
-      prev.includes(partId)
-        ? prev.filter((id) => id !== partId)
-        : [...prev, partId]
-    );
+    setProgressEntries((prev) => updateProgressEntry(prev, `completedExam:${partId}`, !completedExamPartIds.includes(partId)));
   };
 
   const toggleBookmark = (chapterId: number) => {
-    setBookmarkedChapterIds((prev) => {
-      const next = prev.includes(chapterId)
-        ? prev.filter((id) => id !== chapterId)
-        : [...prev, chapterId];
-      try {
-        localStorage.setItem(`codemasr_bookmarks_${codeKey}`, JSON.stringify(next));
-      } catch (e) {
-        console.error(e);
-      }
-      return next;
-    });
+    setProgressEntries((prev) => updateProgressEntry(prev, `bookmarkedChapter:${chapterId}`, !bookmarkedChapterIds.includes(chapterId)));
   };
 
   const handleSaveNote = (chapterId: number, note: string) => {
-    setChapterNotes((prev) => {
-      const next = { ...prev, [chapterId.toString()]: note };
-      try {
-        localStorage.setItem(`codemasr_notes_${codeKey}`, JSON.stringify(next));
-      } catch (e) {
-        console.error(e);
-      }
-      return next;
-    });
+    setProgressEntries((prev) => updateProgressEntry(prev, `chapterNote:${chapterId}`, note));
   };
 
   const handleOpenPlaygroundWithCode = (code: string) => {
@@ -379,23 +288,11 @@ function PlatformApp({ activeCode, role, studentName, onLockPlatform }: Platform
   };
 
   const toggleQuizCompleted = (quizId: string) => {
-    setCompletedQuizIds((prev) =>
-      prev.includes(quizId)
-        ? prev.filter((id) => id !== quizId)
-        : [...prev, quizId]
-    );
+    setProgressEntries((prev) => updateProgressEntry(prev, `completedQuiz:${quizId}`, !completedQuizIds.includes(quizId)));
   };
 
   const handleUpdateChallengeCode = (chapterId: number, code: string) => {
-    setChallengeCodes((prev) => {
-      const updated = { ...prev, [chapterId.toString()]: code };
-      try {
-        localStorage.setItem(`codemasr_challenges_${codeKey}`, JSON.stringify(updated));
-      } catch (e) {
-        console.error('Failed to save challenge code locally:', e);
-      }
-      return updated;
-    });
+    setProgressEntries((prev) => updateProgressEntry(prev, `chapterChallengeCode:${chapterId}`, code));
   };
 
   // Calculate Student Achievements Stats

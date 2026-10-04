@@ -1,17 +1,25 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 const configPath = path.resolve(__dirname, '../firebase-applet-config.json');
 const rawConfig = fs.readFileSync(configPath, 'utf8');
-export const firebaseConfig = JSON.parse(rawConfig);
+export const firebaseConfig = JSON.parse(rawConfig) as {
+  projectId: string;
+  firestoreDatabaseId: string;
+};
 
-export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+// On Google Cloud, ADC uses the service identity attached to the server runtime.
+// For local development, configure ADC with gcloud or GOOGLE_APPLICATION_CREDENTIALS.
+export const app = getApps()[0] || initializeApp({
+  credential: applicationDefault(),
+  projectId: firebaseConfig.projectId,
+});
+
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 export const OperationType = {
@@ -51,15 +59,11 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
 export async function testConnection(): Promise<boolean> {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log('✅ Connected to Firebase Firestore successfully.');
+    await db.doc('test/connection').get();
+    console.log('✅ Connected to Firestore with the server identity.');
     return true;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('Please check your Firebase configuration.');
-    } else {
-      console.log('Firebase connection initialized.');
-    }
+    console.error('Firestore server identity could not read the configured database:', error);
     return false;
   }
 }

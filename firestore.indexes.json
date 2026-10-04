@@ -1,0 +1,25 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "access_codes",
+      "fieldPath": "progress",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "access_codes",
+      "fieldPath": "draftCode",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "access_codes",
+      "fieldPath": "savedSnippets",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "access_codes",
+      "fieldPath": "feedback",
+      "indexes": []
+    }
+  ]
+}
