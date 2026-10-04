@@ -33,6 +33,15 @@ dotenv.config({ override: true });
 const sessionSecret = process.env.SESSION_SECRET || randomBytes(32).toString('hex');
 const SESSION_TTL_SECONDS = 14 * 24 * 60 * 60;
 
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
+    throw new Error('Production requires SESSION_SECRET with at least 32 characters.');
+  }
+  if (!process.env.ADMIN_CODES?.trim()) {
+    throw new Error('Production requires ADMIN_CODES to be configured as a server-side secret.');
+  }
+}
+
 interface SessionClaims {
   subject: string;
   code?: string;
@@ -148,9 +157,21 @@ async function startServer() {
   const requireAdmin = requireSession(['admin']);
   const requireStudent = requireSession(['student']);
 
-  if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
-    console.warn('[Security Notice] SESSION_SECRET is not explicitly configured in environment variables. Using auto-generated secret.');
-  }
+  const isProgressEntryMap = (value: unknown): value is Record<string, { value: boolean | string; updatedAt: number }> => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const entries = Object.entries(value);
+    if (entries.length > 2500) return false;
+    const allowedKey = /^(completedChapter|completedQuiz|completedExam|completedChallenge|bookmarkedChapter|chapterNote|chapterChallengeCode|challengeSolution|bookChallengeSolution):[\w.-]{1,128}$/;
+    return entries.every(([key, raw]) => {
+      if (!allowedKey.test(key) || !raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+      const [kind, id] = key.split(':', 2);
+      if (['completedChapter', 'completedExam', 'bookmarkedChapter'].includes(kind) && !/^\d{1,5}$/.test(id)) return false;
+      const entry = raw as { value?: unknown; updatedAt?: unknown };
+      return (typeof entry.value === 'boolean' || (typeof entry.value === 'string' && entry.value.length <= 30000)) &&
+        typeof entry.updatedAt === 'number' && Number.isFinite(entry.updatedAt) &&
+        entry.updatedAt >= 0 && entry.updatedAt <= Date.now() + 5 * 60 * 1000;
+    });
+  };
 
   const limitCodeAttempts = rateLimit(10, 15 * 60 * 1000);
   const limitHintRequests = rateLimit(60, 60 * 1000);
@@ -344,6 +365,18 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
     });
   });
 
+  // Free-tier manual backup. Only an authenticated admin can export student records.
+  app.get('/api/admin/backup', requireAdmin, async (_req, res) => {
+    const codes = await getStoredCodes();
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({
+      success: true,
+      schemaVersion: 1,
+      createdAt: new Date().toISOString(),
+      codes,
+    });
+  });
+
   // 3. Generate a new code (Admin only)
   app.post('/api/admin/codes/generate', requireAdmin, async (req, res) => {
     const adminCode = (req as SessionRequest).sessionCode!;
@@ -488,15 +521,12 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
   // 8. Update Progress for a specific code
   app.post('/api/progress', requireSession(), async (req, res) => {
     const code = (req as SessionRequest).sessionCode!;
-    const { completedChapters, completedQuizzes, completedChallenges, lastChapterId, challengeCodes } = req.body;
-    await updateCodeProgress(code, {
-      completedChapters,
-      completedQuizzes,
-      completedChallenges,
-      lastChapterId,
-      challengeCodes,
-    });
-    return res.json({ success: true });
+    const { lastChapterId, stateEntries } = req.body || {};
+    if ((lastChapterId !== undefined && (!Number.isInteger(lastChapterId) || lastChapterId < 1)) || !isProgressEntryMap(stateEntries)) {
+      return res.status(400).json({ success: false, message: 'بيانات التقدم غير صالحة.' });
+    }
+    const saved = await updateCodeProgress(code, { lastChapterId, stateEntries });
+    return res.status(saved ? 200 : 503).json({ success: saved, message: saved ? undefined : 'تعذر حفظ التقدم الآن.' });
   });
 
   // 8.b Complete a coding challenge
@@ -504,21 +534,20 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
     const session = (req as SessionRequest).session!;
     const userCode = (req as SessionRequest).sessionCode || session.code;
     const { challengeId } = req.body;
-    if (!challengeId || typeof challengeId !== 'string') {
+    if (typeof challengeId !== 'string' || !/^[\w.-]{1,128}$/.test(challengeId)) {
       return res.status(400).json({ success: false, message: 'معرف التحدي مطلوب.' });
     }
     if (!userCode) {
       return res.status(400).json({ success: false, message: 'كود المستخدم غير موجود في الجلسة.' });
     }
-    const currentProgress = await getCodeProgress(userCode);
-    const existing = Array.isArray(currentProgress.completedChallenges)
-      ? [...currentProgress.completedChallenges]
-      : [];
-    if (!existing.includes(challengeId)) {
-      existing.push(challengeId);
-      await updateCodeProgress(userCode, { completedChallenges: existing });
-    }
-    return res.json({ success: true, completedChallenges: existing });
+    const saved = await updateCodeProgress(userCode, {
+      stateEntries: {
+        [`completedChallenge:${challengeId}`]: { value: true, updatedAt: Date.now() },
+      },
+    });
+    if (!saved) return res.status(503).json({ success: false, message: 'تعذر حفظ التحدي الآن.' });
+    const progress = await getCodeProgress(userCode);
+    return res.json({ success: true, completedChallenges: progress.completedChallenges || [] });
   });
 
   // 9. Get student saved work (draft + snippets)

@@ -18,14 +18,9 @@ import {
   limit,
   startAfter,
   getCountFromServer,
-  QueryConstraint,
-} from 'firebase/firestore';
+} from './firestoreCompat.ts';
+import type { QueryConstraint } from './firestoreCompat.ts';
 import { db, testConnection, handleFirestoreError, OperationType } from './firebase.ts';
-
-const DEFAULT_CONFIGURED_ADMINS = [
-  'ADM-453B831445A0F634',
-  'ADM-7C81E920A3B54DF6',
-];
 
 // Admin credentials are kept securely on the server, never sent to the browser client.
 export function getAdminCodes(): string[] {
@@ -37,7 +32,7 @@ export function getAdminCodes(): string[] {
   if (envCodes.length > 0) {
     return envCodes;
   }
-  return DEFAULT_CONFIGURED_ADMINS;
+  return [];
 }
 
 export interface StudentSnippet {
@@ -56,7 +51,18 @@ export interface CodeProgress {
   lastUpdated: string;
   challengeCodes?: Record<string, string>;
   completedChallenges?: string[];
+  completedExamParts?: number[];
+  bookmarkedChapterIds?: number[];
+  chapterNotes?: Record<string, string>;
+  stateEntries?: ProgressEntries;
 }
+
+export interface ProgressEntry {
+  value: boolean | string;
+  updatedAt: number;
+}
+
+export type ProgressEntries = Record<string, ProgressEntry>;
 
 export interface AccessCodeRecord {
   id: string;
@@ -74,7 +80,10 @@ export interface AccessCodeRecord {
 }
 
 export async function initCodesStorage(): Promise<void> {
-  await testConnection();
+  const connected = await testConnection();
+  if (!connected) {
+    throw new Error('Firestore is unavailable. Configure Application Default Credentials and grant the server identity access.');
+  }
 }
 
 export async function getStoredCodes(): Promise<AccessCodeRecord[]> {
@@ -170,7 +179,7 @@ export async function getStoredCodesPaginated(
       // A. Try exact match by code (1 document read)
       try {
         const exactDoc = await getDoc(doc(db, 'access_codes', searchUpper));
-        if (exactDoc.exists()) {
+        if (exactDoc.exists) {
           const rec = exactDoc.data() as AccessCodeRecord;
           if (filter === 'all' || rec.status === filter) {
             resultsMap.set(rec.code, rec);
@@ -313,7 +322,7 @@ export async function getAccessCodeRecord(codeOrId: string): Promise<AccessCodeR
     // 1. Try direct lookup by code document ID
     const directDoc = doc(db, 'access_codes', clean);
     const snap = await getDoc(directDoc);
-    if (snap.exists()) {
+    if (snap.exists) {
       return snap.data() as AccessCodeRecord;
     }
 
@@ -357,7 +366,7 @@ export async function verifyCode(inputCode: string): Promise<{
   const docRef = doc(db, 'access_codes', clean);
   const snap = await getDoc(docRef);
 
-  if (!snap.exists()) {
+  if (!snap.exists) {
     return {
       valid: false,
       role: 'student',
@@ -465,7 +474,7 @@ export async function generateCode(
       return await runTransaction(db, async (transaction) => {
         const docRef = doc(db, 'access_codes', codeStr);
         const docSnap = await transaction.get(docRef);
-        if (docSnap.exists()) {
+        if (docSnap.exists) {
           return { success: false, message: 'هذا الكود مستخدم بالفعل، اختر كوداً آخر.' };
         }
 
@@ -513,7 +522,7 @@ export async function generateCode(
       const res = await runTransaction(db, async (transaction) => {
         const docRef = doc(db, 'access_codes', codeStr);
         const docSnap = await transaction.get(docRef);
-        if (docSnap.exists()) {
+        if (docSnap.exists) {
           return null; // collision, try again
         }
 
@@ -653,58 +662,100 @@ export async function getCodeProgress(code: string): Promise<CodeProgress> {
   };
 }
 
+function legacyProgressEntries(progress: Partial<CodeProgress>): ProgressEntries {
+  const entries: ProgressEntries = {};
+  const stamp = 0;
+  const addCompleted = (prefix: string, values: unknown) => {
+    if (!Array.isArray(values)) return;
+    values.forEach((value) => {
+      if (typeof value === 'number' || typeof value === 'string') {
+        entries[`${prefix}:${value}`] = { value: true, updatedAt: stamp };
+      }
+    });
+  };
+  addCompleted('completedChapter', progress.completedChapters);
+  addCompleted('completedQuiz', progress.completedQuizzes);
+  addCompleted('completedExam', progress.completedExamParts);
+  addCompleted('completedChallenge', progress.completedChallenges);
+  addCompleted('bookmarkedChapter', progress.bookmarkedChapterIds);
+  for (const [id, value] of Object.entries(progress.chapterNotes || {})) {
+    if (typeof value === 'string') entries[`chapterNote:${id}`] = { value, updatedAt: stamp };
+  }
+  for (const [id, value] of Object.entries(progress.challengeCodes || {})) {
+    if (typeof value === 'string') entries[`chapterChallengeCode:${id}`] = { value, updatedAt: stamp };
+  }
+  return entries;
+}
+
+function progressIds(entries: ProgressEntries, prefix: string): string[] {
+  const keyPrefix = `${prefix}:`;
+  return Object.entries(entries)
+    .filter(([key, entry]) => key.startsWith(keyPrefix) && entry.value === true)
+    .map(([key]) => key.slice(keyPrefix.length));
+}
+
+function progressStringMap(entries: ProgressEntries, prefix: string): Record<string, string> {
+  const keyPrefix = `${prefix}:`;
+  const values: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(entries)) {
+    if (key.startsWith(keyPrefix) && typeof entry.value === 'string' && entry.value !== '') {
+      values[key.slice(keyPrefix.length)] = entry.value;
+    }
+  }
+  return values;
+}
+
 export async function updateCodeProgress(
   code: string,
   progress: Partial<CodeProgress>
 ): Promise<boolean> {
   const clean = code.trim().toUpperCase();
   const docRef = doc(db, 'access_codes', clean);
-  const snap = await getDoc(docRef);
-
-  let existing: CodeProgress = {
-    completedChapters: [],
-    completedQuizzes: [],
-    completedChallenges: [],
-    lastChapterId: 1,
-    challengeCodes: {},
-    lastUpdated: new Date().toISOString(),
-  };
-
-  let recordBase: Record<string, any> = {};
-  if (snap.exists()) {
-    const data = snap.data();
-    if (data.progress) {
-      existing = data.progress as CodeProgress;
-    }
-  } else {
-    const isAdmin = getAdminCodes().includes(clean);
-    recordBase = {
-      id: randomUUID(),
-      code: clean,
-      studentName: isAdmin ? 'مدير المنصة' : 'طالب كود بالمصري',
-      createdAt: new Date().toISOString(),
-      expiresAt: null,
-      status: 'active',
-      usedCount: 1,
-      lastUsedAt: new Date().toISOString(),
-    };
-  }
-
-  const updated: CodeProgress = {
-    completedChapters: progress.completedChapters ?? existing.completedChapters ?? [],
-    completedQuizzes: progress.completedQuizzes ?? existing.completedQuizzes ?? [],
-    completedChallenges: progress.completedChallenges ?? existing.completedChallenges ?? [],
-    lastChapterId: progress.lastChapterId ?? existing.lastChapterId ?? 1,
-    challengeCodes: {
-      ...(existing.challengeCodes || {}),
-      ...(progress.challengeCodes || {}),
-    },
-    lastUpdated: new Date().toISOString(),
-  };
-
   try {
-    await setDoc(docRef, { ...recordBase, progress: updated }, { merge: true });
-    return true;
+    return await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(docRef);
+      const record = snap.exists ? snap.data() : null;
+      const existing = (record?.progress || {}) as Partial<CodeProgress>;
+      const existingEntries = existing.stateEntries && Object.keys(existing.stateEntries).length
+        ? existing.stateEntries
+        : legacyProgressEntries(existing);
+      const incomingEntries: ProgressEntries = {
+        ...legacyProgressEntries(progress),
+        ...(progress.stateEntries || {}),
+      };
+      const mergedEntries: ProgressEntries = { ...existingEntries };
+      for (const [key, incoming] of Object.entries(incomingEntries)) {
+        const current = mergedEntries[key];
+        if (!current || incoming.updatedAt >= current.updatedAt) mergedEntries[key] = incoming;
+      }
+
+      const now = new Date().toISOString();
+      const updated: CodeProgress = {
+        completedChapters: progressIds(mergedEntries, 'completedChapter').map(Number),
+        completedQuizzes: progressIds(mergedEntries, 'completedQuiz'),
+        completedExamParts: progressIds(mergedEntries, 'completedExam').map(Number),
+        completedChallenges: progressIds(mergedEntries, 'completedChallenge'),
+        bookmarkedChapterIds: progressIds(mergedEntries, 'bookmarkedChapter').map(Number),
+        chapterNotes: progressStringMap(mergedEntries, 'chapterNote'),
+        challengeCodes: progressStringMap(mergedEntries, 'chapterChallengeCode'),
+        stateEntries: mergedEntries,
+        lastChapterId: progress.lastChapterId ?? existing.lastChapterId ?? 1,
+        lastUpdated: now,
+      };
+
+      const recordBase = snap.exists ? {} : {
+        id: randomUUID(),
+        code: clean,
+        studentName: getAdminCodes().includes(clean) ? 'مدير المنصة' : 'طالب كود بالمصري',
+        createdAt: now,
+        expiresAt: null,
+        status: 'active',
+        usedCount: 1,
+        lastUsedAt: now,
+      };
+      transaction.set(docRef, { ...recordBase, progress: updated }, { merge: true });
+      return true;
+    });
   } catch (err) {
     console.error('Error updating progress:', err);
     return false;
@@ -743,9 +794,9 @@ export async function syncStudentChallenges(
   };
 
   let recordBase: Record<string, any> = {};
-  if (snap.exists()) {
+  if (snap.exists) {
     const docData = snap.data();
-    if (docData.progress) {
+    if (docData?.progress) {
       existingProgress = docData.progress as CodeProgress;
     }
   } else {
@@ -864,7 +915,7 @@ export async function saveStudentSnippet(
   const snap = await getDoc(docRef);
 
   let existingList: StudentSnippet[] = [];
-  if (snap.exists()) {
+  if (snap.exists) {
     const record = snap.data() as AccessCodeRecord;
     existingList = Array.isArray(record.savedSnippets) ? [...record.savedSnippets] : [];
   }
@@ -903,7 +954,7 @@ export async function deleteStudentSnippet(
   const clean = code.trim().toUpperCase();
   const docRef = doc(db, 'access_codes', clean);
   const snap = await getDoc(docRef);
-  if (!snap.exists()) {
+  if (!snap.exists) {
     return { success: false, message: 'الكود غير مسجل' };
   }
 

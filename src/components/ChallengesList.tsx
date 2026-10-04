@@ -3,7 +3,7 @@ import { Part, Challenge } from '../types';
 import { runJavaScript } from '../utils/codeRunner';
 import { detectCodeLanguage, buildHtmlPreviewDocument } from '../utils/codePreview';
 import { validateChallenge, ChallengeValidationResult } from '../utils/challengeValidator';
-import { sessionHeaders } from '../utils/activation';
+import { saveProgressEntry, sessionHeaders } from '../utils/activation';
 import { markChallengeCompleted } from '../utils/challengesAndTts';
 import { CodeBlock } from './CodeBlock';
 import { CodeEditor } from './CodeEditor';
@@ -95,6 +95,7 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
   });
   const [htmlPreviewDoc, setHtmlPreviewDoc] = useState<string | null>(null);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [isProgressLoaded, setIsProgressLoaded] = useState(false);
 
   // Sync selected challenge if list changes or initial id is missing
   useEffect(() => {
@@ -137,21 +138,34 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
       setShowHint(false);
       setShowSolution(false);
     }
-  }, [selectedChallengeId, codeKey]);
+  }, [selectedChallengeId, codeKey, isProgressLoaded]);
 
   // Auto-save challenge code
   useEffect(() => {
-    if (!currentItem || !userCode) return;
+    if (!isProgressLoaded || !currentItem || !userCode) return;
     try {
       localStorage.setItem(`codemasr_book_chal_code_${codeKey}_${currentItem.challenge.id}`, userCode);
     } catch {}
-  }, [userCode, currentItem?.challenge.id, codeKey]);
+    const timer = window.setTimeout(() => {
+      void saveProgressEntry(codeKey, `bookChallengeSolution:${currentItem.challenge.id}`, userCode);
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [userCode, currentItem?.challenge.id, codeKey, isProgressLoaded]);
 
   // Load server completed challenges on mount
   useEffect(() => {
     fetch('/api/progress', { headers: sessionHeaders() })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
+        const entries = data?.progress?.stateEntries as Record<string, { value: boolean | string; updatedAt: number }> | undefined;
+        if (entries) {
+          Object.entries(entries).forEach(([key, entry]) => {
+            if (key.startsWith('bookChallengeSolution:') && typeof entry.value === 'string') {
+              const challengeId = key.slice('bookChallengeSolution:'.length);
+              localStorage.setItem(`codemasr_book_chal_code_${codeKey}_${challengeId}`, entry.value);
+            }
+          });
+        }
         if (data?.success && Array.isArray(data.progress?.completedChallenges)) {
           setSolvedMap((prev) => {
             const next = { ...prev };
@@ -165,7 +179,8 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
           });
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setIsProgressLoaded(true));
   }, [codeKey]);
 
   const handleRun = async () => {

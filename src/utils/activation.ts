@@ -1,3 +1,6 @@
+import { saveLocalProgressEntry } from './progressSync';
+import type { ProgressEntries } from './progressSync';
+
 /**
  * Client-side Access & Activation Service.
  * Connects to the backend server to verify codes, check expiration, and manage codes.
@@ -15,6 +18,10 @@ export interface CodeProgress {
   lastUpdated?: string;
   challengeCodes?: Record<string, string>;
   completedChallenges?: string[];
+  completedExamParts?: number[];
+  bookmarkedChapterIds?: number[];
+  chapterNotes?: Record<string, string>;
+  stateEntries?: ProgressEntries;
 }
 
 export interface CodeRecord {
@@ -250,6 +257,33 @@ export async function fetchAdminCodes(
   }
 }
 
+export async function fetchAdminBackup(): Promise<{
+  success: boolean;
+  backup?: { schemaVersion: number; createdAt: string; codes: CodeRecord[] };
+  message?: string;
+}> {
+  try {
+    const res = await fetch('/api/admin/backup', {
+      headers: sessionHeaders(),
+      cache: 'no-store',
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success || !Array.isArray(data.codes)) {
+      return { success: false, message: data.message || 'تعذر إنشاء النسخة الاحتياطية.' };
+    }
+    return {
+      success: true,
+      backup: {
+        schemaVersion: Number(data.schemaVersion) || 1,
+        createdAt: String(data.createdAt || new Date().toISOString()),
+        codes: data.codes,
+      },
+    };
+  } catch {
+    return { success: false, message: 'تعذر الاتصال بالخادم لإنشاء النسخة الاحتياطية.' };
+  }
+}
+
 export async function adminGenerateCode(
   _adminCode: string,
   options: {
@@ -347,11 +381,8 @@ export async function fetchCodeProgress(_code: string): Promise<CodeProgress | n
 export async function syncCodeProgress(
   _code: string,
   progress: {
-    completedChapters: number[];
-    completedQuizzes: string[];
     lastChapterId: number;
-    challengeCodes?: Record<string, string>;
-    completedChallenges?: string[];
+    stateEntries: ProgressEntries;
   }
 ): Promise<boolean> {
   try {
@@ -361,6 +392,22 @@ export async function syncCodeProgress(
       body: JSON.stringify(progress),
     });
     return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function saveProgressEntry(
+  _code: string,
+  key: string,
+  value: boolean | string,
+): Promise<boolean> {
+  try {
+    const entry = saveLocalProgressEntry(_code.trim().toUpperCase(), key, value);
+    window.dispatchEvent(new CustomEvent('codemasr:progress-entry', {
+      detail: { codeKey: _code.trim().toUpperCase(), key, entry },
+    }));
+    return true;
   } catch {
     return false;
   }
@@ -445,3 +492,4 @@ export async function deleteStudentSnippetFromServer(
     return false;
   }
 }
+

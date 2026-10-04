@@ -9,6 +9,7 @@ import {
   saveStudentDraftToServer,
   saveStudentSnippetToServer,
   deleteStudentSnippetFromServer,
+  saveProgressEntry,
   sessionHeaders,
   StudentSnippet,
 } from '../utils/activation';
@@ -216,6 +217,7 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
 
   // Coding Challenges States
   const [activeChallenge, setActiveChallenge] = useState<CodingChallenge | null>(null);
+  const [isProgressLoaded, setIsProgressLoaded] = useState(false);
   const [completedChallengeIds, setCompletedChallengeIds] = useState<string[]>(() => {
     try {
       const key = (activeCode || localStorage.getItem('codemasr_active_code') || 'GUEST').trim().toUpperCase();
@@ -273,6 +275,15 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data && data.success) {
+          const entries = data.progress?.stateEntries as Record<string, { value: boolean | string; updatedAt: number }> | undefined;
+          if (entries) {
+            Object.entries(entries).forEach(([key, entry]) => {
+              if (key.startsWith('challengeSolution:') && typeof entry.value === 'string') {
+                const challengeId = key.slice('challengeSolution:'.length);
+                localStorage.setItem(`codemasr_challenge_code_${clean}_${challengeId}`, entry.value);
+              }
+            });
+          }
           if (Array.isArray(data.progress?.completedChallenges)) {
             setCompletedChallengeIds((prev) => {
               const merged = Array.from(new Set([...prev, ...data.progress.completedChallenges]));
@@ -287,7 +298,8 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
           }
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setIsProgressLoaded(true));
   }, [activeCode, initialCode, dismissedFeedback]);
 
   // Auto-save student draft code (debounced 1200ms)
@@ -454,11 +466,21 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
 
   // Auto-save active challenge code
   useEffect(() => {
-    if (!activeChallenge) return;
+    if (!isProgressLoaded || !activeChallenge) return;
     try {
       localStorage.setItem(`codemasr_challenge_code_${codeKey}_${activeChallenge.id}`, code);
     } catch {}
-  }, [code, activeChallenge, codeKey]);
+    const timer = window.setTimeout(() => {
+      void saveProgressEntry(codeKey, `challengeSolution:${activeChallenge.id}`, code);
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [code, activeChallenge, codeKey, isProgressLoaded]);
+
+  useEffect(() => {
+    if (!isProgressLoaded || !activeChallenge || code !== activeChallenge.starterCode) return;
+    const saved = localStorage.getItem(`codemasr_challenge_code_${codeKey}_${activeChallenge.id}`);
+    if (saved && saved !== code) setCode(saved);
+  }, [isProgressLoaded, activeChallenge, code, codeKey]);
 
   // Verify Active Challenge Solution
   const handleVerifyChallenge = async () => {
