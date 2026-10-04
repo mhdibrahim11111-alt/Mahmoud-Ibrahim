@@ -1,13 +1,14 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
-import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
 import { generateSmartLocalHint } from './src/utils/smartHints.ts';
 import {
   getAdminCodes,
+  addDynamicAdminCode,
+  removeDynamicAdminCode,
   verifyCode,
   getStoredCodes,
   getStoredCodesPaginated,
@@ -27,86 +28,50 @@ import {
   setStudentFeedback,
 } from './server/codeManager.ts';
 import type { AccessCodeRecord } from './server/codeManager.ts';
+import {
+  getSessionSecret,
+  createSessionToken,
+  readSessionToken,
+  revokeAllSessions,
+  sessionSubject,
+  createRateLimiter,
+  enforceRequestIntegrity,
+  secureLog,
+  SessionClaims,
+} from './server/security.ts';
+import {
+  validateRequest,
+  verifyCodeSchema,
+  smartHintSchema,
+  generateCodeSchema,
+  codeIdBodySchema,
+  reactivateCodeSchema,
+  rotateAdminCodeSchema,
+  adminPaginationQuerySchema,
+  studentFeedbackSchema,
+  updateProgressSchema,
+  completeChallengeSchema,
+  studentDraftSchema,
+  studentSnippetSchema,
+  snippetParamsSchema,
+} from './server/validation.ts';
 
 dotenv.config({ override: true });
 
-const sessionSecret = process.env.SESSION_SECRET || randomBytes(32).toString('hex');
-const SESSION_TTL_SECONDS = 14 * 24 * 60 * 60;
-
+// Production Secrets Verification
 if (process.env.NODE_ENV === 'production') {
-  if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
-    throw new Error('Production requires SESSION_SECRET with at least 32 characters.');
+  try {
+    getSessionSecret();
+    if (getAdminCodes().length === 0) {
+      throw new Error('FATAL: Production requires ADMIN_CODES to be configured as a secret in environment variables.');
+    }
+  } catch (err: any) {
+    secureLog.error('Production Secrets Configuration Error:', err.message);
+    throw err;
   }
-  if (!process.env.ADMIN_CODES?.trim()) {
-    throw new Error('Production requires ADMIN_CODES to be configured as a server-side secret.');
-  }
-}
-
-interface SessionClaims {
-  subject: string;
-  code?: string;
-  role: 'admin' | 'student';
-  exp: number;
 }
 
 type SessionRequest = express.Request & { session?: SessionClaims; sessionCode?: string };
-
-function rateLimit(maxAttempts: number, windowMs: number, bySession = false) {
-  const attempts = new Map<string, { count: number; resetAt: number }>();
-  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const now = Date.now();
-    const sessionSubject = bySession ? (req as SessionRequest).session?.subject : undefined;
-    const key = `${sessionSubject ? `session:${sessionSubject}` : `ip:${req.ip}`}:${req.path}`;
-    let record = attempts.get(key);
-    if (!record || record.resetAt <= now) {
-      record = { count: 0, resetAt: now + windowMs };
-      attempts.set(key, record);
-    }
-    if (record.count >= maxAttempts) {
-      res.setHeader('Retry-After', Math.ceil((record.resetAt - now) / 1000));
-      return res.status(429).json({ success: false, message: 'محاولات كثيرة. انتظر قليلاً ثم حاول مرة أخرى.' });
-    }
-    record.count += 1;
-    next();
-  };
-}
-
-function sessionSubject(code: string, role: SessionClaims['role']): string {
-  return createHmac('sha256', sessionSecret).update(`${role}:${code.trim().toUpperCase()}`).digest('base64url');
-}
-
-function createSessionToken(code: string, role: SessionClaims['role']): string {
-  const payload = Buffer.from(JSON.stringify({
-    subject: sessionSubject(code, role),
-    code: role === 'student' ? code.trim().toUpperCase() : undefined,
-    role,
-    exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
-  } satisfies SessionClaims)).toString('base64url');
-  const signature = createHmac('sha256', sessionSecret).update(payload).digest('base64url');
-  return `${payload}.${signature}`;
-}
-
-function readSessionToken(token: string): SessionClaims | null {
-  const [payload, signature, extra] = token.split('.');
-  if (!payload || !signature || extra) return null;
-  const expected = createHmac('sha256', sessionSecret).update(payload).digest();
-  let actual: Buffer;
-  try {
-    actual = Buffer.from(signature, 'base64url');
-  } catch {
-    return null;
-  }
-  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return null;
-  try {
-    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as SessionClaims;
-    if (!claims.subject || !['admin', 'student'].includes(claims.role) || claims.exp <= Date.now() / 1000) {
-      return null;
-    }
-    return claims;
-  } catch {
-    return null;
-  }
-}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -115,9 +80,13 @@ async function startServer() {
   await initCodesStorage();
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
+
+  // Cloud Run / Reverse Proxy Trust Configuration
   app.set('trust proxy', 1);
 
+  // Security Middleware: Content limits, CSRF and Request Integrity
   app.use(express.json({ limit: '1mb' }));
+  app.use(enforceRequestIntegrity);
 
   const requireSession = (roles?: SessionClaims['role'][]) => async (
     req: express.Request,
@@ -136,7 +105,7 @@ async function startServer() {
     if (claims.role === 'admin') {
       sessionCode = getAdminCodes().find((code) => sessionSubject(code, 'admin') === claims.subject);
       if (!sessionCode) {
-        return res.status(401).json({ success: false, message: 'جلسة المدير لم تعد صالحة.' });
+        return res.status(401).json({ success: false, message: 'جلسة المدير لم تعد صالحة أو تم تدوير الكود.' });
       }
     } else {
       let record: AccessCodeRecord | null = null;
@@ -144,7 +113,7 @@ async function startServer() {
         record = await getAccessCodeRecord(claims.code);
       }
       if (!record || record.status !== 'active' || (record.expiresAt && Date.parse(record.expiresAt) < Date.now())) {
-        return res.status(401).json({ success: false, message: 'كود الاشتراك لم يعد فعالاً.' });
+        return res.status(401).json({ success: false, message: 'كود الاشتراك لم يعد فعالاً أو انتهت صلاحيته.' });
       }
       sessionCode = record.code;
     }
@@ -156,6 +125,35 @@ async function startServer() {
 
   const requireAdmin = requireSession(['admin']);
   const requireStudent = requireSession(['student']);
+
+  // Multi-tier Rate limiters
+  const limitCodeAttempts = createRateLimiter({
+    maxAttempts: 10,
+    windowMs: 15 * 60 * 1000,
+    prefix: 'auth_verify',
+    errorMessage: 'محاولات كثيرة لتأكيد الكود. الرجاء الانتظار 15 دقيقة.',
+  });
+
+  const limitHintRequests = createRateLimiter({
+    maxAttempts: 60,
+    windowMs: 60 * 1000,
+    prefix: 'hint_ip',
+  });
+
+  const limitHintRequestsPerSession = createRateLimiter({
+    maxAttempts: 15,
+    windowMs: 60 * 1000,
+    bySession: true,
+    prefix: 'hint_sess',
+    errorMessage: 'طلب تلميحات كثيرة في دقيقة واحدة. تمهل قليلاً لتجربة الحل.',
+  });
+
+  const limitProgressSync = createRateLimiter({
+    maxAttempts: 120,
+    windowMs: 60 * 1000,
+    bySession: true,
+    prefix: 'progress_sync',
+  });
 
   const isProgressEntryMap = (value: unknown): value is Record<string, { value: boolean | string; updatedAt: number }> => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -173,37 +171,38 @@ async function startServer() {
     });
   };
 
-  const limitCodeAttempts = rateLimit(10, 15 * 60 * 1000);
-  const limitHintRequests = rateLimit(60, 60 * 1000);
-  const limitHintRequestsPerSession = rateLimit(12, 60 * 1000, true);
+  // ==========================================
+  // Smart Hints AI Endpoint
+  // ==========================================
+  app.post(
+    '/api/smart-hint',
+    requireSession(),
+    limitHintRequests,
+    limitHintRequestsPerSession,
+    validateRequest(smartHintSchema),
+    async (req, res) => {
+      const { code, error, mode } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
 
-  // API endpoint for Smart Hints (التلميحات الذكية)
-  app.post('/api/smart-hint', requireSession(), limitHintRequests, limitHintRequestsPerSession, async (req, res) => {
-    const { code, error, mode } = req.body;
-    if (typeof code !== 'string' || code.length > 30000 || (error !== undefined && (typeof error !== 'string' || error.length > 2000))) {
-      return res.status(400).json({ success: false, message: 'حجم الكود أو رسالة الخطأ غير صالح.' });
-    }
-    const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        const localFallback = generateSmartLocalHint(code, error, mode);
+        return res.json({
+          success: true,
+          ...localFallback,
+        });
+      }
 
-    if (!apiKey) {
-      const localFallback = generateSmartLocalHint(code, error, mode);
-      return res.json({
-        success: true,
-        ...localFallback,
-      });
-    }
-
-    try {
-      const ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
+      try {
+        const ai = new GoogleGenAI({
+          apiKey,
+          httpOptions: {
+            headers: {
+              'User-Agent': 'aistudio-build',
+            },
           },
-        },
-      });
+        });
 
-      const prompt = `الكود البرمجي المكتوب في المحرر:
+        const prompt = `الكود البرمجي المكتوب في المحرر:
 \`\`\`${mode || 'javascript'}
 ${code}
 \`\`\`
@@ -216,96 +215,94 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
 - diagnosis: اشرح للدارس سبب الخطأ أو إيه اللي زعل الكمبيوتر ببساطة ومرح.
 - hint: تلميح للحل خطوة بخطوة من غير ما تديه الحل الكامل الجاهز مباشرة عشان يفكر.
 - proTip: نصيحة ذكية وسريعة للمبرمجين المحترفين عشان يتجنب الخطأ ده.`;
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite',
-        contents: prompt,
-        config: {
-          systemInstruction: `أنت "مدرب البرمجة الذكي" التفاعلي لكتاب ومنصة "زكي كود".
+
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.1-flash-lite',
+          contents: prompt,
+          config: {
+            systemInstruction: `أنت "مدرب البرمجة الذكي" التفاعلي لكتاب ومنصة "زكي كود".
 تساعد الطلاب المبتدئين في فهم أخطاء الكود البرمجي (جافاسكريبت، HTML، CSS) بأسلوب العامية المصرية المريح واللطيف والمشجع، بدون تعقيد ولا مصطلحات جافة.
 قواعد الرد:
 1. استخدم مصطلحات الكتاب المصرية المبهجة: "ماتتخضش! 👻"، "الصندوق والخزنة (let vs const)"، "عصير الدوال"، "الكمبيوتر بينفذ بالملي".
-2. لا تعطِ الكود المصحح كاملاً وجاهزاً من أول لحظة حتى لا تحرم الطالب من متعة المحاولة، بل وجهه للسطر والمشكلة خطوة بخطوة.`,          temperature: 0.4,
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              diagnosis: {
-                type: Type.STRING,
-                description: 'إيه اللي زعل الكمبيوتر؟ شرح سبب المشكلة ببساطة وبالمصري',
+2. لا تعطِ الكود المصحح كاملاً وجاهزاً من أول لحظة حتى لا تحرم الطالب من متعة المحاولة، بل وجهه للسطر والمشكلة خطوة بخطوة.`,
+            temperature: 0.4,
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                diagnosis: {
+                  type: Type.STRING,
+                  description: 'إيه اللي زعل الكمبيوتر؟ شرح سبب المشكلة ببساطة وبالمصري',
+                },
+                hint: {
+                  type: Type.STRING,
+                  description: 'تلميح للحل خطوة بخطوة للتوجيه للتفكير والتصحيح',
+                },
+                proTip: {
+                  type: Type.STRING,
+                  description: 'تفصيلة صغيرة.. بس حوار! نصيحة المحترفين لتجنب الخطأ مستقبلاً',
+                },
               },
-              hint: {
-                type: Type.STRING,
-                description: 'تلميح للحل خطوة بخطوة للتوجيه للتفكير والتصحيح',
-              },
-              proTip: {
-                type: Type.STRING,
-                description: 'تفصيلة صغيرة.. بس حوار! نصيحة المحترفين لتجنب الخطأ مستقبلاً',
-              },
+              required: ['diagnosis', 'hint'],
             },
-            required: ['diagnosis', 'hint'],
           },
-        },
-      });
+        });
 
-      const rawJson = response.text?.trim() || '';
-      let parsed: { diagnosis?: string; hint?: string; proTip?: string } = {};
-      try {
-        parsed = JSON.parse(rawJson);
-      } catch {
-        parsed = {};
-      }
+        const rawJson = response.text?.trim() || '';
+        let parsed: { diagnosis?: string; hint?: string; proTip?: string } = {};
+        try {
+          parsed = JSON.parse(rawJson);
+        } catch {
+          parsed = {};
+        }
 
-      if (parsed.diagnosis && parsed.hint) {
+        if (parsed.diagnosis && parsed.hint) {
+          return res.json({
+            success: true,
+            source: 'gemini',
+            diagnosis: parsed.diagnosis,
+            hint: parsed.hint,
+            proTip: parsed.proTip || 'طريقة المحترفين: دايماً راجع الـ Console خطوة بخطوة.',
+            rawText: '',
+            isAi: true,
+          });
+        }
+
+        if (rawJson) {
+          return res.json({
+            success: true,
+            source: 'gemini',
+            diagnosis: 'الكمبيوتر محتاج مراجعة سريعة للكود ده',
+            hint: rawJson,
+            proTip: 'طريقة المحترفين: دايماً اقرأ رسالة الخطأ بهدوء.',
+            rawText: rawJson,
+            isAi: true,
+          });
+        }
+
+        const localFallback = generateSmartLocalHint(code, error, mode);
         return res.json({
           success: true,
-          source: 'gemini',
-          diagnosis: parsed.diagnosis,
-          hint: parsed.hint,
-          proTip: parsed.proTip || 'طريقة المحترفين: دايماً راجع الـ Console خطوة بخطوة.',
-          rawText: '',
-          isAi: true,
+          ...localFallback,
         });
-      }
-
-      // If json parsing was empty but text exists
-      if (rawJson) {
+      } catch (err: unknown) {
+        secureLog.warn('Gemini API call failed, falling back to local hint:', err instanceof Error ? err.message : String(err));
+        const localFallback = generateSmartLocalHint(code, error, mode);
         return res.json({
           success: true,
-          source: 'gemini',
-          diagnosis: 'الكمبيوتر محتاج مراجعة سريعة للكود ده',
-          hint: rawJson,
-          proTip: 'طريقة المحترفين: دايماً اقرأ رسالة الخطأ بهدوء.',
-          rawText: rawJson,
-          isAi: true,
+          ...localFallback,
         });
       }
-
-      const localFallback = generateSmartLocalHint(code, error, mode);
-      return res.json({
-        success: true,
-        ...localFallback,
-      });
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      console.warn('Gemini API call failed, falling back to local hint:', errorMsg);
-      const localFallback = generateSmartLocalHint(code, error, mode);
-      return res.json({
-        success: true,
-        ...localFallback,
-      });
     }
-  });
+  );
 
   // ==========================================
   // Authentication & Access Code Endpoints
   // ==========================================
 
   // 1. Verify access code (for both Admin & Students)
-  app.post('/api/auth/verify', limitCodeAttempts, async (req, res) => {
+  app.post('/api/auth/verify', limitCodeAttempts, validateRequest(verifyCodeSchema), async (req, res) => {
     const { code } = req.body;
-    if (typeof code !== 'string' || !code.trim() || code.length > 128) {
-      return res.status(400).json({ valid: false, message: 'كود التفعيل مطلوب' });
-    }
     const result = await verifyCode(code);
     if (!result.valid) return res.json(result);
     return res.json({
@@ -328,15 +325,18 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
     });
   });
 
-  // 2. Get codes with server-side pagination & filtering (Admin only)
-  app.get('/api/admin/codes', requireAdmin, async (req, res) => {
-    const page = req.query.page ? Math.max(1, Number(req.query.page)) : 1;
-    const pageSize = req.query.pageSize ? Math.max(1, Number(req.query.pageSize)) : 8;
-    const filter = (req.query.filter as 'all' | 'active' | 'expired') || 'all';
-    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
-    const cursor = typeof req.query.cursor === 'string' && req.query.cursor ? req.query.cursor : null;
+  // ==========================================
+  // Admin Endpoints
+  // ==========================================
 
-    // Backward-compatibility: if client requests full list explicitly
+  // 2. Get codes with server-side pagination & filtering (Admin only)
+  app.get('/api/admin/codes', requireAdmin, validateRequest(adminPaginationQuerySchema), async (req, res) => {
+    const page = Number(req.query.page) || 1;
+    const pageSize = Number(req.query.pageSize) || 8;
+    const filter = (req.query.filter as 'all' | 'active' | 'expired') || 'all';
+    const search = req.query.search as string | undefined;
+    const cursor = (req.query.cursor as string) || null;
+
     if (req.query.all === 'true') {
       const allCodes = await getStoredCodes();
       const counts = await getCodesCounts();
@@ -365,7 +365,7 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
     });
   });
 
-  // Free-tier manual backup. Only an authenticated admin can export student records.
+  // Free-tier manual backup (Admin only)
   app.get('/api/admin/backup', requireAdmin, async (_req, res) => {
     const codes = await getStoredCodes();
     res.setHeader('Cache-Control', 'no-store');
@@ -378,31 +378,19 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
   });
 
   // 3. Generate a new code (Admin only)
-  app.post('/api/admin/codes/generate', requireAdmin, async (req, res) => {
+  app.post('/api/admin/codes/generate', requireAdmin, validateRequest(generateCodeSchema), async (req, res) => {
     const adminCode = (req as SessionRequest).sessionCode!;
     const { studentName, customCode, durationDays } = req.body;
-    if (studentName !== undefined && typeof studentName !== 'string') {
-      return res.status(400).json({ success: false, message: 'اسم الطالب غير صالح.' });
-    }
-    if (customCode !== undefined && customCode !== null && typeof customCode !== 'string') {
-      return res.status(400).json({ success: false, message: 'الكود المخصص غير صالح.' });
-    }
-    const parsedDuration = durationDays === undefined || durationDays === null || durationDays === ''
-      ? 0
-      : Number(durationDays);
-    if (!Number.isInteger(parsedDuration) || parsedDuration < 0 || parsedDuration > 3650) {
-      return res.status(400).json({ success: false, message: 'مدة الصلاحية يجب أن تكون من 0 إلى 3650 يوماً.' });
-    }
     const result = await generateCode(adminCode, {
-      studentName,
-      customCode,
-      durationDays: parsedDuration,
+      studentName: studentName ? studentName.trim() : undefined,
+      customCode: customCode ? customCode.trim() : undefined,
+      durationDays,
     });
     return res.status(result.success ? 200 : 400).json(result);
   });
 
   // 4. Expire a code (Admin only)
-  app.post('/api/admin/codes/expire', requireAdmin, async (req, res) => {
+  app.post('/api/admin/codes/expire', requireAdmin, validateRequest(codeIdBodySchema), async (req, res) => {
     const adminCode = (req as SessionRequest).sessionCode!;
     const { codeId } = req.body;
     const result = await expireCode(adminCode, codeId);
@@ -410,28 +398,55 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
   });
 
   // 5. Reactivate an expired code (Admin only)
-  app.post('/api/admin/codes/reactivate', requireAdmin, async (req, res) => {
+  app.post('/api/admin/codes/reactivate', requireAdmin, validateRequest(reactivateCodeSchema), async (req, res) => {
     const adminCode = (req as SessionRequest).sessionCode!;
     const { codeId, extraDays } = req.body;
-    const result = await reactivateCode(adminCode, codeId, extraDays ? Number(extraDays) : undefined);
+    const result = await reactivateCode(adminCode, codeId, extraDays);
     return res.json(result);
   });
 
   // 6. Delete a code permanently (Admin only)
-  app.post('/api/admin/codes/delete', requireAdmin, async (req, res) => {
+  app.post('/api/admin/codes/delete', requireAdmin, validateRequest(codeIdBodySchema), async (req, res) => {
     const adminCode = (req as SessionRequest).sessionCode!;
     const { codeId } = req.body;
     const result = await deleteCode(adminCode, codeId);
     return res.json(result);
   });
 
-  // 6.b Get all student activity and submissions feed with pagination (Admin only)
-  app.get('/api/admin/student-activity', requireAdmin, async (req, res) => {
-    const page = req.query.page ? Math.max(1, Number(req.query.page)) : 1;
-    const pageSize = req.query.pageSize ? Math.max(1, Number(req.query.pageSize)) : 8;
+  // 7. Security: Revoke All Active Sessions (Admin only)
+  app.post('/api/admin/revoke-all-sessions', requireAdmin, async (_req, res) => {
+    revokeAllSessions();
+    secureLog.warn('All active sessions were globally revoked by an administrator.');
+    return res.json({
+      success: true,
+      message: 'تم إبطال جميع الجلسات النشطة بنجاح. سيتعين على جميع المستخدمين تسجيل الدخول مجدداً.',
+    });
+  });
+
+  // 8. Security: Rotate / Add Admin Code (Admin only)
+  app.post('/api/admin/rotate-admin-code', requireAdmin, validateRequest(rotateAdminCodeSchema), async (req, res) => {
+    const { newAdminCode, revokeOldSessions } = req.body;
+    const ok = addDynamicAdminCode(newAdminCode);
+    if (!ok) {
+      return res.status(400).json({ success: false, message: 'تعذر إضافة كود المدير الجديد.' });
+    }
+    if (revokeOldSessions === true) {
+      revokeAllSessions();
+    }
+    secureLog.warn('Admin credentials rotated.');
+    return res.json({
+      success: true,
+      message: 'تم تحديث كود المدير بنجاح. احتفظ بالكود الجديد في مكان آمن.',
+    });
+  });
+
+  // 9. Get student activity feed (Admin only)
+  app.get('/api/admin/student-activity', requireAdmin, validateRequest(adminPaginationQuerySchema), async (req, res) => {
+    const page = Number(req.query.page) || 1;
+    const pageSize = Number(req.query.pageSize) || 8;
     const filter = (req.query.filter as 'all' | 'active' | 'expired') || 'all';
-    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
-    const cursor = typeof req.query.cursor === 'string' && req.query.cursor ? req.query.cursor : null;
+    const search = req.query.search as string | undefined;
+    const cursor = (req.query.cursor as string) || null;
 
     if (req.query.all === 'true') {
       const allCodes = await getStoredCodes();
@@ -493,12 +508,9 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
     });
   });
 
-  // 6.c Send encouragement feedback to student (Admin only)
-  app.post('/api/admin/student-feedback', requireAdmin, async (req, res) => {
+  // 10. Send encouragement feedback (Admin only)
+  app.post('/api/admin/student-feedback', requireAdmin, validateRequest(studentFeedbackSchema), async (req, res) => {
     const { code, feedback } = req.body;
-    if (!code || typeof feedback !== 'string') {
-      return res.status(400).json({ success: false, message: 'كود الطالب والرسالة مطلوبان.' });
-    }
     const ok = await setStudentFeedback(code, feedback);
     return res.json({
       success: ok,
@@ -506,7 +518,11 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
     });
   });
 
-  // 7. Get Progress for a specific code
+  // ==========================================
+  // Student Data & Progress Endpoints
+  // ==========================================
+
+  // 11. Get Progress for a specific code
   app.get('/api/progress', requireSession(), async (req, res) => {
     const code = (req as SessionRequest).sessionCode!;
     const progress = await getCodeProgress(code);
@@ -518,25 +534,19 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
     });
   });
 
-  // 8. Update Progress for a specific code
-  app.post('/api/progress', requireSession(), async (req, res) => {
+  // 12. Update Progress for a specific code
+  app.post('/api/progress', requireSession(), limitProgressSync, validateRequest(updateProgressSchema), async (req, res) => {
     const code = (req as SessionRequest).sessionCode!;
-    const { lastChapterId, stateEntries } = req.body || {};
-    if ((lastChapterId !== undefined && (!Number.isInteger(lastChapterId) || lastChapterId < 1)) || !isProgressEntryMap(stateEntries)) {
-      return res.status(400).json({ success: false, message: 'بيانات التقدم غير صالحة.' });
-    }
+    const { lastChapterId, stateEntries } = req.body;
     const saved = await updateCodeProgress(code, { lastChapterId, stateEntries });
     return res.status(saved ? 200 : 503).json({ success: saved, message: saved ? undefined : 'تعذر حفظ التقدم الآن.' });
   });
 
-  // 8.b Complete a coding challenge
-  app.post('/api/challenge/complete', requireSession(), async (req, res) => {
+  // 13. Complete a coding challenge
+  app.post('/api/challenge/complete', requireSession(), validateRequest(completeChallengeSchema), async (req, res) => {
     const session = (req as SessionRequest).session!;
     const userCode = (req as SessionRequest).sessionCode || session.code;
     const { challengeId } = req.body;
-    if (typeof challengeId !== 'string' || !/^[\w.-]{1,128}$/.test(challengeId)) {
-      return res.status(400).json({ success: false, message: 'معرف التحدي مطلوب.' });
-    }
     if (!userCode) {
       return res.status(400).json({ success: false, message: 'كود المستخدم غير موجود في الجلسة.' });
     }
@@ -550,38 +560,47 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
     return res.json({ success: true, completedChallenges: progress.completedChallenges || [] });
   });
 
-  // 9. Get student saved work (draft + snippets)
+  // 14. Get student saved work (draft + snippets)
   app.get('/api/student-work', requireSession(), async (req, res) => {
     const code = (req as SessionRequest).sessionCode!;
     const data = await getStudentWork(code);
     return res.json({ success: true, ...data });
   });
 
-  // 10. Auto-save student playground draft code
-  app.post('/api/student-work/draft', requireSession(), async (req, res) => {
+  // 15. Auto-save student playground draft code
+  app.post('/api/student-work/draft', requireSession(), validateRequest(studentDraftSchema), async (req, res) => {
     const code = (req as SessionRequest).sessionCode!;
     const { draftCode } = req.body;
     await saveStudentDraft(code, draftCode || '');
     return res.json({ success: true });
   });
 
-  // 11. Save or update a student snippet
-  app.post('/api/student-work/snippet', requireSession(), async (req, res) => {
+  // 16. Save or update a student snippet
+  app.post('/api/student-work/snippet', requireSession(), validateRequest(studentSnippetSchema), async (req, res) => {
     const code = (req as SessionRequest).sessionCode!;
     const { title, code: snippetCode, language, snippetId } = req.body;
     const result = await saveStudentSnippet(code, title || 'مشروع جديد', snippetCode || '', language || 'javascript', snippetId);
     return res.json(result);
   });
 
-  // 12. Delete a student snippet
-  app.delete('/api/student-work/snippet/:id', requireSession(), async (req, res) => {
+  // 17. Delete a student snippet
+  app.delete('/api/student-work/snippet/:id', requireSession(), validateRequest(snippetParamsSchema), async (req, res) => {
     const code = (req as SessionRequest).sessionCode!;
     const snippetId = req.params.id;
     const result = await deleteStudentSnippet(code, snippetId);
     return res.json(result);
   });
 
-  // Serve public assets (manifest, sw.js, icons)
+  // Global Error Handler
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    secureLog.error('Unhandled server error:', err?.message || String(err));
+    res.status(500).json({
+      success: false,
+      message: 'حدث خطأ غير متوقع في الخادم. يرجى المحاولة مرة أخرى لاحقاً.',
+    });
+  });
+
+  // Serve public assets
   app.use(express.static(path.resolve(__dirname, 'public')));
 
   const isProduction = process.env.NODE_ENV === 'production';
@@ -599,7 +618,7 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server listening on port ${PORT}`);
+    secureLog.info(`Server successfully started on port ${PORT}`);
   });
 }
 

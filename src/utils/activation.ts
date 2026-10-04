@@ -493,3 +493,32 @@ export async function deleteStudentSnippetFromServer(
   }
 }
 
+export async function adminRevokeAllSessions(): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await fetch('/api/admin/revoke-all-sessions', {
+      method: 'POST',
+      headers: sessionHeaders(true),
+    });
+    return await res.json();
+  } catch {
+    return { success: false, message: 'تعذر الاتصال بالخادم لإبطال الجلسات.' };
+  }
+}
+
+export async function adminRotateAdminCode(
+  newAdminCode: string,
+  revokeOldSessions: boolean = true
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await fetch('/api/admin/rotate-admin-code', {
+      method: 'POST',
+      headers: sessionHeaders(true),
+      body: JSON.stringify({ newAdminCode, revokeOldSessions }),
+    });
+    return await res.json();
+  } catch {
+    return { success: false, message: 'تعذر الاتصال بالخادم لتحديث كود المدير.' };
+  }
+}
+
+

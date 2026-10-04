@@ -22,17 +22,123 @@ import {
 import type { QueryConstraint } from './firestoreCompat.ts';
 import { db, testConnection, handleFirestoreError, OperationType } from './firebase.ts';
 
+// ==========================================
+// Environment & Secrets Security Validation
+// ==========================================
+
+export interface EnvValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+/**
+ * Validates the presence and security of required environment secrets.
+ * In production mode, any missing or insecure secrets will immediately terminate the process.
+ */
+export function validateEnvironmentSecrets(options: { terminateOnError?: boolean } = {}): EnvValidationResult {
+  const { terminateOnError = process.env.NODE_ENV === 'production' } = options;
+  const isProd = process.env.NODE_ENV === 'production';
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  const rawAdminCodes = process.env.ADMIN_CODES?.trim() || '';
+  const parsedAdminCodes = rawAdminCodes
+    .split(',')
+    .map((c) => c.trim().toUpperCase())
+    .filter((c) => c.length > 0);
+
+  const insecurePlaceholders = ['REPLACE', 'DEFAULT', 'ADMIN', '123456', 'PASSWORD', 'SECRET', 'CHANGEME'];
+
+  if (!rawAdminCodes) {
+    if (isProd) {
+      errors.push('CRITICAL: ADMIN_CODES environment variable is missing in production.');
+    } else {
+      warnings.push('ADMIN_CODES not set in development mode. Using ephemeral dev code.');
+    }
+  } else {
+    const validCodes = parsedAdminCodes.filter((code) => {
+      const isPlaceholder = insecurePlaceholders.some((p) => code.includes(p));
+      return code.length >= 6 && !isPlaceholder;
+    });
+
+    if (validCodes.length === 0) {
+      if (isProd) {
+        errors.push('CRITICAL: ADMIN_CODES contains only weak or placeholder values (minimum 6 characters required, no placeholder words).');
+      } else {
+        warnings.push('ADMIN_CODES contains placeholder or short codes in development.');
+      }
+    }
+  }
+
+  const rawSessionSecret = process.env.SESSION_SECRET?.trim() || '';
+  if (isProd) {
+    if (!rawSessionSecret || rawSessionSecret.length < 32 || rawSessionSecret.includes('replace-with-a-random-secret')) {
+      errors.push('CRITICAL: SESSION_SECRET must be configured with at least 32 high-entropy characters in production.');
+    }
+  }
+
+  if (errors.length > 0) {
+    console.error('====================================================');
+    console.error('❌ FATAL SECURITY CONFIGURATION ERROR:');
+    errors.forEach((err) => console.error(`  - ${err}`));
+    console.error('====================================================');
+    if (terminateOnError) {
+      console.error('🛑 Terminating process to protect application and student data.');
+      process.exit(1);
+    }
+  }
+
+  if (warnings.length > 0 && !isProd) {
+    warnings.forEach((warn) => console.warn(`⚠️ [Security Warning] ${warn}`));
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}
+
+// Run validation immediately on module load
+validateEnvironmentSecrets();
+
+// Dynamic admin codes set in-memory by authenticated admin rotation
+const dynamicAdminCodes = new Set<string>();
+
 // Admin credentials are kept securely on the server, never sent to the browser client.
 export function getAdminCodes(): string[] {
   const envCodes = (process.env.ADMIN_CODES || '')
     .split(',')
     .map((code) => code.trim().toUpperCase())
-    .filter((code) => code && code !== 'REPLACE_WITH_A_NEW_PRIVATE_ADMIN_CODE');
+    .filter((code) => {
+      const isPlaceholder = ['REPLACE', 'DEFAULT', 'CHANGEME'].some((p) => code.includes(p));
+      return code && !isPlaceholder && code.length >= 6;
+    });
 
-  if (envCodes.length > 0) {
-    return envCodes;
+  const combined = Array.from(new Set([...envCodes, ...dynamicAdminCodes]));
+  if (combined.length > 0) {
+    return combined;
+  }
+  // In non-production, if no admin code was configured in .env, issue an ephemeral dev code
+  if (process.env.NODE_ENV !== 'production') {
+    const devCode = (globalThis as any).__DEV_ADMIN_CODE || ((globalThis as any).__DEV_ADMIN_CODE = 'ADM-DEV-' + Math.random().toString(36).substring(2, 8).toUpperCase());
+    return [devCode];
   }
   return [];
+}
+
+export function addDynamicAdminCode(newAdminCode: string): boolean {
+  const clean = newAdminCode.trim().toUpperCase();
+  if (clean.length < 6 || clean.length > 64 || !/^[A-Z0-9_-]+$/.test(clean)) {
+    return false;
+  }
+  dynamicAdminCodes.add(clean);
+  return true;
+}
+
+export function removeDynamicAdminCode(oldAdminCode: string): void {
+  dynamicAdminCodes.delete(oldAdminCode.trim().toUpperCase());
 }
 
 export interface StudentSnippet {
@@ -80,10 +186,7 @@ export interface AccessCodeRecord {
 }
 
 export async function initCodesStorage(): Promise<void> {
-  const connected = await testConnection();
-  if (!connected) {
-    throw new Error('Firestore is unavailable. Configure Application Default Credentials and grant the server identity access.');
-  }
+  await testConnection();
 }
 
 export async function getStoredCodes(): Promise<AccessCodeRecord[]> {

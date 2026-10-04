@@ -9,6 +9,8 @@ import {
   adminReactivateCode,
   adminDeleteCode,
   fetchAdminBackup,
+  adminRevokeAllSessions,
+  adminRotateAdminCode,
 } from '../utils/activation';
 import {
   KeyRound,
@@ -17,6 +19,8 @@ import {
   Check,
   X,
   ShieldCheck,
+  ShieldAlert,
+  Key,
   Dices,
   Trash2,
   Share2,
@@ -77,6 +81,41 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
   const [isExportingBackup, setIsExportingBackup] = useState(false);
+  const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
+  const [newAdminCodeInput, setNewAdminCodeInput] = useState('');
+  const [isRevokingSessions, setIsRevokingSessions] = useState(false);
+  const [isRotatingAdminCode, setIsRotatingAdminCode] = useState(false);
+
+  const handleRevokeAllSessions = async () => {
+    if (!window.confirm('هل أنت متأكد من إبطال جميع الجلسات النشطة؟ سيتعين على جميع الطلاب والمديرين تسجيل الدخول مجدداً.')) {
+      return;
+    }
+    setIsRevokingSessions(true);
+    const res = await adminRevokeAllSessions();
+    setIsRevokingSessions(false);
+    if (res.success) {
+      showNotification(res.message);
+    } else {
+      showNotification(res.message, 'error');
+    }
+  };
+
+  const handleRotateAdminCode = async () => {
+    if (!newAdminCodeInput.trim() || newAdminCodeInput.trim().length < 8) {
+      showNotification('كود المدير الجديد يجب أن يتكون من 8 خانات على الأقل.', 'error');
+      return;
+    }
+    setIsRotatingAdminCode(true);
+    const res = await adminRotateAdminCode(newAdminCodeInput.trim(), true);
+    setIsRotatingAdminCode(false);
+    if (res.success) {
+      showNotification(res.message);
+      setNewAdminCodeInput('');
+      setIsSecurityModalOpen(false);
+    } else {
+      showNotification(res.message, 'error');
+    }
+  };
 
   // Custom delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; code: string; studentName?: string } | null>(null);
@@ -336,6 +375,15 @@ const msg = `أهلاً بك يا بطل! 🚀\nتم تفعيل اشتراكك �
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsSecurityModalOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-amber-300 hover:text-white hover:bg-amber-900/40 transition border border-amber-500/30"
+              title="مركز الأمان وإبطال الجلسات وتدوير الأكواد"
+            >
+              <ShieldAlert className="w-4 h-4 text-amber-400" />
+              <span className="hidden sm:inline">مركز الأمان 🛡️</span>
+            </button>
             <button
               type="button"
               onClick={() => void handleDownloadBackup()}
@@ -1263,6 +1311,82 @@ const msg = `أهلاً بك يا بطل! 🚀\nتم تفعيل اشتراكك �
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Security & Credential Rotation Modal */}
+      {isSecurityModalOpen && (
+        <div className="fixed inset-0 z-[110] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-3xl p-6 sm:p-7 shadow-2xl space-y-6 text-right dir-rtl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold border border-amber-500/30">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white">مركز الأمان وإدارة الجلسات</h3>
+                  <p className="text-xs text-slate-400">إبطال الجلسات وتدوير صلاحيات الوصول</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSecurityModalOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Section 1: Global Session Revocation */}
+            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3">
+              <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
+                <PowerOff className="w-4 h-4" />
+                <span>إبطال جميع الجلسات النشطة فوراً</span>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                في حال الاشتباه في تسريب أي كود أو لمزيد من الأمان، يمكنك إبطال جميع جلسات الدخول الحالية لجميع الطلاب والمديرين بنقرة واحدة.
+              </p>
+              <button
+                type="button"
+                onClick={handleRevokeAllSessions}
+                disabled={isRevokingSessions}
+                className="w-full py-2.5 px-4 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 text-xs font-bold transition flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <PowerOff className="w-4 h-4" />
+                <span>{isRevokingSessions ? 'جاري إبطال الجلسات...' : 'إبطال كل الجلسات المسجلة الآن'}</span>
+              </button>
+            </div>
+
+            {/* Section 2: Rotate Admin Access Code */}
+            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3">
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+                <Key className="w-4 h-4" />
+                <span>تدوير / إضافة كود مدير جديد (Admin Code Rotation)</span>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                عيّن كود مدير جديد فوري. سيتم تفعيل الكود فوراً على الخادم وإبطال الجلسات السابقة.
+              </p>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  dir="ltr"
+                  value={newAdminCodeInput}
+                  onChange={(e) => setNewAdminCodeInput(e.target.value.toUpperCase())}
+                  placeholder="مثال: ADM-MYNEWSECRETCODE2026"
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-sm focus:border-amber-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleRotateAdminCode}
+                  disabled={isRotatingAdminCode || !newAdminCodeInput.trim()}
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 disabled:opacity-50"
+                >
+                  <KeyRound className="w-4 h-4" />
+                  <span>{isRotatingAdminCode ? 'جاري تدوير الكود...' : 'حفظ وتفعيل كود المدير الجديد'}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

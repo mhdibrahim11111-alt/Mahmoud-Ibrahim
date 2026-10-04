@@ -1,10 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // The application accesses Firestore only from its trusted server using
-    // Firebase Admin SDK and Cloud IAM. Browser clients must never access data.
+    // All student records, access codes, progress, and snippets are managed exclusively
+    // via authenticated backend server endpoints with server-side credentials and rate limiting.
+    // Client direct access is blocked to prevent data exposure or tampering.
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
+
