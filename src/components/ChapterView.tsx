@@ -345,9 +345,9 @@ function evaluateChapterChallenge(
                       <button
                         onClick={() => onOpenInPlayground(sec.codeSnippet!)}
                         className="text-slate-400 hover:text-white px-2 py-1 rounded hover:bg-slate-800 transition"
-                        title="فتح وتعديل في مختبر الأكواد"
+                        title="فتح الكود وتعديله في المحرّر"
                       >
-                        تعديل في المختبر
+                        تعديل في المحرّر
                       </button>
 
                       {isWebCode ? (

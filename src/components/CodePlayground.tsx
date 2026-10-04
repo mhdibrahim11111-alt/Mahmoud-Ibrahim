@@ -36,6 +36,7 @@ import {
   Award,
   MessageSquareHeart,
   Target,
+  MoreHorizontal,
 } from 'lucide-react';
 import { CODING_CHALLENGES, CodingChallenge } from '../data/codingChallenges';
 import { markChallengeCompleted } from '../utils/challengesAndTts';
@@ -196,6 +197,7 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
   const [mode, setMode] = useState<'auto' | 'js' | 'html'>('auto');
   const [previewTheme, setPreviewTheme] = useState<'dark' | 'light'>('dark');
   const [previewRefreshTrigger, setPreviewRefreshTrigger] = useState(0);
+  const [showMoreActions, setShowMoreActions] = useState(false);
 
   // Student Saved Code & Snippets
   const [snippets, setSnippets] = useState<StudentSnippet[]>([]);
@@ -531,54 +533,57 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
       )}
 
       {/* Top Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/80 p-4 rounded-2xl border border-slate-800">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-black text-white flex items-center gap-2">
+      <div className="bg-slate-900/80 p-3 sm:p-4 rounded-2xl border border-slate-800 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
               {isWebMode ? (
                 <Globe className="w-5 h-5 text-cyan-400" />
               ) : (
                 <Terminal className="w-5 h-5 text-amber-400" />
               )}
-              مختبر الأكواد التجريبي التفاعلي
+              <span>محرّر الأكواد</span>
             </h2>
-
-            {/* Auto-save Status Badge */}
-            {activeCode && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-950 border border-slate-800 flex items-center gap-1">
-                {autoSaveStatus === 'saving' ? (
-                  <span className="text-amber-400 animate-pulse">جاري الحفظ بالسيرفر...</span>
-                ) : (
-                  <span className="text-emerald-400 flex items-center gap-1">
-                    <Check className="w-3 h-3" />
-                    <span>محفوظ في حسابك</span>
-                  </span>
-                )}
-              </span>
-            )}
+            <p className="hidden sm:block text-xs text-slate-400 mt-0.5">
+              اكتب وجرب الكود بأمان — يُحفظ تلقائيًا في حسابك
+            </p>
           </div>
-          <p className="text-xs text-slate-400 mt-0.5">
-            اكتب، عدل، وجرب الكود بأمان — كل كود تكتبه يُحفظ تلقائياً في حسابك
-          </p>
+
+          {/* Auto-save Status Badge */}
+          {activeCode && (
+            <span className="shrink-0 text-[10px] px-2 py-1 rounded-full font-bold bg-slate-950 border border-slate-800 flex items-center gap-1">
+              {autoSaveStatus === 'saving' ? (
+                <span className="text-amber-400 animate-pulse">جاري الحفظ</span>
+              ) : (
+                <span className="text-emerald-400 flex items-center gap-1">
+                  <Check className="w-3 h-3" />
+                  <span>محفوظ</span>
+                </span>
+              )}
+            </span>
+          )}
         </div>
 
-        {/* Presets Selector & Actions */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Mode Switcher */}
-          <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+        {/* Main editor controls: language, example, run, and save */}
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2">
+          <div role="group" aria-label="اختيار لغة المحرر" className="col-span-2 sm:col-span-1 flex w-full sm:w-auto items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
             <button
               onClick={() => setMode('auto')}
-              className={`px-2.5 py-1 rounded-lg transition ${
+              aria-pressed={mode === 'auto'}
+              aria-label="اكتشاف اللغة تلقائيًا"
+              className={`flex-1 sm:flex-none px-2.5 py-2 sm:py-1.5 rounded-lg transition ${
                 mode === 'auto'
                   ? 'bg-amber-500 text-slate-950 font-bold'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              كشف تلقائي
+              تلقائي
             </button>
             <button
               onClick={() => setMode('js')}
-              className={`px-2.5 py-1 rounded-lg transition flex items-center gap-1 ${
+              aria-pressed={mode === 'js'}
+              aria-label="JavaScript"
+              className={`flex-1 sm:flex-none px-2.5 py-2 sm:py-1.5 rounded-lg transition flex items-center justify-center gap-1 ${
                 mode === 'js'
                   ? 'bg-amber-500 text-slate-950 font-bold'
                   : 'text-slate-400 hover:text-white'
@@ -589,7 +594,9 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
             </button>
             <button
               onClick={() => setMode('html')}
-              className={`px-2.5 py-1 rounded-lg transition flex items-center gap-1 ${
+              aria-pressed={mode === 'html'}
+              aria-label="HTML وCSS"
+              className={`flex-1 sm:flex-none px-2.5 py-2 sm:py-1.5 rounded-lg transition flex items-center justify-center gap-1 ${
                 mode === 'html'
                   ? 'bg-cyan-500 text-slate-950 font-bold'
                   : 'text-slate-400 hover:text-white'
@@ -600,70 +607,6 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
             </button>
           </div>
 
-          {/* Theme switcher for preview */}
-          {isWebMode && (
-            <button
-              onClick={() => setPreviewTheme(previewTheme === 'dark' ? 'light' : 'dark')}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 hover:text-white"
-              title="تبديل مظهر المعاينة بين الفاتح والداكن"
-            >
-              {previewTheme === 'dark' ? (
-                <>
-                  <Sun className="w-3.5 h-3.5 text-amber-400" />
-                  <span>فاتح</span>
-                </>
-              ) : (
-                <>
-                  <Moon className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>داكن</span>
-                </>
-              )}
-            </button>
-          )}
-
-          {/* Save Code to Account Button */}
-          <button
-            onClick={() => {
-              setSnippetTitleInput(`مشروع ${snippets.length + 1} - ${isWebMode ? 'ويب' : 'JS'}`);
-              setShowSaveModal(true);
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition active:scale-95 shadow shadow-emerald-500/10"
-            title="حفظ الكود الحالي في ملفاتك الدائمة باسم مخصص"
-          >
-            <Save className="w-3.5 h-3.5" />
-            <span>حفظ الكود 💾</span>
-          </button>
-
-          {/* My Saved Snippets Button */}
-          <button
-            onClick={() => setShowSavedSnippetsModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-xs font-bold transition active:scale-95"
-            title="عرض كل الأكواد والمشاريع التي قمت بحفظها"
-          >
-            <FolderCode className="w-3.5 h-3.5" />
-            <span>أكوادي المحفوظة ({snippets.length})</span>
-          </button>
-
-          {/* Interactive Coding Challenges Button */}
-          <button
-            onClick={() => setShowChallengesModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-yellow-500/20 to-amber-500/20 hover:from-yellow-500/30 hover:to-amber-500/30 border border-yellow-500/40 text-yellow-300 text-xs font-bold transition active:scale-95 shadow shadow-yellow-500/10"
-            title="تحديات برمجية تفاعلية مرتبطة بفصول كتاب كود بالمصري"
-          >
-            <Trophy className="w-3.5 h-3.5 text-yellow-400" />
-            <span>تحديات كود بالمصري 🏆 ({completedChallengeIds.length}/{CODING_CHALLENGES.length})</span>
-          </button>
-
-          {/* Smart Hints Trigger Button */}
-          <button
-            onClick={() => fetchSmartHint()}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold transition active:scale-95 shadow shadow-amber-500/10"
-            title="طلب تلميح ومساعدة ذكية لشرح الكود أو الأخطاء"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>تلميح ذكي 💡</span>
-          </button>
-
           <select
             onChange={(e) => {
               const selected = presets.find((p) => p.name === e.target.value);
@@ -673,9 +616,10 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
                 setShowHintBox(false);
               }
             }}
-            className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+            aria-label="اختيار مثال جاهز"
+            className="col-span-2 sm:col-span-1 sm:w-52 min-w-0 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 sm:py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
           >
-            <option value="">اختر مثالاً جاهزاً من الكورس...</option>
+            <option value="">مثال جاهز من الكورس...</option>
             {presets.map((p, idx) => (
               <option key={idx} value={p.name}>
                 {p.name}
@@ -684,29 +628,10 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
           </select>
 
           <button
-            onClick={handleCopy}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition"
-          >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copied ? 'تم النسخ' : 'نسخ'}</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setCode('');
-              setShowHintBox(false);
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>تفريغ</span>
-          </button>
-
-          {/* Unified prominent Run / Refresh button */}
-          <button
             onClick={handleRun}
             disabled={isRunning}
-            className={`flex items-center gap-2 font-black px-5 py-2 rounded-xl text-xs sm:text-sm transition active:scale-95 shadow-lg ${
+            title="تشغيل الكود (Ctrl+Enter)"
+            className={`col-span-2 sm:col-span-1 flex w-full sm:w-auto items-center justify-center gap-2 font-black px-5 py-3 sm:py-2 rounded-xl text-sm transition active:scale-[0.99] shadow-lg disabled:opacity-60 ${
               isWebMode
                 ? 'bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 hover:to-cyan-300 text-slate-950 shadow-cyan-500/25'
                 : 'bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 shadow-amber-500/25'
@@ -714,13 +639,99 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
           >
             {isWebMode ? <Globe className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
             <span>
-              {isRunning
-                ? 'جاري التشغيل...'
-                : isWebMode
-                ? 'تحديث ومعاينة الصفحة (Ctrl+Enter)'
-                : 'تشغيل الكود (Ctrl+Enter)'}
+              {isRunning ? 'جاري التشغيل...' : isWebMode ? 'معاينة الصفحة' : 'تشغيل الكود'}
             </span>
+            <span className="hidden sm:inline text-[10px] font-semibold opacity-70">Ctrl+Enter</span>
           </button>
+
+          <button
+            onClick={() => {
+              setSnippetTitleInput(`مشروع ${snippets.length + 1} - ${isWebMode ? 'ويب' : 'JS'}`);
+              setShowSaveModal(true);
+            }}
+            className="flex min-w-0 items-center justify-center gap-1.5 px-2.5 py-2.5 sm:py-2 rounded-xl bg-emerald-600/15 hover:bg-emerald-600/25 border border-emerald-500/35 text-emerald-300 text-xs font-bold transition active:scale-95"
+            title="حفظ الكود الحالي في ملفاتك الدائمة باسم مخصص"
+          >
+            <Save className="w-4 h-4 shrink-0" />
+            <span>حفظ</span>
+          </button>
+
+          <button
+            onClick={() => setShowSavedSnippetsModal(true)}
+            className="flex min-w-0 items-center justify-center gap-1.5 px-2.5 py-2.5 sm:py-2 rounded-xl bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-500/35 text-indigo-300 text-xs font-bold transition active:scale-95"
+            title="عرض كل الأكواد والمشاريع التي قمت بحفظها"
+          >
+            <FolderCode className="w-4 h-4 shrink-0" />
+            <span className="truncate">المحفوظات ({snippets.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowMoreActions((isOpen) => !isOpen)}
+            aria-expanded={showMoreActions}
+            aria-controls="playground-more-actions"
+            className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+          >
+            <MoreHorizontal className="w-4 h-4" />
+            <span>{showMoreActions ? 'إخفاء الأدوات' : 'أدوات إضافية'}</span>
+            <span className={`transition-transform ${showMoreActions ? 'rotate-180' : ''}`}>⌄</span>
+          </button>
+
+          <div id="playground-more-actions" hidden={!showMoreActions} className="col-span-2 sm:col-span-full sm:w-full grid grid-cols-2 sm:flex sm:flex-wrap gap-2 pt-1">
+              <button
+                onClick={() => {
+                  setShowChallengesModal(true);
+                  setShowMoreActions(false);
+                }}
+                className="flex flex-1 items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold transition"
+                title="تحديات برمجية تفاعلية مرتبطة بفصول الكتاب"
+              >
+                <Trophy className="w-4 h-4 shrink-0" />
+                <span>التحديات {completedChallengeIds.length}/{CODING_CHALLENGES.length}</span>
+              </button>
+              <button
+                onClick={() => {
+                  fetchSmartHint();
+                  setShowMoreActions(false);
+                }}
+                className="flex flex-1 items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-300 text-xs font-bold transition"
+                title="طلب تلميح ذكي حول الكود أو الأخطاء"
+              >
+                <Sparkles className="w-4 h-4 shrink-0" />
+                <span>تلميح ذكي</span>
+              </button>
+              <button
+                onClick={() => {
+                  handleCopy();
+                  setShowMoreActions(false);
+                }}
+                className="flex flex-1 items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition"
+              >
+                {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                <span>{copied ? 'تم النسخ' : 'نسخ الكود'}</span>
+              </button>
+              <button
+                onClick={() => {
+                  setCode('');
+                  setShowHintBox(false);
+                  setShowMoreActions(false);
+                }}
+                className="flex flex-1 items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>مسح الكود</span>
+              </button>
+              {isWebMode && (
+                <button
+                  onClick={() => setPreviewTheme((theme) => theme === 'dark' ? 'light' : 'dark')}
+                  className="col-span-2 sm:col-span-1 flex flex-1 items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition"
+                  title="تبديل مظهر المعاينة بين الفاتح والداكن"
+                >
+                  {previewTheme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-cyan-400" />}
+                  <span>{previewTheme === 'dark' ? 'مظهر فاتح' : 'مظهر داكن'}</span>
+                </button>
+              )}
+          </div>
         </div>
       </div>
 

@@ -106,7 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Terminal className="w-4 h-4 shrink-0" strokeWidth={2.2} />
-              <span>الملعب</span>
+              <span>المحرّر</span>
             </button>
 
             <button

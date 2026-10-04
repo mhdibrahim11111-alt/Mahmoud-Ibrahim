@@ -368,7 +368,7 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
             title="انتقل لكتابة كود حر بدون قيود التحدي"
           >
             <Terminal className="w-3.5 h-3.5 text-orange-400" />
-            <span>كتابة كود حر (الملعب) ↗</span>
+            <span>كتابة كود حر (المحرّر) ↗</span>
           </button>
         )}
       </div>
