@@ -1,0 +1,1 @@
+const Module = require('module'); const originalLoad = Module._load; Module._load = function(request, parent, isMain) { const value = originalLoad.apply(this, arguments); if (request === 'node:os') return { ...value, userInfo: () => ({ username: 'codex' }) }; return value; };

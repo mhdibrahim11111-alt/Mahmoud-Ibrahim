@@ -1,0 +1,6 @@
+{
+"name": "زكي كود - المنصة التفاعلية ومحلل المنهج البرمجي",
+  "description": "منصة تعليمية تفاعلية ومحلل دقيق لكتاب البرمجة للمبتدئين بالعامية المصرية مع محرر أكواد ومختبر تجارب وتدقيق فني وتربوي شامل.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

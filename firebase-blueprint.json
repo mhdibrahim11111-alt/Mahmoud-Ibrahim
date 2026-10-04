@@ -1,0 +1,64 @@
+{
+  "entities": {
+    "AccessCode": {
+      "title": "AccessCode",
+      "description": "Student access code with progress, drafts, and saved snippets",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the access code"
+        },
+        "code": {
+          "type": "string",
+          "description": "Uppercase access code entered by the student"
+        },
+        "studentName": {
+          "type": "string",
+          "description": "Name of the student assigned to the code"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        },
+        "expiresAt": {
+          "type": "string",
+          "description": "Expiration date in ISO format or null"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "expired", "revoked"],
+          "description": "Current status of the code"
+        },
+        "usedCount": {
+          "type": "number",
+          "description": "Number of times the code has been used to authenticate"
+        },
+        "lastUsedAt": {
+          "type": "string",
+          "description": "Last timestamp the code was used"
+        },
+        "draftCode": {
+          "type": "string",
+          "description": "Current draft code from the student playground"
+        },
+        "progress": {
+          "type": "object",
+          "description": "Student course and challenge progress"
+        },
+        "savedSnippets": {
+          "type": "array",
+          "description": "List of student saved code snippets"
+        }
+      },
+      "required": ["id", "code", "studentName", "createdAt", "status", "usedCount"]
+    }
+  },
+  "firestore": {
+    "/access_codes/{codeId}": {
+      "schema": "AccessCode",
+      "description": "Collection of student access codes and associated learning progress"
+    }
+  }
+}

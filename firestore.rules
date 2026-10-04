@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global catch-all default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidAccessCode(data) {
+      return data.keys().hasAll(['id', 'code', 'studentName', 'createdAt', 'status', 'usedCount']) &&
+             data.keys().hasOnly(['id', 'code', 'studentName', 'createdAt', 'expiresAt', 'status', 'usedCount', 'lastUsedAt', 'draftCode', 'progress', 'savedSnippets', 'feedback']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.code is string && data.code.size() <= 64 &&
+             data.studentName is string && data.studentName.size() <= 120 &&
+             data.createdAt is string && data.createdAt.size() <= 64 &&
+             (data.expiresAt == null || (data.expiresAt is string && data.expiresAt.size() <= 64)) &&
+             (data.status in ['active', 'expired', 'revoked']) &&
+             data.usedCount is number && data.usedCount >= 0 &&
+             (data.lastUsedAt == null || (data.lastUsedAt is string && data.lastUsedAt.size() <= 64)) &&
+             (!('draftCode' in data) || (data.draftCode is string && data.draftCode.size() <= 100000)) &&
+             (!('progress' in data) || data.progress is map) &&
+             (!('savedSnippets' in data) || (data.savedSnippets is list && data.savedSnippets.size() <= 200)) &&
+             (!('feedback' in data) || (data.feedback is string && data.feedback.size() <= 2000));
+    }
+
+    match /access_codes/{codeId} {
+      allow get: if isValidId(codeId);
+      allow list: if true;
+      allow create: if isValidId(codeId) && isValidAccessCode(incoming()) && incoming().code == codeId;
+      allow update: if isValidId(codeId) && isValidAccessCode(incoming()) && incoming().code == existing().code && incoming().id == existing().id && incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(codeId);
+    }
+
+    match /test/{docId} {
+      allow read: if true;
+    }
+  }
+}
