@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { ViewMode } from '../types';
 import {
   BookOpen,
@@ -13,7 +13,8 @@ import {
   Search,
 } from 'lucide-react';
 import { InstallAppButton } from './InstallAppButton';
-import { OwnerCodeModal } from './OwnerCodeModal';
+
+const OwnerCodeModal = lazy(() => import('./OwnerCodeModal').then((module) => ({ default: module.OwnerCodeModal })));
 
 interface HeaderProps {
   currentView: ViewMode;
@@ -61,9 +62,11 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="w-full px-3 sm:px-6 lg:px-8">
        <div className="h-16 flex items-center justify-between gap-2 sm:gap-4 w-full">
   {/* Right Brand / Logo */}
-  <div
+  <button
+    type="button"
     onClick={() => onSelectView('reader')}
-    className="flex items-center gap-2 sm:gap-3 cursor-pointer select-none group shrink-0"
+    aria-label="العودة إلى الكتاب"
+    className="flex items-center gap-2 sm:gap-3 cursor-pointer select-none group shrink-0 rounded-xl text-right"
   >
     <img
       src="/icons/icon-192.png"
@@ -78,12 +81,13 @@ export const Header: React.FC<HeaderProps> = ({
         تعلم البرمجة بالعامية من الصفر للاحتراف
       </span>
     </div>
-  </div>
+  </button>
 
           {/* Center Navigation: Desktop Only (Hidden on Mobile/Tablet to eliminate duplication) */}
-          <nav className="hidden lg:flex items-center p-1 bg-slate-900/90 rounded-xl border border-slate-800 shadow-inner">
+          <nav aria-label="التنقل الرئيسي" className="hidden lg:flex items-center p-1 bg-slate-900/90 rounded-xl border border-slate-800 shadow-inner">
             <button
               onClick={() => onSelectView('reader')}
+              aria-current={currentView === 'reader' ? 'page' : undefined}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm transition-all duration-200 whitespace-nowrap ${
                 currentView === 'reader'
                   ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 font-black shadow-md shadow-orange-500/20'
@@ -96,6 +100,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               onClick={() => onSelectView('playground')}
+              aria-current={currentView === 'playground' ? 'page' : undefined}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm transition-all duration-200 whitespace-nowrap ${
                 currentView === 'playground'
                   ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 font-black shadow-md shadow-orange-500/20'
@@ -108,6 +113,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               onClick={() => onSelectView('bughunter')}
+              aria-current={currentView === 'bughunter' ? 'page' : undefined}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm transition-all duration-200 whitespace-nowrap relative ${
                 currentView === 'bughunter'
                   ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 font-black shadow-md shadow-orange-500/20'
@@ -123,6 +129,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               onClick={() => onSelectView('challenges')}
+              aria-current={currentView === 'challenges' ? 'page' : undefined}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm transition-all duration-200 whitespace-nowrap ${
                 currentView === 'challenges'
                   ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 font-black shadow-md shadow-orange-500/20'
@@ -140,6 +147,7 @@ export const Header: React.FC<HeaderProps> = ({
             {onOpenSearch && (
               <button
                 onClick={onOpenSearch}
+                aria-label="بحث شامل في محتوى الكتاب"
                 className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition text-xs font-semibold shadow-sm active:scale-95"
                 title="بحث شامل في محتوى الكتاب (Ctrl+K)"
               >
@@ -155,6 +163,7 @@ export const Header: React.FC<HeaderProps> = ({
             {activeCode && (
               <button
                 onClick={onOpenAchievements}
+                aria-label={`الإنجازات وحساب ${studentName || 'طالب جديد'}`}
                 className="flex items-center bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-orange-500/40 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs gap-1.5 shrink-0 shadow-sm transition active:scale-95"
                 title="اضغط لفتح أوسمة الشرف والإنجازات 🏆"
               >
@@ -176,6 +185,7 @@ export const Header: React.FC<HeaderProps> = ({
             {isAdmin && (
               <button
                 onClick={() => setShowOwnerModal(true)}
+                aria-label="إدارة أكواد الطلاب"
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/30 font-bold transition text-[11px]"
                 title="إدارة وتوليد أكواد الطلاب"
               >
@@ -207,6 +217,7 @@ export const Header: React.FC<HeaderProps> = ({
             {onLockPlatform && (
               <button
                 onClick={onLockPlatform}
+                aria-label="قفل المنصة وتسجيل الخروج"
                 className="text-slate-400 hover:text-rose-400 p-1.5 rounded-xl hover:bg-rose-950/30 transition shrink-0"
                 title="قفل المنصة"
               >
@@ -219,11 +230,15 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Admin Codes Modal */}
       {isAdmin && (
-        <OwnerCodeModal
-          adminCode={activeCode || ''}
-          isOpen={showOwnerModal}
-          onClose={() => setShowOwnerModal(false)}
-        />
+        <Suspense fallback={null}>
+          {showOwnerModal && (
+            <OwnerCodeModal
+              adminCode={activeCode || ''}
+              isOpen={showOwnerModal}
+              onClose={() => setShowOwnerModal(false)}
+            />
+          )}
+        </Suspense>
       )}
     </header>
   );

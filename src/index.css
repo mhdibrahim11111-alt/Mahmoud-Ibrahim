@@ -1,4 +1,5 @@
-@import "tailwindcss";
+@import "tailwindcss" source("../src");
+@source "../index.html";
 
 /* Prevent horizontal page overflow on mobile devices without breaking position: sticky */
 html,
@@ -7,6 +8,23 @@ body,
   overflow-x: hidden;
   max-width: 100vw;
   width: 100%;
+}
+
+/* Keep keyboard focus visible even on controls that reset Tailwind outlines. */
+:focus-visible {
+  outline: 2px solid #fbbf24 !important;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Base direction for code blocks and snippets */

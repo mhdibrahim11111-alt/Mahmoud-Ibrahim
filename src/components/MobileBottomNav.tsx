@@ -19,13 +19,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   ];
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 px-3 py-2 flex items-center justify-around font-['Cairo',sans-serif] shadow-2xl safe-area-bottom h-16">
+    <nav aria-label="التنقل الرئيسي" className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 px-3 py-2 flex items-center justify-around font-['Cairo',sans-serif] shadow-2xl safe-area-bottom h-16">
       {navItems.map((item) => {
         const isActive = currentView === item.view;
         return (
           <button
             key={item.view}
             onClick={() => onSelectView(item.view)}
+            aria-current={isActive ? 'page' : undefined}
             className={`flex-1 flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all duration-200 active:scale-95 ${
               isActive
                 ? 'text-orange-400 font-bold'
