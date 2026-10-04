@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState } from 'react';
+import React from 'react';
 import { ViewMode } from '../types';
 import {
   BookOpen,
@@ -8,13 +8,10 @@ import {
   CheckCircle2,
   Lock,
   KeyRound,
-  User,
   Sparkles,
   Search,
 } from 'lucide-react';
 import { InstallAppButton } from './InstallAppButton';
-
-const OwnerCodeModal = lazy(() => import('./OwnerCodeModal').then((module) => ({ default: module.OwnerCodeModal })));
 
 interface HeaderProps {
   currentView: ViewMode;
@@ -47,7 +44,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAchievements,
   unlockedBadgesCount = 0,
 }) => {
-  const [showOwnerModal, setShowOwnerModal] = useState(false);
   const totalItems = totalChaptersCount + totalQuizzesCount;
   const progressPercent =
     totalItems > 0
@@ -141,6 +137,23 @@ export const Header: React.FC<HeaderProps> = ({
               <Trophy className="w-4 h-4 shrink-0" strokeWidth={2.2} />
               <span>التحديات</span>
             </button>
+
+            {isStaff && (
+              <button
+                onClick={() => onSelectView('admin')}
+                aria-current={currentView === 'admin' ? 'page' : undefined}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm transition-all duration-200 whitespace-nowrap ${
+                  currentView === 'admin'
+                    ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black shadow-md shadow-amber-500/20'
+                    : isMaster
+                    ? 'text-amber-300 hover:text-amber-200 hover:bg-amber-950/40 font-bold border border-amber-500/30'
+                    : 'text-emerald-300 hover:text-emerald-200 hover:bg-emerald-950/40 font-bold border border-emerald-500/30'
+                }`}
+              >
+                <KeyRound className="w-4 h-4 shrink-0" strokeWidth={2.2} />
+                <span>{isMaster ? 'لوحة الإدارة 👑' : 'لوحة فصلي 👨‍🏫'}</span>
+              </button>
+            )}
           </nav>
 
           {/* Left Controls: Single Search, Combined Profile & Trophies Badge, PWA */}
@@ -183,32 +196,6 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Master Admin / Teacher Manager Modal Trigger */}
-            {isStaff && (
-              <button
-                onClick={() => setShowOwnerModal(true)}
-                aria-label={isMaster ? 'إدارة أكواد المنصة' : 'لوحة إدارة طلاب فصلي'}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold transition text-[11px] shadow-sm active:scale-95 ${
-                  isMaster
-                    ? 'bg-orange-500/15 hover:bg-orange-500/25 text-orange-300 border border-orange-500/30'
-                    : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30'
-                }`}
-                title={isMaster ? 'لوحة تحكم مالك المنصة 👑' : 'لوحة المعلم وإدارة الطلاب 👨‍🏫'}
-              >
-                {isMaster ? (
-                  <>
-                    <KeyRound className="w-3.5 h-3.5 text-orange-400" strokeWidth={2.3} />
-                    <span className="hidden sm:inline">لوحة المالك</span>
-                  </>
-                ) : (
-                  <>
-                    <User className="w-3.5 h-3.5 text-emerald-400" strokeWidth={2.3} />
-                    <span className="hidden sm:inline">لوحة المعلم</span>
-                  </>
-                )}
-              </button>
-            )}
-
             {/* PWA Install Button (Desktop & Tablet only) */}
             <div className="hidden sm:flex">
               <InstallAppButton />
@@ -242,21 +229,6 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Staff Codes Modal */}
-      {isStaff && (
-        <Suspense fallback={null}>
-          {showOwnerModal && (
-            <OwnerCodeModal
-              adminCode={activeCode || ''}
-              role={role}
-              studentName={studentName}
-              isOpen={showOwnerModal}
-              onClose={() => setShowOwnerModal(false)}
-            />
-          )}
-        </Suspense>
-      )}
     </header>
   );
 };

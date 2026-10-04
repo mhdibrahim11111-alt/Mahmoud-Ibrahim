@@ -1,21 +1,28 @@
 import React from 'react';
 import { ViewMode } from '../types';
-import { BookOpen, Terminal, Bug, Code2 } from 'lucide-react';
+import { BookOpen, Terminal, Bug, Code2, KeyRound } from 'lucide-react';
 
 interface MobileBottomNavProps {
   currentView: ViewMode;
+  role?: 'master' | 'admin' | 'teacher' | 'student';
   onSelectView: (view: ViewMode) => void;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   currentView,
+  role = 'student',
   onSelectView,
 }) => {
+  const isMaster = role === 'master' || role === 'admin';
+  const isTeacher = role === 'teacher';
+  const isStaff = isMaster || isTeacher;
+
   const navItems: { view: ViewMode; label: string; icon: React.ReactNode }[] = [
     { view: 'reader', label: 'الكتاب', icon: <BookOpen className="w-5 h-5" /> },
     { view: 'playground', label: 'الملعب', icon: <Terminal className="w-5 h-5" /> },
     { view: 'bughunter', label: 'صياد الأخطاء', icon: <Bug className="w-5 h-5" /> },
     { view: 'challenges', label: 'التحديات', icon: <Code2 className="w-5 h-5" /> },
+    ...(isStaff ? [{ view: 'admin' as ViewMode, label: isMaster ? 'الإدارة 👑' : 'الفصل 👨‍🏫', icon: <KeyRound className="w-5 h-5" /> }] : []),
   ];
 
   return (

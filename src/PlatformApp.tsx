@@ -29,6 +29,7 @@ const PartSummaryView = lazy(() => import('./components/PartSummaryView').then((
 const CodePlayground = lazy(() => import('./components/CodePlayground').then((module) => ({ default: module.CodePlayground })));
 const BugHunter = lazy(() => import('./components/BugHunter').then((module) => ({ default: module.BugHunter })));
 const ChallengesList = lazy(() => import('./components/ChallengesList').then((module) => ({ default: module.ChallengesList })));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard').then((module) => ({ default: module.AdminDashboard })));
 const GlobalSearchModal = lazy(() => import('./components/GlobalSearchModal').then((module) => ({ default: module.GlobalSearchModal })));
 const AchievementsModal = lazy(() => import('./components/AchievementsModal').then((module) => ({ default: module.AchievementsModal })));
 
@@ -68,11 +69,11 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
   const [currentView, setCurrentView] = useState<ViewMode>(() => {
     try {
       const hash = window.location.hash.replace('#', '').toLowerCase();
-      if (['reader', 'playground', 'bughunter', 'challenges'].includes(hash)) {
+      if (['reader', 'playground', 'bughunter', 'challenges', 'admin'].includes(hash)) {
         return hash as ViewMode;
       }
       const saved = localStorage.getItem(`codemasr_active_view_${codeKey}`);
-      if (saved && ['reader', 'playground', 'bughunter', 'challenges'].includes(saved)) {
+      if (saved && ['reader', 'playground', 'bughunter', 'challenges', 'admin'].includes(saved)) {
         return saved as ViewMode;
       }
     } catch {}
@@ -220,7 +221,7 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '').toLowerCase();
-      if (['reader', 'playground', 'bughunter', 'challenges'].includes(hash)) {
+      if (['reader', 'playground', 'bughunter', 'challenges', 'admin'].includes(hash)) {
         setCurrentView(hash as ViewMode);
       }
     };
@@ -548,13 +549,24 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
               }}
             />
           )}
+
+          {currentView === 'admin' && (
+            <AdminDashboard
+              key={`admin-dash-${codeKey}`}
+              activeCode={activeCode}
+              role={role}
+              studentName={studentName}
+              onSelectView={setCurrentView}
+            />
+          )}
           </Suspense>
         </main>
       </div>
 
-      {/* Feature 6: Mobile Bottom Navigation Bar (4 primary items) */}
+      {/* Feature 6: Mobile Bottom Navigation Bar (4-5 primary items) */}
       <MobileBottomNav
         currentView={currentView}
+        role={role}
         onSelectView={(view) => {
           setCurrentView(view);
           setIsMobileSidebarOpen(false);

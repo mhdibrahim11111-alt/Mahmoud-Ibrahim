@@ -253,14 +253,12 @@ export const OwnerCodeModal: React.FC<OwnerCodeModalProps> = ({
   };
 
   const handleRevokeAllSessions = async () => {
-    if (!window.confirm('هل أنت متأكد من إبطال جميع الجلسات النشطة؟ سيتعين على جميع الطلاب والمعلمين تسجيل الدخول مجدداً.')) {
-      return;
-    }
     setIsRevokingSessions(true);
     const res = await adminRevokeAllSessions();
     setIsRevokingSessions(false);
     if (res.success) {
       showNotification(res.message);
+      setIsSecurityModalOpen(false);
     } else {
       showNotification(res.message, 'error');
     }
