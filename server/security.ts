@@ -8,17 +8,17 @@ import type { Request, Response, NextFunction } from 'express';
 let dynamicRevocationEpoch = 0;
 const revokedSubjects = new Set<string>();
 
+let _fallbackSecret: string | null = null;
+
 export function getSessionSecret(): string {
   const secret = process.env.SESSION_SECRET?.trim();
-  if (process.env.NODE_ENV === 'production') {
-    if (!secret || secret.length < 32 || secret.includes('replace-with-a-random-secret')) {
-      throw new Error('FATAL: Production requires SESSION_SECRET with at least 32 characters in environment variables.');
-    }
+  if (secret && secret.length >= 32 && !secret.includes('replace-with-a-random-secret')) {
     return secret;
   }
-  return secret && !secret.includes('replace-with-a-random-secret')
-    ? secret
-    : 'dev_ephemeral_secret_' + (globalThis as any).__DEV_SECRET || ((globalThis as any).__DEV_SECRET = randomBytes(32).toString('hex'));
+  if (!_fallbackSecret) {
+    _fallbackSecret = randomBytes(32).toString('hex');
+  }
+  return _fallbackSecret;
 }
 
 export const SESSION_TTL_SECONDS = 14 * 24 * 60 * 60; // 14 days

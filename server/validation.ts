@@ -1,14 +1,14 @@
-import { Request, Response, NextFunction } from 'express';
-import { z, ZodError, ZodSchema } from 'zod';
+import type { Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { secureLog } from './security.ts';
 
 /**
  * Validation options interface specifying optional Zod schemas for body, query, and params.
  */
 export interface RequestSchemas {
-  body?: ZodSchema;
-  query?: ZodSchema;
-  params?: ZodSchema;
+  body?: z.ZodSchema;
+  query?: z.ZodSchema;
+  params?: z.ZodSchema;
 }
 
 /**
@@ -30,7 +30,7 @@ export function validateRequest(schemas: RequestSchemas) {
       }
       next();
     } catch (error) {
-      if (error instanceof ZodError) {
+      if (error instanceof z.ZodError) {
         const issues = error.issues.map((i) => ({
           path: i.path.join('.'),
           message: i.message,

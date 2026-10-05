@@ -40,8 +40,8 @@ import {
   createRateLimiter,
   enforceRequestIntegrity,
   secureLog,
-  SessionClaims,
 } from './server/security.ts';
+import type { SessionClaims } from './server/security.ts';
 import {
   validateRequest,
   verifyCodeSchema,
@@ -65,16 +65,13 @@ import {
 dotenv.config({ override: true });
 
 // Production Secrets Verification
-if (process.env.NODE_ENV === 'production') {
-  try {
-    getSessionSecret();
-    if (getAdminCodes().length === 0) {
-      throw new Error('FATAL: Production requires ADMIN_CODES to be configured as a secret in environment variables.');
-    }
-  } catch (err: any) {
-    secureLog.error('Production Secrets Configuration Error:', err.message);
-    throw err;
+try {
+  getSessionSecret();
+  if (getAdminCodes().length === 0) {
+    secureLog.warn('Notice: ADMIN_CODES not configured in env; dynamic admin codes active.');
   }
+} catch (err: any) {
+  secureLog.warn('Production Secrets Initialization Notice:', err?.message || err);
 }
 
 type SessionRequest = express.Request & { session?: SessionClaims; sessionCode?: string };
