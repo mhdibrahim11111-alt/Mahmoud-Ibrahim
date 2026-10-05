@@ -27,27 +27,39 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   ];
 
   return (
-    <nav aria-label="التنقل الرئيسي" className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 px-3 py-2 flex items-center justify-around font-['Cairo',sans-serif] shadow-2xl safe-area-bottom h-16">
+    <nav
+      aria-label="التنقل الرئيسي"
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 px-2 py-1 flex items-center justify-around font-['Cairo',sans-serif] shadow-2xl safe-area-bottom min-h-[64px] h-[calc(4.25rem+env(safe-area-inset-bottom,0px))] touch-manipulation"
+    >
       {navItems.map((item) => {
         const isActive = currentView === item.view;
         return (
           <button
             key={item.view}
+            type="button"
             onClick={() => {
               soundManager.playClick();
               onSelectView(item.view);
             }}
             aria-current={isActive ? 'page' : undefined}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all duration-200 active:scale-95 ${
+            className={`flex-1 min-h-[52px] min-w-[48px] py-1 px-1 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-150 active:scale-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 select-none ${
               isActive
-                ? 'text-orange-400 font-bold'
+                ? 'text-amber-400 font-bold'
                 : 'text-slate-400 hover:text-slate-200 font-medium'
             }`}
           >
-            <div className={`p-1 rounded-lg transition ${isActive ? 'bg-orange-500/15 text-orange-400' : ''}`}>
+            <div
+              className={`p-1.5 rounded-xl transition flex items-center justify-center ${
+                isActive
+                  ? 'bg-amber-500/20 text-amber-400 shadow-sm shadow-amber-500/10'
+                  : 'text-slate-400'
+              }`}
+            >
               {item.icon}
             </div>
-            <span className="text-[11px] leading-none">{item.label}</span>
+            <span className={`text-[11px] sm:text-xs leading-none transition-transform ${isActive ? 'font-bold' : ''}`}>
+              {item.label}
+            </span>
           </button>
         );
       })}

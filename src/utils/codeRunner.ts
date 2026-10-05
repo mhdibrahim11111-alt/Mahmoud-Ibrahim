@@ -120,7 +120,9 @@ export function translateErrorToArabic(rawError: string): string {
     return 'SyntaxError: Identifier already declared. (الاسم ده متعرّف قبل كده بـ let أو const! مينفعش تكتب let لنفس المتغير مرتين في نفس النطاق).';
   }
   if (rawError.includes('is not defined')) {
-    const varName = rawError.split(' ')[0] || 'المتغير';
+    // Extract actual identifier (handles both "ReferenceError: foo is not defined" and "foo is not defined")
+    const match = rawError.match(/(?:ReferenceError:\s*)?([a-zA-Z0-9_$]+)\s+is not defined/i);
+    const varName = match?.[1] || 'المتغير أو الدالة';
     return `${rawError} (الكمبيوتر بيقولك: أنا مش لاقي "${varName}"! اتأكد من كتابة الاسم صح (الحروف الكبيرة والصغيرة)، وإنه متعرّف في نفس الكود اللي بتشغّله؛ كل بلوك تشغيل منفصل ومش بيشارك متغيراته مع البلوكات التانية).`;
   }
   if (rawError.includes('Unexpected token')) {

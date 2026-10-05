@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { Chapter } from '../types';
 import { runJavaScript } from '../utils/codeRunner';
 import { CodeBlock } from './CodeBlock';
-import { CodeEditor } from './CodeEditor';
 import { detectCodeLanguage, buildHtmlPreviewDocument } from '../utils/codePreview';
 import { validateChallenge } from '../utils/challengeValidator';
 import { LiveBrowserPreview } from './LiveBrowserPreview';
 import { FormattedArabicText } from './FormattedArabicText';
 import { ChapterQuiz } from './ChapterQuiz';
 import { soundManager } from '../utils/soundManager';
+
+const CodeEditor = lazy(() =>
+  import('./CodeEditor').then((module) => ({ default: module.CodeEditor }))
+);
 import {
   Play,
   RotateCcw,
@@ -96,6 +99,34 @@ export const ChapterView: React.FC<ChapterViewProps> = ({
   const [challengeSuccess, setChallengeSuccess] = useState<boolean | null>(null);
   const [challengeFeedback, setChallengeFeedback] = useState<string | null>(null);
 
+  // Defer CodeEditor loading until student scrolls to or clicks the challenge editor
+  const [isEditorActivated, setIsEditorActivated] = useState(false);
+  const editorObserverRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (isEditorActivated) return;
+    const target = editorObserverRef.current;
+    if (!target) return;
+
+    if (!('IntersectionObserver' in window)) {
+      setIsEditorActivated(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setIsEditorActivated(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '300px' }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [isEditorActivated, chapter.id]);
+
   // Sync challenge code when chapter or savedChallengeCode changes
   React.useEffect(() => {
     const codeToSet =
@@ -126,10 +157,45 @@ export const ChapterView: React.FC<ChapterViewProps> = ({
     }
   };
 
+  const getChainedSnippetCode = (index: number, code: string): string => {
+    if (index === 0) return code;
+    const lang = detectCodeLanguage(code);
+    if (lang === 'html' || lang === 'css') return code;
+
+    const previousSnippets: string[] = [];
+    for (let i = 0; i < index; i++) {
+      const prevSec = chapter.contentSections[i];
+      if (prevSec?.codeSnippet) {
+        const prevLang = detectCodeLanguage(prevSec.codeSnippet);
+        if (prevLang !== 'html' && prevLang !== 'css') {
+          previousSnippets.push(prevSec.codeSnippet);
+        }
+      }
+    }
+    if (previousSnippets.length === 0) return code;
+    return [...previousSnippets, code].join('\n\n');
+  };
+
   const handleRunSnippet = async (index: number, code: string) => {
     soundManager.playRun();
     setRunningSnippetIndex(index);
-    const res = await runJavaScript(code);
+    let res = await runJavaScript(code);
+
+    // If standalone execution failed due to an undefined variable/function (ReferenceError),
+    // automatically link and chain with previous code snippets in the same chapter
+    if (res.errors && res.errors.length > 0 && index > 0) {
+      const hasNotDefinedError = res.errors.some((err) => err.includes('is not defined'));
+      if (hasNotDefinedError) {
+        const chainedCode = getChainedSnippetCode(index, code);
+        if (chainedCode !== code) {
+          const chainedRes = await runJavaScript(chainedCode);
+          if (chainedRes.success || chainedRes.errors.length < res.errors.length) {
+            res = chainedRes;
+          }
+        }
+      }
+    }
+
     setSnippetOutputs((prev) => ({
       ...prev,
       [index]: { logs: res.logs, errors: res.errors },
@@ -273,6 +339,30 @@ function evaluateChapterChallenge(
     }
   };
 
+  // If detailed lesson content is loading dynamically for this part
+  if (!chapter || !chapter.contentSections || chapter.contentSections.length === 0) {
+    return (
+      <article className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-6 sm:space-y-8 animate-pulse w-full pb-32">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+          <div className="space-y-2 w-full max-w-md">
+            <div className="h-5 bg-slate-800 rounded-md w-1/3"></div>
+            <div className="h-8 bg-slate-800 rounded-lg w-3/4"></div>
+            <div className="h-4 bg-slate-800 rounded w-1/2"></div>
+          </div>
+        </div>
+        <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-6 space-y-4">
+          <div className="h-4 bg-slate-800 rounded w-full"></div>
+          <div className="h-4 bg-slate-800 rounded w-5/6"></div>
+          <div className="h-4 bg-slate-800 rounded w-4/6"></div>
+        </div>
+        <div className="flex items-center justify-center py-8 text-slate-500 font-mono text-xs gap-2">
+          <BookOpen className="w-5 h-5 animate-pulse text-amber-500/60" />
+          <span>جاري فتح محتوى الدرس وموضوعاته...</span>
+        </div>
+      </article>
+    );
+  }
+
   return (
     <article className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-6 sm:space-y-8 animate-fadeIn overflow-hidden w-full pb-32 sm:pb-36 lg:pb-12">
       {/* Chapter Top Breadcrumb & Actions */}
@@ -394,7 +484,7 @@ function evaluateChapterChallenge(
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => onOpenInPlayground(sec.codeSnippet!)}
+                        onClick={() => onOpenInPlayground(getChainedSnippetCode(idx, sec.codeSnippet!))}
                         className="text-slate-400 hover:text-white px-2 py-1 rounded hover:bg-slate-800 transition"
                         title="فتح الكود وتعديله في المحرّر"
                       >
@@ -760,15 +850,49 @@ function evaluateChapterChallenge(
               </div>
             )}
 
-            <div className="rounded-2xl overflow-hidden border border-slate-800 shadow-xl">
-              <CodeEditor
-                value={challengeCode}
-                onChange={handleChallengeChange}
-                onRun={handleTestChallenge}
-                placeholder="// اكتب كودك هنا..."
-                isWebMode={chapter.id === 18 || chapter.id === 19}
-                className="h-60 sm:h-72"
-              />
+            <div
+              ref={editorObserverRef}
+              className="rounded-2xl overflow-hidden border border-slate-800 shadow-xl"
+            >
+              {isEditorActivated ? (
+                <Suspense
+                  fallback={
+                    <div className="h-60 sm:h-72 bg-slate-950 flex flex-col items-center justify-center gap-2 text-slate-500 font-mono text-xs">
+                      <Terminal className="w-6 h-6 animate-pulse text-amber-500/60" />
+                      <span>جاري تشغيل محرر الأكواد...</span>
+                    </div>
+                  }
+                >
+                  <CodeEditor
+                    value={challengeCode}
+                    onChange={handleChallengeChange}
+                    onRun={handleTestChallenge}
+                    placeholder="// اكتب كودك هنا..."
+                    isWebMode={chapter.id === 18 || chapter.id === 19}
+                    className="h-60 sm:h-72"
+                  />
+                </Suspense>
+              ) : (
+                <div
+                  onClick={() => setIsEditorActivated(true)}
+                  className="h-60 sm:h-72 bg-slate-950/80 p-4 font-mono text-xs text-slate-400 cursor-pointer flex flex-col justify-between hover:bg-slate-900/60 transition group select-none"
+                  title="انقر لتشغيل المحرر وكتابة الحل"
+                >
+                  <div className="space-y-1.5 opacity-75 group-hover:opacity-100 transition">
+                    <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                      <Terminal className="w-3.5 h-3.5 text-amber-400" />
+                      <span>محرر الكود التفاعلي (انقر للبدء)</span>
+                    </div>
+                    <pre className="text-slate-300 font-mono text-xs overflow-hidden leading-relaxed whitespace-pre-wrap">
+                      {challengeCode || '// اكتب كود الحل هنا...'}
+                    </pre>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-amber-400 bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/20">
+                    <span>انقر لتفعيل المحرر وكتابة الحل ⚡</span>
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2.5">

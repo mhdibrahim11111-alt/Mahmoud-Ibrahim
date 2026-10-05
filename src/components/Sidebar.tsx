@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { Part, Chapter } from '../types';
 import {
   ChevronDown,
@@ -41,50 +41,6 @@ const partIcons: Record<number, React.ReactNode> = {
   4: <Cpu className="w-4 h-4 text-purple-400" />,
   5: <Layers className="w-4 h-4 text-rose-400" />,
   6: <Globe className="w-4 h-4 text-cyan-400" />,
-};
-
-interface SidebarCheckmarkProps {
-  isCompleted: boolean;
-  onToggle: (e: React.MouseEvent) => void;
-}
-
-const SidebarCheckmark: React.FC<SidebarCheckmarkProps> = ({ isCompleted, onToggle }) => {
-  const [justToggled, setJustToggled] = useState(false);
-  const isInitialMount = useRef(true);
-
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    setJustToggled(true);
-    const timer = setTimeout(() => setJustToggled(false), 550);
-    return () => clearTimeout(timer);
-  }, [isCompleted]);
-
-  return (
-    <button
-      onClick={onToggle}
-      aria-label={isCompleted ? 'تمييز كغير مقروء' : 'تمييز كمقروء ومكتمل'}
-      title={isCompleted ? 'تمييز كغير مقروء' : 'تمييز كمقروء ومكتمل'}
-      className="relative p-1 rounded-md text-slate-500 hover:text-emerald-400 transition-all duration-200 active:scale-75 focus-visible:outline-none flex items-center justify-center shrink-0"
-    >
-      {justToggled && isCompleted && (
-        <span className="absolute inset-0 rounded-full bg-emerald-400/40 animate-check-ripple pointer-events-none" />
-      )}
-      <div className="relative flex items-center justify-center">
-        {isCompleted ? (
-          <CheckCircle
-            className={`w-3.5 h-3.5 text-emerald-400 transition-transform duration-300 ${
-              justToggled ? 'animate-check-pop' : ''
-            }`}
-          />
-        ) : (
-          <Circle className="w-3.5 h-3.5 text-slate-600 hover:text-slate-300 transition-colors duration-200" />
-        )}
-      </div>
-    </button>
-  );
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -145,18 +101,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Search Input & Filter Tabs */}
       <div className="p-3 border-b border-slate-800 space-y-2">
         <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5" />
+          <Search className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="ابحث في فصول وموضوعات الكتاب..."
-            className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl pr-9 pl-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/80 transition"
+            className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl pr-9 pl-10 py-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/80 transition min-h-[42px]"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute left-2.5 top-2 text-xs text-slate-400 hover:text-white"
+              aria-label="مسح البحث"
+              className="absolute left-1 top-1/2 -translate-y-1/2 min-h-[38px] min-w-[38px] flex items-center justify-center text-xs text-slate-400 hover:text-white rounded-lg active:bg-slate-800 transition touch-manipulation"
             >
               مسح
             </button>
@@ -164,26 +121,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Bookmarks & All Toggle Tabs */}
-        <div className="flex items-center gap-1 p-1 bg-slate-950/80 rounded-xl border border-slate-800/80 text-[11px] font-bold">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-950/80 rounded-xl border border-slate-800/80 text-xs font-bold">
           <button
+            type="button"
             onClick={() => setOnlyBookmarked(false)}
-            className={`flex-1 py-1 rounded-lg transition ${
+            className={`flex-1 min-h-[44px] sm:min-h-[38px] py-2 rounded-lg transition flex items-center justify-center touch-manipulation ${
               !onlyBookmarked
-                ? 'bg-amber-500 text-slate-950 shadow-sm'
+                ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             كل الفصول (25)
           </button>
           <button
+            type="button"
             onClick={() => setOnlyBookmarked(true)}
-            className={`flex-1 py-1 rounded-lg transition flex items-center justify-center gap-1 ${
+            className={`flex-1 min-h-[44px] sm:min-h-[38px] py-2 rounded-lg transition flex items-center justify-center gap-1.5 touch-manipulation ${
               onlyBookmarked
-                ? 'bg-amber-500 text-slate-950 shadow-sm'
+                ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Star className="w-3 h-3 fill-current" />
+            <Star className="w-3.5 h-3.5 fill-current" />
             <span>المفضلة ({bookmarkedChapterIds.length})</span>
           </button>
         </div>
@@ -216,34 +175,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               {/* Part Header Accordion */}
               <button
+                type="button"
                 onClick={() => togglePart(part.id)}
-                className="w-full flex items-center justify-between p-2.5 text-right bg-slate-900/40 hover:bg-slate-800/40 transition"
+                className="w-full min-h-[50px] flex items-center justify-between p-3 text-right bg-slate-900/40 hover:bg-slate-800/40 active:bg-slate-800/60 transition touch-manipulation"
               >
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <div className="p-1 rounded-md bg-slate-800">
+                <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                  <div className="p-1.5 rounded-lg bg-slate-800 shrink-0">
                     {partIcons[part.id] || <Boxes className="w-4 h-4 text-amber-400" />}
                   </div>
-                  <div className="truncate flex-1 min-w-0">
-                    <h3 className="text-xs font-bold text-white truncate">{part.title}</h3>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <p className="text-[10px] text-slate-400 truncate font-sans shrink-0">
-                        {completedCount} من {part.chapters.length} منجز
-                      </p>
-                      <div dir="ltr" className="flex-1 max-w-[48px] h-1.5 bg-slate-800/80 rounded-full overflow-hidden shadow-inner">
-                        <div
-                          className="h-full bg-gradient-to-r from-amber-500 to-emerald-400 rounded-full transition-[width] duration-300"
-                          style={{
-                            width: `${part.chapters.length > 0 ? Math.round((completedCount / part.chapters.length) * 100) : 0}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
+                  <div className="truncate">
+                    <h3 className="text-xs sm:text-sm font-bold text-white truncate">{part.title}</h3>
+                    <p className="text-[11px] text-slate-400 truncate font-sans">
+                      {completedCount} من {part.chapters.length} منجز
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 text-slate-400 shrink-0">
+                <div className="flex items-center gap-1.5 text-slate-400 shrink-0">
                   {completedCount === part.chapters.length && part.chapters.length > 0 && (
-                    <span className="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold animate-badge-pop shadow-sm shadow-emerald-500/10">
+                    <span className="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold">
                       تم ✓
                     </span>
                   )}
@@ -267,37 +217,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     return (
                       <div
                         key={chapter.id}
-                        className={`group flex items-center justify-between rounded-lg px-2 py-1.5 transition text-xs ${
+                        className={`group flex items-center justify-between rounded-xl px-2 py-1 min-h-[46px] transition text-xs ${
                           isSelected
                             ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold'
                             : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
                         }`}
                       >
                         <button
+                          type="button"
                           onClick={() => onSelectChapter(chapter)}
-                          className="flex-1 text-right flex items-center gap-1.5 truncate pl-1"
+                          className="flex-1 min-h-[44px] text-right flex items-center gap-2 truncate pl-2 py-1 touch-manipulation active:scale-[0.99] transition"
                         >
-                          <span className="w-4 text-slate-500 text-[10px] font-mono">
+                          <span className="w-5 text-slate-500 text-xs font-mono shrink-0">
                             {chapter.id}
                           </span>
-                          <span className="truncate">{chapter.title.split(':')[1] || chapter.title}</span>
+                          <span className="truncate text-xs sm:text-[13px]">{chapter.title.split(':')[1] || chapter.title}</span>
                           {isBookmarked && (
-                            <Star className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />
+                            <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
                           )}
                           {hasNote && (
                             <span title="يحتوي على ملاحظاتك">
-                              <FileText className="w-3 h-3 text-sky-400 shrink-0" />
+                              <FileText className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                             </span>
                           )}
                         </button>
 
-                        <SidebarCheckmark
-                          isCompleted={isCompleted}
-                          onToggle={(e) => {
+                        <button
+                          type="button"
+                          onClick={(e) => {
                             e.stopPropagation();
                             onToggleChapterCompleted(chapter.id);
                           }}
-                        />
+                          aria-label={isCompleted ? 'تمييز كغير مقروء' : 'تمييز كمقروء ومكتمل'}
+                          title={isCompleted ? 'تمييز كغير مقروء' : 'تمييز كمقروء ومكتمل'}
+                          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-500 hover:text-emerald-400 active:bg-slate-800 active:scale-90 transition touch-manipulation shrink-0"
+                        >
+                          {isCompleted ? (
+                            <CheckCircle className="w-4 h-4 text-emerald-400" />
+                          ) : (
+                            <Circle className="w-4 h-4 text-slate-600 hover:text-slate-400" />
+                          )}
+                        </button>
                       </div>
                     );
                   })}
@@ -305,23 +265,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {/* Part Summary & Capstone Shortcut */}
                   {(part.summary || part.comprehensiveExam) && onSelectPartExam && (
                     <button
+                      type="button"
                       onClick={() => onSelectPartExam(part.id)}
-                      className={`w-full mt-1.5 flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs transition font-semibold ${
+                      className={`w-full mt-2 min-h-[46px] flex items-center justify-between px-3 py-2.5 rounded-xl border text-xs transition font-semibold touch-manipulation active:scale-[0.99] ${
                         selectedPartExamId === part.id
                           ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 shadow-sm'
                           : 'bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-transparent border-amber-500/25 text-amber-300 hover:from-amber-500/20 hover:via-indigo-500/20'
                       }`}
                     >
-                      <span className="flex items-center gap-1.5 text-[11px]">
-                        <Trophy className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span className="flex items-center gap-2 text-xs">
+                        <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
                         <span>ملخص وتحدي {part.title.split(':')[0]} الشامل</span>
                       </span>
                       {completedExamIds?.includes(part.id) ? (
-                        <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-1 rounded border border-emerald-500/30">
+                        <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/30">
                           مكتمل 🏆
                         </span>
                       ) : (
-                        <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full font-bold">
+                        <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold">
                           ملخص 📋
                         </span>
                       )}
@@ -330,19 +291,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                   {/* Bug Hunter Shortcut */}
                   <button
+                    type="button"
                     onClick={() => onSelectBugHunter(part.id)}
-                    className="w-full mt-1.5 flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-rose-950/20 border border-rose-900/30 text-rose-300 hover:bg-rose-950/40 text-xs transition"
+                    className="w-full mt-1.5 min-h-[46px] flex items-center justify-between px-3 py-2.5 rounded-xl bg-rose-950/20 border border-rose-900/30 text-rose-300 hover:bg-rose-950/40 text-xs transition touch-manipulation active:scale-[0.99]"
                   >
-                    <span className="flex items-center gap-1.5 text-[11px] font-medium">
-                      <Bug className="w-3.5 h-3.5 text-rose-400" />
+                    <span className="flex items-center gap-2 text-xs font-medium">
+                      <Bug className="w-4 h-4 text-rose-400 shrink-0" />
                       <span>اكتشف الخطأ! {part.title.split(':')[0]}</span>
                     </span>
                     {isQuizDone ? (
-                      <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-1 rounded border border-emerald-500/30">
+                      <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/30">
                         محلول ✓
                       </span>
                     ) : (
-                      <span className="text-[10px] text-rose-400">تحدٍّ</span>
+                      <span className="text-[10px] text-rose-400 bg-rose-900/40 px-2 py-0.5 rounded-full">تحدٍّ</span>
                     )}
                   </button>
                 </div>
