@@ -12,13 +12,13 @@ export const part4: Part = {
     partId: 4,
     title: 'كويز: لغز الخصم التائه (الطباعة أم الإرجاع؟)',
     context:
-      'الكود ده المفروض يحسب سعر المنتج بعد الخصم ويفحص لو كان العرض قوياً، لكنه بيطبع "عرض عادي" دائماً حتى لو كان الخصم كبيراً!',
+      'الكود ده المفروض يحسب سعر المنتج بعد خصم 50% ويفحص لو كان العرض قوياً، لكنه لا يستخدم ناتج الحساب في الشرط!',
     problemCode: `function applyDiscount(price, discountPercent) {
   const discountAmount = price * discountPercent / 100;
   console.log(price - discountAmount);
 }
 
-const finalPrice = applyDiscount(200, 10);
+const finalPrice = applyDiscount(200, 50);
 
 if (finalPrice < 150) {
   console.log("عرض قوي");
@@ -35,7 +35,7 @@ if (finalPrice < 150) {
   return price - discountAmount; // رجّع القيمة للمستدعي!
 }
 
-const finalPrice = applyDiscount(200, 50); // خصم 50% = 100
+const finalPrice = applyDiscount(200, 50); // نفس المدخلات قبل الإصلاح
 
 if (finalPrice < 150) {
   console.log("عرض قوي");

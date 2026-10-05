@@ -188,157 +188,96 @@ do {
     },
   },
 
-  // Part 4: الدوال والمصفوفات
+  // Part 4: Math والدوال والنطاق ولعبة التخمين
   4: {
     0: {
-      codeSnippet: `function makeJuice(fruit) {
-  return "عصير " + fruit + " طازج 🍹";
-}
-const myDrink = makeJuice("مانجو");
-console.log(myDrink);`,
-      explanation:
-        'الدالة زي الخلاط: بتدخلها فواكه (Parameters)، بتخلطهم وتطلع لك كباية عصير لذيذة في يدك عبر أمر return.',
-      realLifeAnalogy:
-        'زي ماكينة الـ ATM: بتدخل الكارت والمبلغ (مدخلات)، تخرجلك الفلوس في يدك (return). لو طبعت على الشاشة بس ومن غير فلوس مش هتعرف تشتري حاجة!',
+      codeSnippet: "const dice = Math.floor(Math.random() * 6) + 1;",
+      explanation: "Math.floor بتقرب لتحت، وMath.random بترجع كسر من صفر لأقل من واحد؛ ولما نركبهم مع بعض نقدر نطلع رقم صحيح من 1 لـ6.",
+      realLifeAnalogy: "زي اختيار رقم عشوائي من حجر النرد.",
     },
     1: {
-      codeSnippet: `// دالة سهم بسطر واحد مع return ضمني:
-const double = x => x * 2;
-console.log(double(10)); // 20`,
-      explanation:
-        'دوال السهم (Arrow Functions) هي الاختصار العصري للدوال؛ لما تكتفي بسطر واحد بدون أقواس معقوصة، بتعمل return للناتج تلقائياً وبأناقة.',
-      realLifeAnalogy:
-        'زي الرموز التعبيرية والـ Emojis: بتوصل نفس المعنى كامل بس برمز صغير وسريع بدل سطر كتابة طويل!',
+      codeSnippet: "function doubleNumber(number) { return number * 2; } console.log(doubleNumber(7));",
+      explanation: "المعامل بياخد قيمة وقت ما نستدعي الدالة، والدالة بترجع الناتج باستخدام return.",
+      realLifeAnalogy: "زي آلة بندخلها رقم وتطلع لنا نتيجة.",
     },
     2: {
-      codeSnippet: `const heroes = ["سبايدرمان", "باتمان"];
-console.log(heroes[0]); // "سبايدرمان" (البداية من صفر)
-heroes.push("سوبرمان"); // إضافة في الآخر
-console.log(heroes.length); // 3`,
-      explanation:
-        'المصفوفات عبارة عن دولاب أدراج مرقم من الصفر [0]؛ وخاصية length بتقولك فيه كام درج مليان، ودالة push بتزود درج جديد في الآخر.',
-      realLifeAnalogy:
-        'زي أدوار العمارة في مصر: الدور الأرضي هو الصفر [0]، والأول فوقه، فلو عمارة 3 أدوار آخرها الدور التاني!',
+      codeSnippet: "function makeMessage(name) { return \"أهلاً \" + name; } console.log(makeMessage(\"سارة\"));",
+      explanation: "return بيرجّع قيمة نقدر نخزنها ونستخدمها بعدين؛ console.log بيعرضها بس.",
+      realLifeAnalogy: "زي إنك تسلّم الإجابة للي طلبها بدل ما تعرضها على الشاشة بس.",
     },
     3: {
-      codeSnippet: `const scores = [45, 80, 92, 35, 70];
-const passed = scores.filter(s => s >= 50);
-console.log(passed); // [80, 92, 70]`,
-      explanation:
-        'دالة .filter() زي المصفاة: بتعدّي فقط العناصر اللي حققت شرطك في مصفوفة جديدة وبتستبعد الباقي بدون ما تعدل المصفوفة الأصلية.',
-      realLifeAnalogy:
-        'زي مصفاة الشاي أو أمن النادي: بيسيب الأعضاء اللي معاهم كارنيه يعدوا ويرجع الباقي!',
+      codeSnippet: "function startGame() { const secretCode = 999; console.log(\"اللعبة بدأت\"); } startGame();",
+      explanation: "المتغير المحلي اللي بنعرّفه جوه الدالة بيبقى متاح جواها بس.",
+      realLifeAnalogy: "زي مفتاح أوضة مينفعش نستخدمه برّه الأوضة.",
     },
     4: {
-      codeSnippet: `const prices = [10, 20, 30];
-const withTax = prices.map(p => p * 1.14);
-console.log(withTax); // [11.4, 22.8, 34.2]`,
-      explanation:
-        'دالة .map() زي خط إنتاج في مصنع: بتاخد كل عنصر في المصفوفة، تعمل عليه عملية معينة، وتطلع مصفوفة جديدة تماماً بنفس الطول.',
-      realLifeAnalogy:
-        'زي ماكينة طلاء السيارات: بتدخلها 3 عربيات لونهم أبيض، تخرجهم كلهم لونهم أزرق ميتالك!',
+      codeSnippet: "const secret = 6, guess = 6; if (guess === secret) { console.log(\"مبروك كسبت\"); }",
+      explanation: "اللعبة بتقارن التخمين بالرقم السري وبتعرض النتيجة المناسبة.",
+      realLifeAnalogy: "لعبة تخمين رقم.",
     },
   },
 
-  // Part 5: الكائنات والـ DOM
+  // Part 5: المصفوفات والحلقات وطرقها
   5: {
     0: {
-      codeSnippet: `const player = {
-  name: "محمد",
-  level: 5,
-  isOnline: true
-};
-console.log(player.name);       // طريقة النقطة
-console.log(player["level"]);   // طريقة الأقواس`,
-      explanation:
-        'الكائن (Object) هو صندوق ذكي بيجمع معلومات كيان واحد في مفاتيح وقيم؛ تقدر توصف بيه شخص، عربية، منتج، أو أي حاجة في عالمنا.',
-      realLifeAnalogy:
-        'زي بطاقة الرقم القومي أو رخصة القيادة: فيها الاسم، الرقم، الصورة، وتاريخ الميلاد في كارت واحد منظم.',
+      codeSnippet: "const scores = [88, 77, 95]; console.log(scores[0], scores[scores.length - 1]);",
+      explanation: "الفهارس بتبدأ من صفر، وآخر فهرس بيساوي length - 1.",
+      realLifeAnalogy: "زي رفوف مرقمة بتبدأ من صفر.",
     },
     1: {
-      codeSnippet: `const car = {
-  brand: "تويوتا",
-  speed: 0,
-  accelerate() {
-    this.speed = this.speed + 20;
-    console.log(this.brand + " سرعتها الآن: " + this.speed);
-  }
-};
-car.accelerate();`,
-      explanation:
-        'الدوال جوه الكائنات اسمها Methods؛ وكلمة this بتشير لنفس الكائن الحالي عشان تقدر الدالة تقرأ وتعدل خواصه الداخلية بحرية.',
-      realLifeAnalogy:
-        'زي لما تقول "أنا محتاج أشرب مية".. كلمة "أنا" بتشير لنفسك أنت مش لشخص تاني في الشارع!',
+      codeSnippet: "const foods = [\"كشري\", \"ملوخية\"]; for (const food of foods) { console.log(food); }",
+      explanation: "for...of بتعدّي على قيم المصفوفة واحدة واحدة.",
+      realLifeAnalogy: "قراءة قائمة صنفاً بعد صنف.",
     },
     2: {
-      codeSnippet: `// شجرة الـ DOM
-const title = document.querySelector("#main-title");
-title.textContent = "أهلاً بكم في كود بالمصري 🚀";`,
-      explanation:
-        'الـ DOM هو الكوبري بين جافاسكريبت وعناصر صفحة الويب؛ بيحول كود الـ HTML لكائنات تفاعلية تقدر تقرأها وتعدل نصوصها وألوانها على الطاير.',
-      realLifeAnalogy:
-        'زي جهاز الريموت كنترول: واقف بعيد وبضغطة زرار بتغير القناة أو تعلي الصوت في الشاشة بدون ما تلمسها!',
+      codeSnippet: "const fruits = [\"تفاح\"]; fruits.push(\"موز\"); fruits.pop();",
+      explanation: "push بتضيف عنصر في الآخر، وpop بتحذف آخر عنصر.",
+      realLifeAnalogy: "إضافة كتاب أعلى كومة ثم إزالة العلوي.",
     },
     3: {
-      codeSnippet: `const btn = document.querySelector("#save-btn");
-btn.addEventListener("click", () => {
-  console.log("تم النقر على الزرار بنجاح! 🎯");
-});`,
-      explanation:
-        'الدالة addEventListener بتنصب فخاً أو حارساً على العنصر؛ بيفضل مراقب لحد ما المستخدم ينقر أو يكتب، وأول ما الحدث يحصل بيشغل الكود فوراً.',
-      realLifeAnalogy:
-        'زي جرس الباب: بيفضل ساكت لحد ما الضيف يدوس على الزرار، فيرن في الحال!',
+      codeSnippet: "const colors = [\"أحمر\", \"أزرق\"]; console.log(colors.includes(\"أزرق\"), colors.indexOf(\"أحمر\"));",
+      explanation: "includes بتشوف إذا القيمة موجودة، وindexOf بيرجّع مكانها أو -1.",
+      realLifeAnalogy: "البحث في قائمة وتحديد رقم العنصر.",
+    },
+    4: {
+      codeSnippet: "const values = [2, 5, 8]; for (let i = 0; i < values.length; i++) console.log(values[i]);",
+      explanation: "خلّي شرط الحلقة مرتبط بطول المصفوفة عشان متعدّيش آخر فهرس.",
+      realLifeAnalogy: "عدّ الخانات المتاحة فقط.",
     },
   },
 
-  // Part 6: الويب والمشاريع المتكاملة
+  // Part 6: HTML وCSS والنماذج والكائنات وDOM
   6: {
     0: {
-      codeSnippet: `// تخزين واسترجاع كائن في الـ LocalStorage:
-const user = { name: "أحمد", score: 100 };
-localStorage.setItem("user_profile", JSON.stringify(user));
-
-const saved = JSON.parse(localStorage.getItem("user_profile") || "{}");
-console.log(saved.name); // "أحمد"`,
-      explanation:
-        'الـ LocalStorage بتخزن البيانات في متصفح المستخدم حتى بعد قفل الجهاز؛ ولأنها مبتقبلش غير نصوص، بنحول الكائن لنص بـ JSON.stringify وبنرجعه بـ JSON.parse.',
-      realLifeAnalogy:
-        'زي كرتونة الشحن: لازم تفكك العفش وترصه في كرتونة عشان تشحنه (stringify)، ولما يوصل البيت تفكه وتركبه تاني (parse)!',
+      codeSnippet: "<h1>العنوان</h1><p>فقرة</p><ul><li>عنصر</li></ul><img src=\"photo.jpg\" alt=\"وصف الصورة\">",
+      explanation: "وسوم HTML بتوضح شكل ومعنى المحتوى، وalt وصف بديل للصورة.",
+      realLifeAnalogy: "مخطط المبنى ولافتات الغرف.",
     },
     1: {
-      codeSnippet: `async function loadData() {
-  console.log("جاري جلب البيانات...");
-  const response = await fetch("https://api.example.com/items");
-  const data = await response.json();
-  console.log("وصلت البيانات بنجاح: ", data);
-}`,
-      explanation:
-        'العمليات غير المتزامنة (Async / Await) بتسمح للمتصفح يجلب بيانات من السيرفر في الخلفية بدون ما يجمد الصفحة أو يعطل حركة الماوس عند المستخدم.',
-      realLifeAnalogy:
-        'زي لما تطلب بيتزا دليفري: بتطلب وتكمل حياتك وتتفرج على التلفزيون لحد ما الدليفري يخبط على الباب، مش بتفضل واقف عند الباب متبسم ساعتين!',
+      codeSnippet: "button { color: white; background-color: #2563eb; padding: 12px; border-radius: 8px; }",
+      explanation: "قاعدة CSS بتحدد العنصر وخصائصه؛ padding للمساحة الداخلية وborder-radius لتدوير الحواف.",
+      realLifeAnalogy: "الدهان والأثاث والمسافات.",
     },
     2: {
-      codeSnippet: `try {
-  // كود ممكن يفشل (زي انقطاع الإنترنت أو مدخل خاطئ)
-  const result = JSON.parse("invalid-json");
-} catch (error) {
-  console.log("اصطدنا الخطأ بسلام ودون انهيار التطبيق: " + error.message);
-}`,
-      explanation:
-        'بنية try...catch هي شبكة الأمان؛ الكود اللي جوه try لو حصل فيه أي عطل أو خطأ غير متوقع، البرنامج مش هيموت بل هيروح لـ catch عشان تعالج المشكلة بلطف.',
-      realLifeAnalogy:
-        'زي حزام الأمان في العربية: لو حصلت فرملة مفاجئة، بيحميك وميخليش العربية تتقلب!',
+      codeSnippet: "<form><label for=\"email\">البريد</label><input id=\"email\" name=\"email\" type=\"email\"></form>",
+      explanation: "اربط label بالحقل عن طريق for وid، واستخدم name عشان تميّز قيمة الحقل.",
+      realLifeAnalogy: "عنوان واضح لكل خانة في الاستمارة.",
     },
     3: {
-      codeSnippet: `const form = document.querySelector("#login-form");
-form.addEventListener("submit", (e) => {
-  e.preventDefault(); // وقف الريلود التلقائي
-  console.log("هنعالج البيانات بجافاسكريبت بدون وميض أو ريفريش!");
-});`,
-      explanation:
-        'السلوك الطبيعي لأي فورم في المتصفح هو إعادة تحميل الصفحة (Reload) فور الإرسال؛ وأمر e.preventDefault() بيوقف السلوك ده ويخلي التطبيق SPA سلس.',
-      realLifeAnalogy:
-        'زي لما تكون في قطار سريع وعايز تنزل محطة، فبتشد فرملة الطوارئ قبل ما يعديها!',
+      codeSnippet: "const car = { brand: \"تويوتا\", speed: 0, accelerate() { this.speed += 20; } }; car.accelerate();",
+      explanation: "الكائن بيجمع بياناته والطرق بتاعته، وthis بتشاور على الكائن اللي استدعينا طريقته.",
+      realLifeAnalogy: "بطاقة مواصفات وعمليات السيارة.",
+    },
+    4: {
+      codeSnippet: "const button = document.querySelector(\"#save\"); button.addEventListener(\"click\", () => { document.querySelector(\"#status\").textContent = \"تم الحفظ\"; });",
+      explanation: "DOM بيسمح لنا نختار عناصر الصفحة، وaddEventListener بيربط تفاعل المستخدم بتغيير ظاهر.",
+      realLifeAnalogy: "جرس يشغّل فعلاً عند النقر.",
+    },
+    5: {
+      codeSnippet: "<style>.card { max-width: 320px; margin: auto; }</style><article class=\"card\"><h2>ملفي</h2></article>",
+      explanation: "المشروع بيجمع HTML للمحتوى وCSS للشكل.",
+      realLifeAnalogy: "تركيب الهيكل والديكور في مشروع واحد.",
     },
   },
+
 };

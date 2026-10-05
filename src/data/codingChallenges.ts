@@ -25,8 +25,8 @@ export interface CodingChallenge {
 export const CODING_CHALLENGES: CodingChallenge[] = [
   {
     id: 'challenge-1-vars',
-    chapterId: 1,
-    chapterTitle: 'الفصل 1: الأساسيات ومفاهيم البرمجة',
+    chapterId: 3,
+    chapterTitle: 'الفصل 3: المتغيرات let و const',
     title: 'تحدي الصندوق والخزنة (let & const)',
     difficulty: 'beginner',
     difficultyLabel: 'سهل للمبتدئين 🌱',
@@ -82,8 +82,8 @@ export const CODING_CHALLENGES: CodingChallenge[] = [
   },
   {
     id: 'challenge-2-conditionals',
-    chapterId: 2,
-    chapterTitle: 'الفصل 2: اتخاذ القرارات (if / else)',
+    chapterId: 5,
+    chapterTitle: 'الفصل 5: الشروط واتخاذ القرارات',
     title: 'تحدي كاشير السوبرماركت (الخصم الذكي)',
     difficulty: 'beginner',
     difficultyLabel: 'سهل وممتع 🛒',
@@ -133,8 +133,8 @@ if (/* اكتب الشرط هنا */) {
   },
   {
     id: 'challenge-3-functions',
-    chapterId: 3,
-    chapterTitle: 'الفصل 3: الدوال وعصير الأوامر',
+    chapterId: 11,
+    chapterTitle: 'الفصل 11: الدوال ومعاملاتها',
     title: 'تحدي خلاط الدوال (دالة حساب المجموع)',
     difficulty: 'intermediate',
     difficultyLabel: 'متوسط 🥤',
@@ -187,8 +187,8 @@ function calculateTotal(price1, price2) {
   },
   {
     id: 'challenge-4-arrays-loops',
-    chapterId: 4,
-    chapterTitle: 'الفصل 4: المصفوفات وحلقات التكرار',
+    chapterId: 16,
+    chapterTitle: 'الفصل 16: الحلقات والمصفوفات',
     title: 'تحدي منيو الأكلات المصرية (Loops & Arrays)',
     difficulty: 'intermediate',
     difficultyLabel: 'متوسط ولذيذ 🍲',
@@ -239,8 +239,8 @@ const foods = ["كشري", "ملوخية", "حواوشي"];
   },
   {
     id: 'challenge-5-objects',
-    chapterId: 5,
-    chapterTitle: 'الفصل 5: الكائنات ومصنع البيانات',
+    chapterId: 24,
+    chapterTitle: 'الفصل 24: الكائنات وطرقها',
     title: 'تحدي كائن بطل اللعبة (Objects)',
     difficulty: 'intermediate',
     difficultyLabel: 'متوسط 🦸‍♂️',
@@ -286,14 +286,14 @@ const hero = {
   },
   {
     id: 'challenge-6-dom',
-    chapterId: 6,
-    chapterTitle: 'الفصل 6: تفاعل صفحة الويب والـ DOM',
+    chapterId: 25,
+    chapterTitle: 'الفصل 25: DOM والأحداث',
     title: 'تحدي الزر التفاعلي والـ DOM (HTML & JS)',
     difficulty: 'hero',
     difficultyLabel: 'تحدي الأبطال 👑',
     points: 30,
     story: 'الـ DOM هو الكوبري السحري اللي بيخلي جافاسكريبت تتحكم في أي عنصر في صفحة الـ HTML وتغير ألوانه ونصوصه لما المستخدم يضغط كليك!',
-    objective: 'حوّل المحرر لوضع HTML، اعمل زر button بزر كليك يغير نص عنوان h1 إلى "مبروك يا مبرمج كود بالمصري!".',
+    objective: 'حوّل المحرر لوضع HTML، واستخدم addEventListener("click") لتغيير نص عنوان h1 إلى "مبروك يا مبرمج كود بالمصري!".',
     starterCode: `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
@@ -304,30 +304,30 @@ const hero = {
 </head>
 <body>
   <h1 id="title">اضغط على الزر يا بطل!</h1>
-  <button onclick="changeText()">غيّر النص 🪄</button>
+  <button id="changeText">غيّر النص 🪄</button>
 
   <script>
-    function changeText() {
+    document.getElementById("changeText").addEventListener("click", () => {
       // 1. استخدم document.getElementById لمسك العنصر صاحب الـ id="title"
       
       // 2. غيّر خاصية innerText للعنصر واكتب: "مبروك يا مبرمج كود بالمصري!"
       
-    }
+    });
   </script>
 </body>
 </html>
 `,
-    solutionHint: 'جوه الدالة اكتب: document.getElementById("title").innerText = "مبروك يا مبرمج كود بالمصري!";',
+    solutionHint: 'داخل مستمع النقر، اكتب: document.getElementById("title").textContent = "مبروك يا مبرمج كود بالمصري!";',
     check: (code: string) => {
       const c = code.toLowerCase();
-      const hasButton = c.includes('<button') && c.includes('onclick');
+      const hasButton = c.includes('<button') && c.includes('addeventlistener') && c.includes('"click"');
       const hasGetElement = c.includes('getelementbyid') || c.includes('queryselector');
       const hasChange = c.includes('innertext') || c.includes('innerhtml') || c.includes('textcontent');
 
       if (!hasButton) {
         return {
           passed: false,
-          message: 'لازم الصفحة تحتوي على عنصر <button> فيه حدث onclick!',
+          message: 'لازم تضيف زراراً وتربطه بحدث click عبر addEventListener.',
         };
       }
       if (!hasGetElement || !hasChange) {

@@ -138,22 +138,22 @@ export const part6: Part = {
         },
         {
           heading: 'إضافة الصور <img> والروابط <a> والوسوم الذاتية',
-          text: `وسم الصورة <img> وسم مميز جداً لأنه "ذاتي الإغلاق (Self-closing)"، يعني ملوش وسم قفل </img>!
+          text: `وسم الصورة <img> عنصر فارغ (void element)، يعني مش بنكتبله وسم إغلاق </img>.
 بيحتاج خاصيتين (Attributes) مهمين:
 - src: مسار أو رابط الصورة على الإنترنت.
-- alt: نص بديل بيظهر لو النت بطيء، وبيساعد محركات البحث ومكفوفي البصر.
+- alt: نص بديل وصف بديل يفيد قارئات الشاشة، ويظهر مكان الصورة إذا تعذر تحميلها.
 
 أما الروابط <a> (Anchor) فبتحتاج خاصية href لتحديد الصفحة التي سينتقل إليها المستخدم عند النقر.`,
           codeSnippet: `<!-- رابط ينتقل لموقع خارجي -->
 <a href="https://google.com">ابحث في جوجل</a>
 
-<!-- صورة ذاتية الإغلاق -->
+<!-- img عنصر فارغ ولا يحتاج وسم إغلاق -->
 <img src="logo.png" alt="شعار كود بالمصري">`,
           callout: {
             type: 'tip',
             title: 'قاعدة الـ h1 الذهبية 🔍',
             content:
-              'محركات البحث (جوجل) بتفضل إن كل صفحة ويب يكون فيها وسم <h1> واحد فقط رئيسي يعبر عن موضوع الصفحة بالكامل، واستخدم h2 و h3 للعناوين الفرعية.',
+              'رتّب العناوين بشكل يوضّح أقسام الصفحة: h1 للعنوان الرئيسي، وبعده h2 وh3 للعناوين الفرعية. المهم العنوان يبقى معبّر وترتيبه منطقي؛ مفيش عدد ثابت لازم من وسوم h1.',
           },
         },
       ],
@@ -161,8 +161,8 @@ export const part6: Part = {
         {
           id: 'ch18-ex1',
           title: 'التمرين 1: قائمة التسوق',
-          code: `console.log("<ul>\\n  <li>تفاح</li>\\n  <li>موز</li>\\n</ul>");`,
-          expectedOutput: `<ul>\n  <li>تفاح</li>\n  <li>موز</li>\n</ul>`,
+          code: `<ul>\n  <li>تفاح</li>\n  <li>موز</li>\n</ul>`,
+          expectedOutput: 'معاينة قائمة غير مرتبة فيها التفاح والموز.',
           explanation: 'كود HTML منظم لقائمة غير مرتبة.',
         },
       ],
@@ -224,11 +224,11 @@ export const part6: Part = {
         id: 'ch18-chal',
         title: 'وريني شطارتك 🧠: كارت المبرمج في HTML',
         prompt:
-          'اكتب كود HTML يطبع في الكونسول وسم <h1> باسمك، وتحته فقرة <p> فيها جملة "أنا مبرمج ويب"، ثم قائمة <ul> فيها مهارتين من مهاراتك بـ <li>.',
-        hint: 'ادمج الوسوم داخل نص console.log واحد مع أسطر جديدة \\n.',
+          'اكتب HTML مباشرة لبطاقة فيها عنوان <h1> باسمك، وفقرة <p> بالنص "أنا مبرمج ويب"، وقائمة <ul> فيها مهارتان داخل <li>.',
+        hint: 'اكتب وسوم h1 و p و ul/li مباشرة، دون console.log.',
         initialCode: `// اكتب كود طباعة وسوم الـ HTML بالترتيب هنا بنفسك...
 `,
-        solutionCode: `console.log("<h1>كود بالمصري</h1>\\n<p>أنا مبرمج ويب</p>\\n<ul>\\n  <li>JavaScript</li>\\n  <li>HTML</li>\\n</ul>");`,
+        solutionCode: `<h1>كود بالمصري</h1>\n<p>أنا مبرمج ويب</p>\n<ul><li>JavaScript</li><li>HTML</li></ul>`,
       },
     },
     {
@@ -263,7 +263,7 @@ h1 {
           text: `أي كود CSS في الكون بيتكتب بقاعدة واحدة ثابتة:
 1. المحدّد (Selector): بنشاور على العنصر اللي عايزين نلونه (مثلاً: h1 أو p أو button).
 2. الأقواس المعقوصة { }: بنفتح قوسين نحط جواهم كل التعديلات.
-3. الخاصية والقيمة (Property: Value;): بنكتب اسم الحاجة اللي عايزين نغيرها (زي color)، بعدها نقطتين فوق بعض (: )، بعدها القيمة، ونختم السطر دائماً بفاصلة منقوطة (;).`,
+3. الخاصية والقيمة (Property: Value;): بنكتب اسم الخاصية (زي color)، ثم نقطتين، ثم القيمة. الفاصلة المنقوطة تفصل بين التصريحات، ويُستحسن وضعها في النهاية رغم أنها اختيارية بعد آخر تصريح.`,
           codeSnippet: `p {
   color: #38bdf8;          /* لون النص سماوي جميل */
   background-color: #0f172a; /* لون الخلفية كحلي داكن */
@@ -312,7 +312,7 @@ h1 {
             type: 'warning',
             title: 'إياك ونسيان الفاصلة المنقوطة (;)! ⛔',
             content:
-              'كل سطر تنسيق في CSS لازم ينتهي بـ ; وإلا المتصفح هيتوه بين الخاصية دي واللي بعدها ومش هينفذ التنسيق خالص!',
+              'الفاصلة المنقوطة بتفصل تعليمات CSS عن بعض. الأفضل تحطها بعد كل تعليمة، حتى الأخيرة، عشان تسهّل الإضافة بعدين؛ ولو اتشالت من آخر تعليمة بس، القاعدة لسه شغالة.',
           },
         },
       ],
@@ -320,8 +320,8 @@ h1 {
         {
           id: 'ch19-ex1',
           title: 'التمرين 1: تنسيق الفقرة في CSS',
-          code: `console.log("p { color: red; font-size: 20px; }");`,
-          expectedOutput: `p { color: red; font-size: 20px; }`,
+          code: `p { color: red; font-size: 20px; }`,
+          expectedOutput: 'معاينة فقرة بخط أحمر حجمه 20px.',
           explanation: 'قاعدة CSS واضحة تحدد اللون والحجم للفقرة.',
         },
       ],
@@ -381,11 +381,11 @@ h1 {
         id: 'ch19-chal',
         title: 'وريني شطارتك 🧠: كود التنسيق الملكي',
         prompt:
-          'اكتب كود يطبع في الكونسول قاعدة CSS لوسم h1 تجعل اللون أزرق (color: blue;) ومحاذاة النص في المنتصف (text-align: center;).',
-        hint: 'h1 { color: blue; text-align: center; }',
+          'اكتب قاعدة CSS للمحدد .highlight تجعل لون النص أصفر باستخدام color: yellow.',
+        hint: '.highlight { color: yellow; }',
         initialCode: `// اكتب كود طباعة قاعدة CSS لـ h1 هنا بنفسك...
 `,
-        solutionCode: `console.log("h1 { color: blue; text-align: center; }");`,
+        solutionCode: `.highlight { color: yellow; }`,
       },
     },
     {
@@ -418,9 +418,9 @@ h1 {
 العنصر المسؤول عن ده هو وسم <input> (وهو ذاتي الإغلاق).
 السر كله في خاصية type:
 - type="text": حقل لكتابة نص عادي.
-- type="password": حقل لكتابة كلمة السر (بيشفر الحروف لنقاط سوداء لحماية الخصوصية!).
-- type="number": حقل يقبل أرقام فقط مع أسهم للزيادة والنقصان.
-- type="email": حقل يتأكد من وجود علامة @.`,
+- type="password": بيخفي الحروف وهي بتتكتب، لكنه مش بيشفّرها ولا بيحميها لوحده.
+- type="number": حقل للأرقام؛ ممكن يقبل كسور أو إشارات حسب إعداداته والمتصفح.
+- type="email": بيفحص شكل البريد بشكل مبدئي، بس مش بيتأكد إن العنوان حقيقي أو بتاع المستخدم.`,
           codeSnippet: `<input type="text" placeholder="اكتب اسمك بالكامل">
 <input type="password" placeholder="أدخل كلمة المرور">
 <input type="number" min="1" max="100" placeholder="العمر">`,
@@ -428,40 +428,40 @@ h1 {
         {
           heading: 'بناء نموذج تسجيل متكامل (Interactive Form)',
           text: `تعال نجمع الـ <div> والـ <label> وحقول الـ <input> مع زرار <button> لبناء نموذج تسجيل أنيق:`,
-          codeSnippet: `<div class="login-box">
+          codeSnippet: `<form class="login-box">
   <h3>تسجيل الدخول</h3>
-  <label>البريد الإلكتروني:</label>
-  <input type="email" placeholder="name@example.com">
-  <label>كلمة المرور:</label>
-  <input type="password" placeholder="••••••••">
+  <label for="email">البريد الإلكتروني:</label>
+  <input id="email" name="email" type="email" placeholder="name@example.com">
+  <label for="password">كلمة المرور:</label>
+  <input id="password" name="password" type="password" placeholder="••••••••">
   <button type="submit">دخول 🚀</button>
-</div>`,
+</form>`,
           type: 'html_preview',
-          htmlCode: `<div class="p-6 bg-slate-900 border border-slate-700 rounded-2xl max-w-sm mx-auto shadow-2xl font-sans" dir="rtl">
+          htmlCode: `<form class="p-6 bg-slate-900 border border-slate-700 rounded-2xl max-w-sm mx-auto shadow-2xl font-sans" dir="rtl">
   <h3 class="text-xl font-bold text-amber-400 mb-4 text-center">تسجيل الدخول</h3>
   <div class="space-y-3">
     <div>
-      <label class="block text-xs font-semibold text-slate-300 mb-1">البريد الإلكتروني:</label>
-      <input type="email" placeholder="student@codemasr.com" class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-slate-100 text-sm focus:outline-none focus:border-amber-400" />
+      <label for="email" class="block text-xs font-semibold text-slate-300 mb-1">البريد الإلكتروني:</label>
+      <input id="email" name="email" type="email" placeholder="student@codemasr.com" class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-slate-100 text-sm focus:outline-none focus:border-amber-400" />
     </div>
     <div>
-      <label class="block text-xs font-semibold text-slate-300 mb-1">كلمة المرور:</label>
-      <input type="password" placeholder="••••••••" class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-slate-100 text-sm focus:outline-none focus:border-amber-400" />
+      <label for="password" class="block text-xs font-semibold text-slate-300 mb-1">كلمة المرور:</label>
+      <input id="password" name="password" type="password" placeholder="••••••••" class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-slate-100 text-sm focus:outline-none focus:border-amber-400" />
     </div>
     <button class="w-full py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold rounded-lg transition shadow-lg mt-2 text-sm">
       تسجيل الدخول 🚀
     </button>
   </div>
-</div>`,
+</form>`,
         },
       ],
       exercises: [
         {
           id: 'ch20-ex1',
           title: 'التمرين 1: حقل كلمة المرور',
-          code: `console.log('<input type="password" placeholder="كلمة المرور">');`,
-          expectedOutput: `<input type="password" placeholder="كلمة المرور">`,
-          explanation: 'حقل إدخال مشفر لحماية كلمات المرور.',
+          code: `<label for="password">كلمة المرور</label>\n<input id="password" name="password" type="password" placeholder="كلمة المرور">`,
+          expectedOutput: 'معاينة حقل كلمة مرور مع تسمية مرتبطة به.',
+          explanation: 'الإخفاء بصري فقط؛ اربط label بالحقل باستخدام for و id.',
         },
       ],
       quiz: [
@@ -474,7 +474,7 @@ h1 {
               text: 'type="password"',
               isCorrect: true,
               explanation:
-                'صح جداً! 🔒 نوع password مصمم خصيصاً لتشفير الحروف أثناء الكتابة.',
+                'صح! 🔒 نوع password يخفي الأحرف على الشاشة، لكنه لا يشفّر قيمة الحقل.',
             },
             {
               id: 'b',
@@ -493,13 +493,13 @@ h1 {
       ],
       challenge: {
         id: 'ch20-chal',
-        title: 'وريني شطارتك 🧠: كود الزرار التفاعلي',
+        title: 'وريني شطارتك 🧠: نموذج بريد إلكتروني',
         prompt:
-          'اكتب كود يطبع في الكونسول وسم زرار <button> يحمل المعرف id="btn" وبداخله نص "انقر هنا".',
-        hint: '<button id="btn">انقر هنا</button>',
+          'اكتب نموذج HTML فيه label مرتبط بحقل بريد باستخدام for و id، وحقل type="email"، وزر إرسال.',
+        hint: 'اجعل قيمة label for مساوية لـ id الحقل، واستخدم button type="submit".',
         initialCode: `// اكتب كود طباعة وسم الزرار هنا بنفسك...
 `,
-        solutionCode: `console.log('<button id="btn">انقر هنا</button>');`,
+        solutionCode: `<form><label for="email">البريد الإلكتروني</label><input id="email" name="email" type="email"><button type="submit">إرسال</button></form>`,
       },
     },
     {
@@ -579,8 +579,8 @@ h1 {
         {
           id: 'ch21-ex1',
           title: 'التمرين 1: تأثير المرور hover',
-          code: `console.log("button:hover { background-color: darkblue; }");`,
-          expectedOutput: `button:hover { background-color: darkblue; }`,
+          code: `button:hover { background-color: darkblue; }`,
+          expectedOutput: 'معاينة قاعدة CSS التي تغيّر خلفية الزر عند المرور عليه.',
           explanation: 'تغيير لون الزر عند مرور مؤشر الفأرة.',
         },
       ],
@@ -615,11 +615,11 @@ h1 {
         id: 'ch21-chal',
         title: 'وريني شطارتك 🧠: حواف الزرار المستديرة',
         prompt:
-          'اكتب كود يطبع قاعدة CSS تجعل أزرار button بحواف دائرية (border-radius: 12px;).',
+          'اكتب قاعدة CSS مباشرة تجعل أزرار button بحواف دائرية (border-radius: 12px;).',
         hint: 'button { border-radius: 12px; }',
         initialCode: `// اكتب كود تدوير حواف الأزرار هنا بنفسك...
 `,
-        solutionCode: `console.log("button { border-radius: 12px; }");`,
+        solutionCode: `button { border-radius: 12px; }`,
       },
     },
     {
@@ -697,8 +697,8 @@ h1 {
         {
           id: 'ch22-ex1',
           title: 'التمرين 1: لون نصف شفاف بـ rgba',
-          code: `console.log("div { background-color: rgba(0, 0, 0, 0.5); }");`,
-          expectedOutput: `div { background-color: rgba(0, 0, 0, 0.5); }`,
+          code: `div { background-color: rgba(0, 0, 0, 0.5); }`,
+          expectedOutput: 'معاينة قاعدة CSS بخلفية سوداء شفافة.',
           explanation: 'خلفية سوداء بنصف شفافية.',
         },
       ],
@@ -733,22 +733,22 @@ h1 {
         id: 'ch22-chal',
         title: 'وريني شطارتك 🧠: شفرة الهكس الخالصة',
         prompt:
-          'اكتب كود يطبع قاعدة CSS تجعل لون خلفية الصفحة body باللون الأبيض النقي باستخدام شفرة الـ Hex وهي #ffffff.',
+          'اكتب قاعدة CSS مباشرة تجعل لون خلفية الصفحة body أبيض باستخدام شفرة Hex وهي #ffffff.',
         hint: 'body { background-color: #ffffff; }',
         initialCode: `// اكتب كود تلوين خلفية body بالهكس الأبيض هنا بنفسك...
 `,
-        solutionCode: `console.log("body { background-color: #ffffff; }");`,
+        solutionCode: `body { background-color: #ffffff; }`,
       },
     },
     {
       id: 23,
       partId: 6,
       partTitle: 'الجزء السادس: من الكود للصفحة',
-      title: 'الفصل 23: بناء موقع متكامل (مشروع عملي)',
-      subtitle: 'صفحة بروفايل أو كارت شخصي متكامل',
+        title: 'الفصل 23: بناء بطاقة ملف شخصي (مشروع عملي)',
+        subtitle: 'دمج HTML وCSS في بطاقة شخصية',
       summaryPoints: [
         'دمج HTML و CSS لبناء كارت بروفايل مبرمج احترافي كامل (Portfolio Card).',
-        'توسيط الكارت في منتصف الصفحة وجعله متجاوباً على الموبايل والكمبيوتر.',
+        'توسيط البطاقة وضبط عرضها لتناسب الشاشات الصغيرة.',
         'استخدام الخطوط والصور والظلال والأزرار التفاعلية في مشروع واحد.',
         'فحص الصفحة والتأكد من توافق الألوان والتنسيقات في بيئة المتصفح الحقيقية.',
       ],
@@ -763,7 +763,14 @@ h1 {
 - الحواف الدائرية وتأثيرات :hover وظلال الصناديق.
 - أنظمة الألوان RGB و Hex والتدرجات.
 
-الآن هنبني معاً صفحة بروفايل مبرمج احترافي (Developer Profile Card)، نقدر نرفعه على الإنترنت ونشاركه مع أصحابنا ويكون أول سطر في معرض أعمالك!`,
+الآن هنبني نموذج بطاقة ملف شخصي. هذا مثال تدريبي لدمج HTML وCSS، ويمكنك تطويره لاحقاً وإضافة رابط تواصل حقيقي قبل نشره.
+
+في CSS هنا استخدمنا Flexbox عشان نوسّط المحتوى:
+- display: flex بيشغّل ترتيب العناصر المرن جوه الحاوية.
+- justify-content بيوسّط العناصر أفقياً.
+- align-items بيوسّطها رأسياً.
+- min-height: 100vh بيخلي الحاوية بطول الشاشة.
+- width: min(...) بيحط حد أقصى للعرض وبيسيب مساحة على الموبايل.`,
           codeSnippet: `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -783,7 +790,7 @@ h1 {
       border-radius: 20px;
       padding: 30px;
       text-align: center;
-      width: 320px;
+      width: min(320px, calc(100% - 32px));
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
     }
     .avatar {
@@ -848,8 +855,8 @@ h1 {
         {
           id: 'ch23-ex1',
           title: 'التمرين 1: هيكل بطاقة البروفايل',
-          code: `console.log('<div class="card">\\n  <h2>اسم المبرمج</h2>\\n  <p>نبذة</p>\\n</div>');`,
-          expectedOutput: `<div class="card">\n  <h2>اسم المبرمج</h2>\n  <p>نبذة</p>\n</div>`,
+          code: `<div class="card"><h2>اسم المبرمج</h2><p>نبذة</p></div>`,
+          expectedOutput: 'معاينة بطاقة فيها اسم المبرمج ونبذة.',
           explanation: 'تجميع الكارت في حاوية div واحدة.',
         },
       ],
@@ -884,11 +891,11 @@ h1 {
         id: 'ch23-chal',
         title: 'وريني شطارتك 🧠: كارت المنتج المتكامل',
         prompt:
-          'اكتب كود يطبع في الكونسول div يحمل class="product" وبداخله عنوان <h3>ساعة ذكية</h3> وتحته زرار <button>شراء</button>.',
-        hint: '<div class="product">\\n  <h3>ساعة ذكية</h3>\\n  <button>شراء</button>\\n</div>',
+          'اكتب بطاقة منتج HTML بكلاس product-card، فيها عنوان h2 وفقرة وزر شراء، وأضف قاعدة CSS واحدة لتنسيق البطاقة.',
+        hint: '<style>.product-card { padding: 16px; }</style><article class="product-card"><h2>ساعة ذكية</h2><p>خفيفة وعملية</p><button>شراء</button></article>',
         initialCode: `// اكتب كود طباعة كارت المنتج هنا بنفسك...
 `,
-        solutionCode: `console.log('<div class="product">\\n  <h3>ساعة ذكية</h3>\\n  <button>شراء</button>\\n</div>');`,
+        solutionCode: `<style>.product-card { padding: 16px; background: #eee; }</style><article class="product-card"><h2>ساعة ذكية</h2><p>خفيفة وعملية</p><button>شراء</button></article>`,
       },
     },
     {
@@ -1152,9 +1159,9 @@ btn.addEventListener("click", function() {
         {
           id: 'ch25-ex1',
           title: 'التمرين 1: تغيير النص في الـ DOM',
-          code: `console.log('document.getElementById("title").textContent = "جديد";');`,
-          expectedOutput: `document.getElementById("title").textContent = "جديد";`,
-          explanation: 'تحديد العنصر وتعديل خاصية textContent.',
+          code: `<h1 id="title">العنوان القديم</h1>\n<button id="change">غيّر النص</button>\n<script>\n  document.getElementById("change").addEventListener("click", () => {\n    document.getElementById("title").textContent = "جديد";\n  });\n</script>`,
+          expectedOutput: 'معاينة صفحة يتغير عنوانها عند النقر على الزر.',
+          explanation: 'اربط حدث النقر ثم حدّث textContent للعنوان.',
         },
       ],
       quiz: [
@@ -1213,17 +1220,15 @@ btn.addEventListener("click", function() {
         id: 'ch25-chal',
         title: 'وريني شطارتك 🧠: مبدل حالة النور (Light Switch)',
         prompt:
-          'اكتب كود يغير نص الفقرة بين "النور مضاء" و "النور مطفي" في كل مرة يتم فيها النقر على الزرار باستخدام متغير boolean.',
-        hint: 'let isOn = false; btn.addEventListener("click", () => { isOn = !isOn; status.textContent = isOn ? "النور مضاء" : "النور مطفي"; });',
+          'اكتب صفحة HTML فيها زر وفقرة. استخدم addEventListener("click") ومتغير boolean لتبديل نص الفقرة بين "النور مضاء" و "النور مطفي" عند كل نقرة.',
+        hint: 'عرّف isOn واربِط الزر بـ addEventListener، ثم بدّل القيمة والنص عبر textContent.',
         initialCode: `// اكتب كود دالة تبديل النور وفحص الحالة بنفسك هنا...
 `,
-        solutionCode: `let isOn = false;
-function toggleLight() {
+        solutionCode: `<!doctype html><html lang="ar" dir="rtl"><body><button id="toggle">بدّل النور</button><p id="status">النور مطفي</p><script>let isOn = false;
+document.getElementById("toggle").addEventListener("click", () => {
   isOn = !isOn;
-  return isOn ? "النور مضاء" : "النور مطفي";
-}
-console.log(toggleLight()); // النور مضاء
-console.log(toggleLight()); // النور مطفي`,
+  document.getElementById("status").textContent = isOn ? "النور مضاء" : "النور مطفي";
+});</script></body></html>`,
       },
     },
   ],
