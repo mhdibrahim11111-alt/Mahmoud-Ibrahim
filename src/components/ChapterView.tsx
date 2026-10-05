@@ -188,7 +188,8 @@ function evaluateChapterChallenge(
           setChallengeFeedback(msg);
         }
       } else if (chapter.id === 19) {
-        const hasHighlight = /\.highlight\s*\{[\s\S]*?\}/i.test(challengeCode);
+        const highlightRule = challengeCode.match(/\.highlight\s*\{([\s\S]*?)\}/i)?.[1] ?? '';
+        const hasHighlight = /(?:^|;)\s*color\s*:\s*yellow\s*(?:;|$)/i.test(highlightRule);
         if (hasHighlight) {
           setChallengeOutput({
             logs: ['🎉 رائع! تم تطبيق قاعدة كلاس .highlight على النص في المعاينة الحية.'],
@@ -205,6 +206,43 @@ function evaluateChapterChallenge(
           setChallengeSuccess(false);
           setChallengeFeedback(msg);
         }
+      } else if (chapter.id === 20) {
+        const labelFor = challengeCode.match(/<label\b[^>]*\bfor=["']([^"']+)["']/i)?.[1];
+        const inputId = challengeCode.match(/<input\b[^>]*\bid=["']([^"']+)["']/i)?.[1];
+        const valid = /<form\b/i.test(challengeCode) && labelFor && labelFor === inputId &&
+          /<input\b[^>]*\btype=["']email["']/i.test(challengeCode) &&
+          /<button\b[^>]*\btype=["']submit["']/i.test(challengeCode);
+        const msg = valid ? 'ممتاز! النموذج فيه تسمية مربوطة بحقل البريد وزر إرسال.' : 'ضيف form، واربط label بالحقل بـ for وid، واستخدم input type="email" وزر type="submit".';
+        setChallengeOutput({ logs: valid ? [msg] : [], errors: valid ? [] : [msg] });
+        setChallengeSuccess(Boolean(valid));
+        setChallengeFeedback(msg);
+      } else if (chapter.id === 21) {
+        const hasRule = /button\s*\{[\s\S]*?border-radius\s*:\s*12px\s*;?[\s\S]*?\}/i.test(challengeCode);
+        const msg = hasRule ? 'حلو! قاعدة button بتدوّر الحواف بمقدار 12px.' : 'اكتب قاعدة button فيها border-radius: 12px;.';
+        setChallengeOutput({ logs: hasRule ? [msg] : [], errors: hasRule ? [] : [msg] });
+        setChallengeSuccess(hasRule);
+        setChallengeFeedback(msg);
+      } else if (chapter.id === 22) {
+        const hasRule = /body\s*\{[\s\S]*?background-color\s*:\s*#ffffff\s*;?[\s\S]*?\}/i.test(challengeCode);
+        const msg = hasRule ? 'تمام! خليت خلفية body بيضا بكود Hex.' : 'اكتب body { background-color: #ffffff; }.';
+        setChallengeOutput({ logs: hasRule ? [msg] : [], errors: hasRule ? [] : [msg] });
+        setChallengeSuccess(hasRule);
+        setChallengeFeedback(msg);
+      } else if (chapter.id === 23) {
+        const valid = /class=["']product-card["']/i.test(challengeCode) && /<h2\b/i.test(challengeCode) &&
+          /<p\b/i.test(challengeCode) && /<button\b/i.test(challengeCode) && /\.product-card\s*\{/i.test(challengeCode);
+        const msg = valid ? 'بطاقة المنتج كاملة: HTML للمحتوى وقاعدة CSS للشكل.' : 'ضيف بطاقة class="product-card" فيها h2 وفقرة وزر، واكتب قاعدة CSS للمحدد .product-card.';
+        setChallengeOutput({ logs: valid ? [msg] : [], errors: valid ? [] : [msg] });
+        setChallengeSuccess(valid);
+        setChallengeFeedback(msg);
+      } else if (chapter.id === 25) {
+        const valid = /<button\b/i.test(challengeCode) && /<p\b[^>]*\bid=["']status["']/i.test(challengeCode) &&
+          /addEventListener\s*\(\s*["']click["']/i.test(challengeCode) && /isOn\s*=\s*!isOn/.test(challengeCode) &&
+          /textContent/.test(challengeCode) && /النور مضاء/.test(challengeCode) && /النور مطفي/.test(challengeCode);
+        const msg = valid ? 'ممتاز! الزر بيبدّل قيمة Boolean وبيغيّر نص الفقرة لما نضغط عليه.' : 'ضيف زر وفقرة id="status"، واربط click عشان يبدّل isOn ويغيّر textContent للنصين المطلوبين.';
+        setChallengeOutput({ logs: valid ? [msg] : [], errors: valid ? [] : [msg] });
+        setChallengeSuccess(valid);
+        setChallengeFeedback(msg);
       } else {
         setChallengeOutput({ logs: ['✓ تم تفعيل المعاينة الحية في المتصفح بنجاح.'], errors: [] });
         setChallengeSuccess(true);

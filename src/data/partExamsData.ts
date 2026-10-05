@@ -452,16 +452,15 @@ console.log("المجموع الكلي: " + sum);`,
     id: 'part-4-exam',
     partId: 4,
     title: 'الاختبار والتحدي الشامل: الجزء الرابع',
-    subtitle: 'الدوال والمصفوفات (الفصول 10 إلى 13)',
+    subtitle: 'Math والدوال وreturn وscope ومحاكاة لعبة التخمين (الفصول 10 إلى 14)',
     description:
-      'اختبار مجمّع يقيس قدرتك على تنظيم الكود في دوال قابلة لإعادة الاستخدام، ومعالجة مجموعات البيانات الكبيرة بالمصفوفات ودوال التحويل map و filter.',
+      'الاختبار ده بيراجع أدوات Math، وكتابة الدوال واستدعاءها، والفرق بين الطباعة وreturn، ونطاق المتغيرات، ومنطق لعبة التخمين.',
     keyPoints: [
-          "الدوال تُجمّع الأوامر في وحدة واحدة قابلة لإعادة الاستخدام؛ والمعاملات (Parameters) هي مدخلات الدالة.",
-          "أمر return هو الذي يُسلّم ناتج الدالة لباقي البرنامج؛ والدالة بدون return ترجع undefined تلقائياً.",
-          "دوال السهم (Arrow Functions) توفر صيغة أنيقة ومختصرة مع إرجاع ضمني (Implicit Return) عند كتابتها بسطر واحد.",
-          "المصفوفات تبدأ من الفهرس صفر [0]؛ ونستخدم push للإضافة في النهاية، و pop للحذف، و length لمعرفة عدد العناصر.",
-          "دالة filter تستخرج العناصر التي تحقق شرطاً معيناً في مصفوفة جديدة.",
-          "دالة map تحوّل كل عنصر في المصفوفة وتنتج مصفوفة جديدة بنفس الطول."
+          "Math فيها دوال جاهزة زي round وfloor وceil وrandom.",
+          "الدالة بتستقبل مدخلات عن طريق parameters، ونقدر نستدعيها أكتر من مرة.",
+          "return بيرجّع القيمة لمكان استدعاء الدالة، إنما console.log بيعرضها بس.",
+          "المتغير المحلي اللي جوه الدالة مش بنقدر نستخدمه برّه نطاقها.",
+          "لعبة التخمين بتستخدم رقم عشوائي وشرط if/else عشان تقارن التخمين بالرقم السري."
     ],
     quiz: [
       {
@@ -490,120 +489,118 @@ console.log("المجموع الكلي: " + sum);`,
       },
       {
         id: 'p4-q2',
-        question: 'دالة السهم (Arrow Function) دي بتعمل إيه؟ const square = n => n * n;',
+        question: 'Math.random() بترجع قيمة في أي مدى؟',
         options: [
           {
             id: 'a',
-            text: 'بتاخد رقم n وترجع مربعه (n * n) تلقائياً (Implicit Return)',
+            text: 'من 0 (مشمولة) إلى أقل من 1',
             isCorrect: true,
-            explanation: 'ممتاز! 🚀 دالة سهم أنيقة بسطر واحد بدون أقواس أو كلمة return.',
+            explanation: 'صحيح، وتقدر دمجها مع Math.floor لتوليد أعداد صحيحة ضمن مدى.',
           },
           {
             id: 'b',
-            text: 'بتجمع n + n',
+            text: 'من 1 إلى 100 دائماً',
             isCorrect: false,
-            explanation: 'العلامة هي * يعني ضرب.',
+            explanation: 'Math.random لا تختار مدى صحيحاً بهذا الشكل تلقائياً.',
           },
           {
             id: 'c',
-            text: 'بتطبع في الكونسول فقط',
+            text: 'تعيد دائماً الرقم 0',
             isCorrect: false,
-            explanation: 'الدالة تعيد قيمة ناتج الضرب.',
+            explanation: 'القيمة تتغير عشوائياً مع كل استدعاء.',
           },
         ],
       },
       {
         id: 'p4-q3',
-        question: 'توقّع ناتج تشغيل الكود التالي في الكونسول:',
-        codeSnippet: 'const fruits = ["تفاح", "موز"];\nfruits.push("مانجو");\nconsole.log(fruits.length);',
+        question: 'توقّع ناتج الكود التالي:',
+        codeSnippet: 'console.log(Math.floor(8.99));',
         options: [
           {
             id: 'a',
-            text: '3',
+            text: '8',
             isCorrect: true,
-            explanation: 'برافو! 🎯 push أضافت "مانجو" في الآخر، فأصبح عدد العناصر 3.',
+            explanation: 'Math.floor تنزل إلى العدد الصحيح الأقل.',
           },
           {
             id: 'b',
-            text: '2',
+            text: '9',
             isCorrect: false,
-            explanation: 'push زادت طول المصفوفة بعنصر جديد.',
+            explanation: 'هذا ناتج التقريب للأعلى، وليس floor.',
           },
           {
             id: 'c',
-            text: '"مانجو"',
+            text: '8.9',
             isCorrect: false,
-            explanation: 'المطلوب طباعة fruits.length يعني عدد العناصر.',
+            explanation: 'floor تعيد عدداً صحيحاً ولا تحتفظ بالكسور.',
           },
         ],
       },
       {
         id: 'p4-q4',
-        question: 'لو عندك مصفوفة درجات وعايز تستخرج فقط درجات الطلاب الناجحين (>= 50)، أنسب دالة هي:',
+        question: 'ما نتيجة Math.max(10, 50, 5)؟',
         options: [
           {
             id: 'a',
-            text: '.filter()',
+            text: '50',
             isCorrect: true,
-            explanation: 'صح جداً! 🌟 filter بتصفي وتطلع مصفوفة جديدة بالعناصر التي تحقق الشرط فقط.',
+            explanation: 'Math.max تعيد أكبر قيمة من المدخلات.',
           },
           {
             id: 'b',
-            text: '.push()',
+            text: '10',
             isCorrect: false,
-            explanation: 'push لإضافة عناصر في النهاية.',
+            explanation: 'هذه أصغر قيمة، وتعيدها Math.min.',
           },
           {
             id: 'c',
-            text: '.sort()',
+            text: '5',
             isCorrect: false,
-            explanation: 'sort للترتيب فقط.',
+            explanation: '5 ليست أكبر قيمة في القائمة.',
           },
         ],
       },
       {
         id: 'p4-q5',
-        question: 'دالة .map() بتختلف عن .forEach() في إنها:',
+        question: 'لو عرّفنا const secret داخل دالة startGame، هل يمكن قراءته خارجها؟',
         options: [
           {
             id: 'a',
-            text: 'ترجع مصفوفة جديدة بنفس الطول بعد تطبيق التعديل على كل عنصر',
+            text: 'لا، لأنه متغير محلي داخل نطاق الدالة',
             isCorrect: true,
-            explanation: 'إجابة عبقرية! 💡 map بتحوّل البيانات لمصفوفة جديدة، و forEach بتلف وتنفذ أوامر بس.',
+            explanation: 'المتغير المحلي متاح داخل الدالة فقط.',
           },
           {
             id: 'b',
-            text: 'بتحذف العناصر غير المرغوبة',
+            text: 'نعم، كل المتغيرات متاحة عالمياً',
             isCorrect: false,
-            explanation: 'الحذف والتصفية وظيفة filter.',
+            explanation: 'النطاق يمنع الوصول لمتغير محلي من الخارج.',
           },
           {
             id: 'c',
-            text: 'بتشتغل على أول عنصر بس',
+            text: 'نعم، إذا بدأ اسمه بحرف كبير',
             isCorrect: false,
-            explanation: 'map بتمر على كل عناصر المصفوفة بلا استثناء.',
+            explanation: 'اسم المتغير لا يغيّر نطاقه.',
           },
         ],
       },
     ],
     challenge: {
       id: 'part4-capstone',
-      title: 'تحدي الجزء 4 الشامل: نظام تحليل نتائج الطلاب',
+      title: 'تحدي الجزء 4 الشامل: لعبة تخمين الرقم',
       prompt:
-        'عندك مصفوفة درجات: `const scores = [45, 80, 92, 35, 70];`. اكتب دالة باسم `getPassed` تستخدم `.filter()` لاستخراج الدرجات الناجحة (>= 50)، ثم استخدم `.map()` لإضافة 5 درجات بونص لكل درجة ناجحة، واطبع في النهاية عدد الطلاب الناجحين بالشكل: "الناجحين: 3".',
-      hint: 'استخدم filter أولاً ثم map أو اطبع طول المصفوفة المفلترة.',
-      initialCode: `// اكتب كود نظام تحليل درجات الطلاب للجزء الرابع هنا بنفسك...
+        'اكتب دالة checkGuess(secret, guess) ترجع "مبروك كسبت" لو الرقمين زي بعض، و"حاول مرة تانية" لو مختلفين. جرّبها بالرقمين 6 و6 واطبع النتيجة.',
+      hint: 'استخدم if/else جوه الدالة وreturn عشان ترجع الرسالة، وبعدها اطبع checkGuess(6, 6).',
+      initialCode: `// اكتب دالة لعبة التخمين هنا...
 `,
-      solutionCode: `const scores = [45, 80, 92, 35, 70];
-
-function getPassed(arr) {
-  const passed = arr.filter(s => s >= 50);
-  const withBonus = passed.map(s => s + 5);
-  console.log("الناجحين: " + passed.length);
-  return withBonus;
+      solutionCode: `function checkGuess(secret, guess) {
+  if (secret === guess) {
+    return "مبروك كسبت";
+  }
+  return "حاول مرة أخرى";
 }
 
-getPassed(scores);`,
+console.log(checkGuess(6, 6));`,
     },
   },
 
@@ -611,160 +608,153 @@ getPassed(scores);`,
     id: 'part-5-exam',
     partId: 5,
     title: 'الاختبار والتحدي الشامل: الجزء الخامس',
-    subtitle: 'الكائنات وشجرة الـ DOM وتفاعل المستخدم (الفصول 14 إلى 17)',
+    subtitle: 'المصفوفات والفهرسة والحلقات وطرق المصفوفة (الفصول 15 إلى 17)',
     description:
-      'اختبار مجمّع يقيس قدرتك على نمذجة البيانات المعقدة بالكائنات والـ Methods، وربط كود جافاسكريبت بصفحة الويب والـ DOM والاستجابة لنقرات المستخدم.',
+      'الاختبار ده بيراجع الفهرسة من الصفر، وlength، وحلقة for...of، وطرق push وpop وincludes وindexOf.',
     keyPoints: [
-          "الكائنات (Objects) تنظم البيانات المعقدة في هيئة مفاتيح وقيم { key: value } يسهل الوصول إليها بنقطة (.) أو أقواس ([]).",
-          "الدوال داخل الكائنات تسمى Methods؛ والكلمة المفتاحية this تشير إلى نفس الكائن الحالي الذي استدعى الدالة.",
-          "شجرة الـ DOM تمثل صفحة الويب ككائنات قابلة للتحكم والتعديل بواسطة كود جافاسكريبت.",
-          "دالة document.querySelector تختار العناصر بأي محدد CSS؛ وخاصية textContent تعدل النصوص بأمان وسرعة.",
-          "نستخدم addEventListener(\"click\", callback) للاستماع لتفاعلات ونقرات المستخدم والاستجابة لها في الحال."
+          "عناصر المصفوفة بتبدأ من index 0، وآخر فهرس هو length - 1.",
+          "نقدر نغيّر عنصر عن طريق فهرسه، وlength بتقولنا عدد العناصر.",
+          "حلقة for...of بتعدّي على قيم العناصر مباشرة.",
+          "push بتضيف عنصر في آخر المصفوفة، وpop بتحذف آخر عنصر.",
+          "includes بتشوف إذا كانت القيمة موجودة، وindexOf بيرجّع فهرسها أو -1 لو مش موجودة."
     ],
     quiz: [
       {
         id: 'p5-q1',
-        question: 'في الكائن التالي، إزاي ننفذ دالة الترحيب sayHello؟',
-        codeSnippet: 'const bot = {\n  name: "روبوت",\n  sayHello() { return "أهلاً"; }\n};',
+        question: 'كيف نصل إلى أول عنصر في المصفوفة التالية؟',
+        codeSnippet: 'const foods = ["كشري", "ملوخية"];',
         options: [
           {
             id: 'a',
-            text: 'bot.sayHello()',
+            text: 'foods[0]',
             isCorrect: true,
-            explanation: 'صح جداً! 🤖 نكتب اسم الكائن ثم نقطة ثم اسم الدالة وقوسين الاستدعاء ().',
+            explanation: 'الفهرسة تبدأ من صفر، لذلك foods[0] هو العنصر الأول.',
           },
           {
             id: 'b',
-            text: 'sayHello()',
+            text: 'foods[1]',
             isCorrect: false,
-            explanation: 'الدالة موجودة داخل الكائن bot وليست معرّفة خارجه.',
+            explanation: 'هذا هو العنصر الثاني.',
           },
           {
             id: 'c',
-            text: 'bot["sayHello"] بدون أقواس',
+            text: 'foods.length',
             isCorrect: false,
-            explanation: 'بدون أقواس هيرجعلك نص الدالة مش هينفذها.',
+            explanation: 'length تعيد عدد العناصر، لا أول عنصر.',
           },
         ],
       },
       {
         id: 'p5-q2',
-        question: 'كلمة this لما نستخدمها جوه دالة تابعة لكائن بتشير لمين؟',
+        question: 'إذا كانت المصفوفة فيها 4 عناصر، فما فهرس آخر عنصر؟',
         options: [
           {
             id: 'a',
-            text: 'للكائن الحالي نفسه اللي الدالة شغالة جواه',
+            text: '3',
             isCorrect: true,
-            explanation: 'إجابة ممتازة! 👏 this بتسمح للدالة تقرأ وتعدل خواص نفس الكائن بسهولة.',
+            explanation: 'الفهارس 0 و1 و2 و3؛ أي أن آخر فهرس هو length - 1.',
           },
           {
             id: 'b',
-            text: 'لمتصفح جوجل كروم',
+            text: '4',
             isCorrect: false,
-            explanation: 'سياق التنفيذ مرتبط بالكائن المستدعي.',
+            explanation: '4 هو عدد العناصر، وليس فهرس آخر عنصر.',
           },
           {
             id: 'c',
-            text: 'لأي متغير عشوائي في الملف',
+            text: '5',
             isCorrect: false,
-            explanation: 'this محددة بدقة بحسب طريقة الاستدعاء.',
+            explanation: '5 يتجاوز عدد العناصر.',
           },
         ],
       },
       {
         id: 'p5-q3',
-        question: 'أفضل دالة عصرية للوصول لعنصر من عناصر الـ HTML بكلاس أو id هي:',
+        question: 'أي حلقة تمر على قيم المصفوفة مباشرة؟',
         options: [
           {
             id: 'a',
-            text: 'document.querySelector()',
+            text: 'for...of',
             isCorrect: true,
-            explanation: 'صح! 🎯 بتاخد أي محدد CSS زي #id أو .class أو اسم الوسم.',
+            explanation: 'for...of تسند كل قيمة إلى المتغير في كل دورة.',
           },
           {
             id: 'b',
-            text: 'document.find()',
+            text: 'try...catch',
             isCorrect: false,
-            explanation: 'مفيش دالة في الـ DOM القياسي بالاسم ده.',
+            explanation: 'هذه بنية لمعالجة الأخطاء وليست حلقة.',
           },
           {
             id: 'c',
-            text: 'window.getElement()',
+            text: 'addEventListener',
             isCorrect: false,
-            explanation: 'البحث عن العناصر يتم عبر كائن document.',
+            explanation: 'تستمع هذه الدالة للأحداث على عناصر الصفحة.',
           },
         ],
       },
       {
         id: 'p5-q4',
-        question: 'لتغيير الكلام المكتوب جوه فقرة <p> بأمان وبدون ثغرات أمنية بنستخدم:',
+        question: 'ما الذي تفعله push عند استخدامها مع مصفوفة؟',
         options: [
           {
             id: 'a',
-            text: 'element.textContent = "النص الجديد"',
+            text: 'تضيف عنصراً إلى نهاية المصفوفة',
             isCorrect: true,
-            explanation: 'أحسن ممارسة برمجية! 🛡️ textContent يعامل المدخلات كنص صريح ويحمي من حقن الأكواد الخبيثة.',
+            explanation: 'push تضيف قيمة جديدة بعد آخر عنصر.',
           },
           {
             id: 'b',
-            text: 'element.writeText("النص الجديد")',
+            text: 'تحذف أول عنصر',
             isCorrect: false,
-            explanation: 'اسم الخاصية القياسي هو textContent أو innerText.',
+            explanation: 'shift هي التي تحذف أول عنصر.',
           },
           {
             id: 'c',
-            text: 'element.change()',
+            text: 'ترتب المصفوفة أبجدياً',
             isCorrect: false,
-            explanation: 'change ده حدث مش دالة لتغيير النصوص.',
+            explanation: 'push لا ترتب العناصر.',
           },
         ],
       },
       {
         id: 'p5-q5',
-        question: 'لمراقبة نقرة المستخدم على زر في الصفحة، بنربط الحدث باستخدام:',
+        question: 'ما نتيجة colors.includes("أزرق") إذا كانت colors تساوي ["أحمر", "أزرق"]؟',
         options: [
           {
             id: 'a',
-            text: 'btn.addEventListener("click", () => { ... })',
+            text: 'true',
             isCorrect: true,
-            explanation: 'برافو! 🚀 addEventListener هي الأسلوب الاحترافي القياسي في برمجة الويب.',
+            explanation: 'includes تعيد true عند وجود القيمة في المصفوفة.',
           },
           {
             id: 'b',
-            text: 'btn.listenOnClick()',
+            text: 'false',
             isCorrect: false,
-            explanation: 'اسم الدالة الرسمي هو addEventListener.',
+            explanation: 'القيمة موجودة بالفعل.',
           },
           {
             id: 'c',
-            text: 'btn.waitClick()',
+            text: '1',
             isCorrect: false,
-            explanation: 'مفيش دالة بالاسم ده.',
+            explanation: '1 هو فهرس القيمة، وليس نتيجة includes.',
           },
         ],
       },
     ],
     challenge: {
       id: 'part5-capstone',
-      title: 'تحدي الجزء 5 الشامل: نظام كائن الحساب البنكي الذكي',
+      title: 'تحدي الجزء 5 الشامل: تلخيص درجات الطلاب',
       prompt:
-        'أنشئ كائناً باسم `account` يحتوي على الخاصية `balance: 500`، ودالة `deposit(amount)` تزود الرصيد بـ this.balance وتطبع "تم إيداع: " مع المبلغ، ودالة `getBalance()` تطبع بالظبط: "الرصيد الحالي: " مع الرصيد بعد التعديل. استدعِ deposit بمبلغ 200 ثم استدعِ getBalance.',
-      hint: 'استخدم this.balance للوصول للرصيد وتعديله داخل الدوال.',
-      initialCode: `// اكتب كود كائن الحساب البنكي للجزء الخامس هنا بنفسك...
+        'معاك المصفوفة [45, 80, 92, 35, 70]. استخدم حلقة for...of وعدّ الدرجات الناجحة (50 أو أكتر)، وبعدها اطبع "الناجحين: 3".',
+      hint: 'ابدأ العداد بصفر، وجوه for...of زوّده لما الدرجة تبقى >= 50.',
+      initialCode: `// اكتب حلقة لحساب عدد الدرجات الناجحة...
 `,
-      solutionCode: `const account = {
-  balance: 500,
-  deposit(amount) {
-    this.balance = this.balance + amount;
-    console.log("تم إيداع: " + amount);
-  },
-  getBalance() {
-    console.log("الرصيد الحالي: " + this.balance);
-  }
-};
-
-account.deposit(200);
-account.getBalance();`,
+      solutionCode: `const scores = [45, 80, 92, 35, 70];
+let passed = 0;
+for (const score of scores) {
+  if (score >= 50) passed++;
+}
+console.log("الناجحين: " + passed);`,
     },
   },
 
@@ -772,160 +762,155 @@ account.getBalance();`,
     id: 'part-6-exam',
     partId: 6,
     title: 'الاختبار والتحدي الشامل: الجزء السادس والنهائي',
-    subtitle: 'الويب المتكامل، التخزين المحلي، والـ Async (الفصول 18 إلى 25)',
+    subtitle: 'HTML وCSS والنماذج والمشروع والـ DOM (الفصول 18 إلى 25)',
     description:
-      'الاختبار النهائي الكبير لكامل مسار احتراف البرمجة بجافاسكريبت: يدمج التخزين في localStorage مع JSON، التعامل مع النماذج، الأكواد غير المتزامنة async/await، معالجة الأخطاء بـ try..catch، وبناء التطبيقات المتكاملة.',
+      'الاختبار الختامي ده بيراجع HTML ومعاني الوسوم، وقواعد CSS والألوان، والنماذج، والكائنات، وأساسيات DOM والأحداث.',
     keyPoints: [
-          "HTML يبني الهيكل الأساسي للصفحة، و CSS يتحكم في الألوان والتنسيقات والمسافات.",
-          "في النماذج (Forms)، نستخدم input.value لقراءة مدخلات المستخدم، و e.preventDefault() لمنع إعادة تحميل الصفحة.",
-          "التخزين المحلي localStorage يحفظ البيانات في متصفح المستخدم؛ ونستخدم JSON.stringify للحفظ و JSON.parse للقراءة.",
-          "العمليات غير المتزامنة async و await تضمن عدم تجميد واجهة المستخدم أثناء جلب البيانات الخارجية بـ fetch.",
-          "بنية try...catch تحمي التطبيق من الانهيار المفاجئ وتصطاد الأخطاء غير المتوقعة (Exceptions) بذكاء.",
-          "فصل المسؤوليات (Separation of Concerns) هو المبدأ الهندسي الأهم لتنظيم الحالة (State) والواجهة (UI) والأحداث (Events)."
+          "HTML بيبني هيكل الصفحة، والعناوين والقوائم والصور والروابط بتوضح معنى المحتوى.",
+          "alt وصف بديل للصورة، وlabel المرتبط بالحقل بيخلّي النموذج أوضح وأسهل في الاستخدام.",
+          "CSS بينسّق العناصر بمحددات وخصائص وقيم، وبيتحكم في الألوان والمسافات والحدود.",
+          "نموذج الصندوق بيتكوّن من المحتوى والحشوة والحدود والهامش.",
+          "الكائن بيجمع الخصائص والطرق، وthis بتشاور على الكائن اللي استدعى الطريقة.",
+          "DOM وaddEventListener بيربطوا تفاعل المستخدم بعناصر الصفحة."
     ],
     quiz: [
       {
         id: 'p6-q1',
-        question: 'ليه لازم نعمل JSON.stringify() لما نخزن كائن في localStorage؟',
+        question: 'ما وظيفة الخاصية alt في وسم img؟',
         options: [
           {
             id: 'a',
-            text: 'لأن localStorage بتخزن نصوص فقط، و stringify بتحول الكائن لنص JSON صالح للتخزين',
+            text: 'تقدم وصفاً بديلاً لقارئات الشاشة وعند تعذر تحميل الصورة',
             isCorrect: true,
-            explanation: 'إجابة صحيحة 100%! 📦 لو مخزنتوش كـ stringify هيتخزن كنص مشوه ومستحيل ترجعه.',
+            explanation: 'alt يصف الصورة لمن لا يراها أو عند تعذر تحميلها.',
           },
           {
             id: 'b',
-            text: 'لحماية الكود من الفيروسات',
+            text: 'تغير حجم الصورة',
             isCorrect: false,
-            explanation: 'JSON هو صيغة بيانات نصية وليس برنامج حماية.',
+            explanation: 'تتحكم CSS بحجم الصورة، لا خاصية alt.',
           },
           {
             id: 'c',
-            text: 'لإرساله للسيرفر فوراً',
+            text: 'تضيف رابط الصورة',
             isCorrect: false,
-            explanation: 'localStorage تخزين محلي على جهاز المستخدم فقط.',
+            explanation: 'src تحدد مسار الصورة.',
           },
         ],
       },
       {
         id: 'p6-q2',
-        question: 'لما نستقبل بيانات من localStorage بنستخدم دالة إيه عشان نرجعها كائن حقيقي؟',
+        question: 'لماذا نربط label بحقل الإدخال باستخدام for و id؟',
         options: [
           {
             id: 'a',
-            text: 'JSON.parse()',
+            text: 'يجعل التسمية مرتبطة بالحقل ويسهل تفعيله وفهمه',
             isCorrect: true,
-            explanation: 'ممتاز! 🔄 parse بتفك النص وترجعه كائن جافاسكريبت تقدر تقرأ خواصه بسهولة.',
+            explanation: 'عند تطابق for وid، يصبح الضغط على التسمية مرتبطاً بالحقل.',
           },
           {
             id: 'b',
-            text: 'JSON.stringify()',
+            text: 'يغير لون الحقل',
             isCorrect: false,
-            explanation: 'stringify بتعمل العكس (من كائن لنص).',
+            explanation: 'تغيير اللون يتم عبر CSS.',
           },
           {
             id: 'c',
-            text: 'JSON.decode()',
+            text: 'يمنع إدخال البيانات',
             isCorrect: false,
-            explanation: 'اسم الدالة الرسمي هو JSON.parse.',
+            explanation: 'هذه ليست وظيفة ربط label بالحقل.',
           },
         ],
       },
       {
         id: 'p6-q3',
-        question: 'كلمة await في كود جافاسكريبت وظيفتها إيه؟',
+        question: 'أي خاصية CSS تضيف مساحة داخلية بين المحتوى والحدود؟',
         options: [
           {
             id: 'a',
-            text: 'انتظار اكتمال الوعد (Promise) وحل نتيجته بدون تجميد واجهة المستخدم',
+            text: 'padding',
             isCorrect: true,
-            explanation: 'صح جداً! ⏳ بتخلي الكود غير المتزامن يتقرأ ويتكتب بأسلوب متسلسل وأنيق.',
+            explanation: 'padding هي المسافة الداخلية بين المحتوى والحدود.',
           },
           {
             id: 'b',
-            text: 'إيقاف المتصفح لمدة ساعة',
+            text: 'margin',
             isCorrect: false,
-            explanation: 'هي بتنتظر فقط العملية غير المتزامنة وتكمل فوراً بعد انتهائها.',
+            explanation: 'margin تضيف مساحة خارج الحدود.',
           },
           {
             id: 'c',
-            text: 'إعادة تشغيل الصفحة',
+            text: 'border-radius',
             isCorrect: false,
-            explanation: 'ملهاش علاقة بالريلود.',
+            explanation: 'border-radius تدوّر الحواف.',
           },
         ],
       },
       {
         id: 'p6-q4',
-        question: 'ليه بنستخدم بنية try...catch في التطبيقات الكبيرة؟',
+        question: 'ما القيم التي يتكون منها نموذج الصندوق الأساسي؟',
         options: [
           {
             id: 'a',
-            text: 'لاصطياد الأخطاء غير المتوقعة (Exceptions) ومنع انهيار التطبيق وتقديم تجربة مستقرة للمستخدم',
+            text: 'المحتوى والحشوة الداخلية والحدود والهامش الخارجي',
             isCorrect: true,
-            explanation: 'فكر مهندس برمجيات حقيقي! 🛡️ بتخلي التطبيق صلب (Resilient) ويتحمل أي عطل غير متوقع.',
+            explanation: 'يتكوّن نموذج الصندوق من content وpadding وborder وmargin.',
           },
           {
             id: 'b',
-            text: 'لتسريع معالجة الصور',
+            text: 'العناوين والصور والروابط',
             isCorrect: false,
-            explanation: 'try/catch وظيفتها الأمان ومعالجة الأخطاء.',
+            explanation: 'هذه عناصر من هيكل الصفحة وليست طبقات نموذج الصندوق.',
           },
           {
             id: 'c',
-            text: 'لحذف الملفات المؤقتة',
+            text: 'النص واللون والخط',
             isCorrect: false,
-            explanation: 'لا علاقة لها بالملفات.',
+            explanation: 'هذه خصائص مظهر، وليست طبقات نموذج الصندوق.',
           },
         ],
       },
       {
         id: 'p6-q5',
-        question: 'أمر e.preventDefault() مع حدث submit في النماذج (Forms) بيعمل إيه؟',
+        question: 'ما وظيفة addEventListener("click", callback)؟',
         options: [
           {
             id: 'a',
-            text: 'بيمنع السلوك التلقائي للمتصفح وهو إعادة تحميل الصفحة بالكامل (Page Reload)',
+            text: 'يربط دالة تستجيب لحدث النقر على العنصر',
             isCorrect: true,
-            explanation: 'عاش! 🚀 بيسمح لجافاسكريبت تاخد البيانات وتعالجها وتخزنها فوراً دون وميض أو ريفريش.',
+            explanation: 'تستدعي الدالة المرتبطة عندما يقع حدث click على العنصر.',
           },
           {
             id: 'b',
-            text: 'بيمنع المستخدم من الكتابة في الفورم',
+            text: 'يحذف العنصر من الصفحة',
             isCorrect: false,
-            explanation: 'هو بس بيمنع إعادة التحميل عند الإرسال.',
+            explanation: 'إزالة العنصر تحتاج طريقة مختلفة.',
           },
           {
             id: 'c',
-            text: 'بيحذف قاعدة البيانات',
+            text: 'يغير نوع الحقل تلقائياً',
             isCorrect: false,
-            explanation: 'أمر آمن يخص أحداث المتصفح فقط.',
+            explanation: 'الحدث لا يغيّر نوع الحقل تلقائياً.',
           },
         ],
       },
     ],
     challenge: {
       id: 'part6-capstone',
-      title: 'التحدي النهائي للمسار: نظام إدارة وحفظ المهام',
+      title: 'التحدي النهائي للمسار: بطاقة الطالب بالكائنات',
       prompt:
-        'اكتب برنامجاً متكاملاً: يحتوي على دالة `saveTask(taskName)` بتفحص اسم المهمة؛ لو كان فارغاً ترمي خطأ بـ `throw new Error("اسم المهمة مطلوب")`. استخدم بنية `try...catch` لاستدعاء الدالة بمهمة صحيحة "تعلم جافاسكريبت"، واطبع في النجاح: "تم حفظ المهمة بنجاح 🎯"، مع تجربة استدعائها بنص فارغ واصطياد الخطأ وطباعة رسالته.',
-      hint: 'استخدم try { saveTask("تعلم جافاسكريبت"); } ثم try ثانية أو if/else مع throw و catch.',
+        'اعمل object اسمه student فيه name وgrade، وضيف method اسمها introduce تستخدم this.name وترجع جملة "أنا سارة". استدعيها واطبع الناتج.',
+      hint: 'اكتب introduce() جوه الكائن وخليها ترجع "أنا " + this.name.',
       initialCode: `// اكتب كود التحدي الختامي الشامل للمسار هنا بنفسك...
 `,
-      solutionCode: `function saveTask(taskName) {
-  if (!taskName || taskName.trim() === "") {
-    throw new Error("اسم المهمة مطلوب");
+      solutionCode: `const student = {
+  name: "سارة",
+  grade: 95,
+  introduce() {
+    return "أنا " + this.name;
   }
-  console.log("تم حفظ المهمة بنجاح 🎯");
-}
-
-try {
-  saveTask("تعلم جافاسكريبت");
-  saveTask("");
-} catch (err) {
-  console.log("تم اصطياد الخطأ: " + err.message);
-}`,
+};
+console.log(student.introduce());`,
     },
   },
 };
