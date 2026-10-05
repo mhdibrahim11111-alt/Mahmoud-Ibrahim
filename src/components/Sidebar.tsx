@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Part, Chapter } from '../types';
 import {
   ChevronDown,
@@ -41,6 +41,50 @@ const partIcons: Record<number, React.ReactNode> = {
   4: <Cpu className="w-4 h-4 text-purple-400" />,
   5: <Layers className="w-4 h-4 text-rose-400" />,
   6: <Globe className="w-4 h-4 text-cyan-400" />,
+};
+
+interface SidebarCheckmarkProps {
+  isCompleted: boolean;
+  onToggle: (e: React.MouseEvent) => void;
+}
+
+const SidebarCheckmark: React.FC<SidebarCheckmarkProps> = ({ isCompleted, onToggle }) => {
+  const [justToggled, setJustToggled] = useState(false);
+  const isInitialMount = useRef(true);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    setJustToggled(true);
+    const timer = setTimeout(() => setJustToggled(false), 550);
+    return () => clearTimeout(timer);
+  }, [isCompleted]);
+
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={isCompleted ? 'تمييز كغير مقروء' : 'تمييز كمقروء ومكتمل'}
+      title={isCompleted ? 'تمييز كغير مقروء' : 'تمييز كمقروء ومكتمل'}
+      className="relative p-1 rounded-md text-slate-500 hover:text-emerald-400 transition-all duration-200 active:scale-75 focus-visible:outline-none flex items-center justify-center shrink-0"
+    >
+      {justToggled && isCompleted && (
+        <span className="absolute inset-0 rounded-full bg-emerald-400/40 animate-check-ripple pointer-events-none" />
+      )}
+      <div className="relative flex items-center justify-center">
+        {isCompleted ? (
+          <CheckCircle
+            className={`w-3.5 h-3.5 text-emerald-400 transition-transform duration-300 ${
+              justToggled ? 'animate-check-pop' : ''
+            }`}
+          />
+        ) : (
+          <Circle className="w-3.5 h-3.5 text-slate-600 hover:text-slate-300 transition-colors duration-200" />
+        )}
+      </div>
+    </button>
+  );
 };
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -179,17 +223,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="p-1 rounded-md bg-slate-800">
                     {partIcons[part.id] || <Boxes className="w-4 h-4 text-amber-400" />}
                   </div>
-                  <div className="truncate">
+                  <div className="truncate flex-1 min-w-0">
                     <h3 className="text-xs font-bold text-white truncate">{part.title}</h3>
-                    <p className="text-[10px] text-slate-400 truncate font-sans">
-                      {completedCount} من {part.chapters.length} منجز
-                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-[10px] text-slate-400 truncate font-sans shrink-0">
+                        {completedCount} من {part.chapters.length} منجز
+                      </p>
+                      <div dir="ltr" className="flex-1 max-w-[48px] h-1.5 bg-slate-800/80 rounded-full overflow-hidden shadow-inner">
+                        <div
+                          className="h-full bg-gradient-to-r from-amber-500 to-emerald-400 rounded-full transition-[width] duration-300"
+                          style={{
+                            width: `${part.chapters.length > 0 ? Math.round((completedCount / part.chapters.length) * 100) : 0}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1 text-slate-400 shrink-0">
                   {completedCount === part.chapters.length && part.chapters.length > 0 && (
-                    <span className="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-1 rounded font-bold">
+                    <span className="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold animate-badge-pop shadow-sm shadow-emerald-500/10">
                       تم ✓
                     </span>
                   )}
@@ -237,20 +291,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           )}
                         </button>
 
-                        <button
-                          onClick={(e) => {
+                        <SidebarCheckmark
+                          isCompleted={isCompleted}
+                          onToggle={(e) => {
                             e.stopPropagation();
                             onToggleChapterCompleted(chapter.id);
                           }}
-                          title={isCompleted ? 'تمييز كغير مقروء' : 'تمييز كمقروء ومكتمل'}
-                          className="text-slate-500 hover:text-emerald-400 p-0.5 transition"
-                        >
-                          {isCompleted ? (
-                            <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-                          ) : (
-                            <Circle className="w-3.5 h-3.5 text-slate-600 hover:text-slate-400" />
-                          )}
-                        </button>
+                        />
                       </div>
                     );
                   })}

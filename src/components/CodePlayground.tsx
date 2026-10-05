@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { CODING_CHALLENGES, CodingChallenge } from '../data/codingChallenges';
 import { markChallengeCompleted } from '../utils/challengesAndTts';
+import { useSoundManager } from '../hooks/useSoundManager';
 
 interface CodePlaygroundProps {
   initialCode?: string;
@@ -198,6 +199,7 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
   const [previewTheme, setPreviewTheme] = useState<'dark' | 'light'>('dark');
   const [previewRefreshTrigger, setPreviewRefreshTrigger] = useState(0);
   const [showMoreActions, setShowMoreActions] = useState(false);
+  const { playSuccess, playCompletion, playError, playRun } = useSoundManager();
 
   // Student Saved Code & Snippets
   const [snippets, setSnippets] = useState<StudentSnippet[]>([]);
@@ -329,8 +331,10 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
   };
 
   const handleRun = async () => {
+    playRun();
     if (isWebMode) {
       setPreviewRefreshTrigger((prev) => prev + 1);
+      playSuccess();
       return;
     }
 
@@ -340,6 +344,12 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
     setErrors(result.errors);
     setExecTime(result.executionTimeMs);
     setIsRunning(false);
+
+    if (result.errors && result.errors.length > 0) {
+      playError();
+    } else {
+      playSuccess();
+    }
   };
 
   const handleCopy = () => {
@@ -505,6 +515,7 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
     setIsVerifyingChallenge(false);
 
     if (checkRes.passed) {
+      playCompletion();
       const updated = await markChallengeCompleted(activeChallenge.id);
       const newIds = Array.from(
         new Set([
@@ -519,6 +530,8 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
         localStorage.setItem(`codemasr_challenge_code_${codeKey}_${activeChallenge.id}`, code);
       } catch {}
       setCelebrationModal({ title: activeChallenge.title, points: activeChallenge.points });
+    } else {
+      playError();
     }
   };
 

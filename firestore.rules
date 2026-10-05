@@ -1,20 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /access_codes/{document=**} {
-      allow read, write: if true;
-    }
-    match /system_config/{document=**} {
-      allow read, write: if true;
-    }
-    match /admin_progress/{document=**} {
-      allow read, write: if true;
-    }
-    match /test/{document=**} {
-      allow read, write: if true;
-    }
+    // Deny all direct client reads and writes by default.
+    // The application uses a secure server-side architecture where all data operations
+    // are mediated by the Express server using the Firebase Admin SDK.
+    // Admin SDK calls bypass security rules and authenticate via Google Cloud IAM.
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

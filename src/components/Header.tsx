@@ -12,6 +12,7 @@ import {
   Search,
 } from 'lucide-react';
 import { InstallAppButton } from './InstallAppButton';
+import { SoundControlButton } from './SoundControlButton';
 
 interface HeaderProps {
   currentView: ViewMode;
@@ -195,6 +196,9 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
               </button>
             )}
+
+            {/* Sound Effects Controller & Mute Toggle */}
+            <SoundControlButton />
 
             {/* PWA Install Button (Desktop & Tablet only) */}
             <div className="hidden sm:flex">

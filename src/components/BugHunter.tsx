@@ -4,6 +4,7 @@ import { runJavaScript } from '../utils/codeRunner';
 import { detectCodeLanguage, buildHtmlPreviewDocument } from '../utils/codePreview';
 import { CodeBlock } from './CodeBlock';
 import { LiveBrowserPreview } from './LiveBrowserPreview';
+import { useSoundManager } from '../hooks/useSoundManager';
 import {
   Bug,
   CheckCircle,
@@ -38,6 +39,7 @@ export const BugHunter: React.FC<BugHunterProps> = ({
   const currentPart = parts.find((p) => p.id === selectedPartId) || parts[0];
   const quiz = currentPart.bugHunter;
   const isWebQuiz = detectCodeLanguage(quiz.problemCode) === 'html';
+  const { playSuccess, playCompletion, playError, playRun } = useSoundManager();
 
   // Running states
   const [isRunningBug, setIsRunningBug] = useState(false);
@@ -65,6 +67,7 @@ export const BugHunter: React.FC<BugHunterProps> = ({
   const isCompleted = completedQuizIds.includes(quiz.id);
 
   const handleRunBuggyCode = async () => {
+    playRun();
     setIsRunningBug(true);
     if (isWebQuiz) {
       setShowBugPreview(true);
@@ -79,15 +82,18 @@ export const BugHunter: React.FC<BugHunterProps> = ({
         ],
       });
       setIsRunningBug(false);
+      playError();
       return;
     }
 
     const res = await runJavaScript(quiz.problemCode);
     setBugOutput({ logs: res.logs, errors: res.errors });
     setIsRunningBug(false);
+    playError();
   };
 
   const handleRunFixedCode = async () => {
+    playRun();
     setIsRunningFixed(true);
     if (isWebQuiz) {
       setShowFixedPreview(true);
@@ -100,12 +106,14 @@ export const BugHunter: React.FC<BugHunterProps> = ({
         errors: [],
       });
       setIsRunningFixed(false);
+      playSuccess();
       return;
     }
 
     const res = await runJavaScript(quiz.fixedCode);
     setFixedOutput({ logs: res.logs, errors: res.errors });
     setIsRunningFixed(false);
+    playSuccess();
   };
 
   return (
@@ -133,7 +141,12 @@ export const BugHunter: React.FC<BugHunterProps> = ({
           </div>
 
           <button
-            onClick={() => onToggleQuizCompleted(quiz.id)}
+            onClick={() => {
+              if (!isCompleted) {
+                playCompletion();
+              }
+              onToggleQuizCompleted(quiz.id);
+            }}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition self-start sm:self-center ${
               isCompleted
                 ? 'bg-emerald-500 text-slate-950 font-black shadow-lg shadow-emerald-500/20'

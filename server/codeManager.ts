@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { randomInt, randomUUID } from 'crypto';
+import { randomInt, randomUUID, createHmac } from 'crypto';
 
 dotenv.config({ override: true });
 import {
@@ -105,6 +105,13 @@ validateEnvironmentSecrets();
 
 // Dynamic admin codes set in-memory by authenticated admin rotation
 const dynamicAdminCodes = new Set<string>();
+// Persisted cryptographic hashes of dynamic admin codes (never stored in plaintext)
+const persistedHashedAdminCodes = new Set<string>();
+
+export function hashAdminSecret(code: string): string {
+  const salt = process.env.SESSION_SECRET || 'platform-admin-credential-salt-secret';
+  return createHmac('sha256', salt).update(code.trim().toUpperCase()).digest('hex');
+}
 
 // Admin credentials are kept securely on the server, never sent to the browser client.
 export function getAdminCodes(): string[] {
@@ -128,17 +135,35 @@ export function getAdminCodes(): string[] {
   return [];
 }
 
+export function isMasterAdminCode(code: string): boolean {
+  const clean = code.trim().toUpperCase();
+  if (!clean || clean.length < 6) return false;
+  if (getAdminCodes().includes(clean)) return true;
+  const hash = hashAdminSecret(clean);
+  if (persistedHashedAdminCodes.has(hash)) {
+    dynamicAdminCodes.add(clean);
+    return true;
+  }
+  return false;
+}
+
 export async function addDynamicAdminCode(newAdminCode: string): Promise<boolean> {
   const clean = newAdminCode.trim().toUpperCase();
   if (clean.length < 6 || clean.length > 64 || !/^[A-Z0-9_-]+$/.test(clean)) {
     return false;
   }
   dynamicAdminCodes.add(clean);
+  const hash = hashAdminSecret(clean);
+  persistedHashedAdminCodes.add(hash);
   try {
     const configDoc = doc(db, 'system_config', 'admin_settings');
-    await setDoc(configDoc, { dynamicCodes: Array.from(dynamicAdminCodes), updatedAt: new Date().toISOString() }, { merge: true });
+    // Store only HMAC-SHA256 hashes, NEVER plaintext admin codes
+    await setDoc(configDoc, {
+      hashedAdminCodes: Array.from(persistedHashedAdminCodes),
+      updatedAt: new Date().toISOString(),
+    });
   } catch (err) {
-    console.warn('Could not persist dynamic admin code to Firestore:', err);
+    console.warn('Could not persist hashed admin code to Firestore:', err);
   }
   return true;
 }
@@ -146,11 +171,16 @@ export async function addDynamicAdminCode(newAdminCode: string): Promise<boolean
 export async function removeDynamicAdminCode(oldAdminCode: string): Promise<void> {
   const clean = oldAdminCode.trim().toUpperCase();
   dynamicAdminCodes.delete(clean);
+  const hash = hashAdminSecret(clean);
+  persistedHashedAdminCodes.delete(hash);
   try {
     const configDoc = doc(db, 'system_config', 'admin_settings');
-    await setDoc(configDoc, { dynamicCodes: Array.from(dynamicAdminCodes), updatedAt: new Date().toISOString() }, { merge: true });
+    await setDoc(configDoc, {
+      hashedAdminCodes: Array.from(persistedHashedAdminCodes),
+      updatedAt: new Date().toISOString(),
+    });
   } catch (err) {
-    console.warn('Could not update dynamic admin codes in Firestore:', err);
+    console.warn('Could not update hashed admin codes in Firestore:', err);
   }
 }
 
@@ -209,12 +239,39 @@ export async function initCodesStorage(): Promise<void> {
     const snap = await getDoc(configDoc);
     if (snap.exists) {
       const data = snap.data();
+      let hadLegacyPlaintext = false;
+
+      // If legacy plaintext dynamicCodes exists, migrate them to hashes and remove plaintext
       if (Array.isArray(data?.dynamicCodes)) {
+        hadLegacyPlaintext = true;
         data.dynamicCodes.forEach((code: string) => {
           if (typeof code === 'string' && code.length >= 6) {
-            dynamicAdminCodes.add(code.trim().toUpperCase());
+            const clean = code.trim().toUpperCase();
+            dynamicAdminCodes.add(clean);
+            persistedHashedAdminCodes.add(hashAdminSecret(clean));
           }
         });
+      }
+
+      if (Array.isArray(data?.hashedAdminCodes)) {
+        data.hashedAdminCodes.forEach((h: string) => {
+          if (typeof h === 'string' && h.length > 0) {
+            persistedHashedAdminCodes.add(h);
+          }
+        });
+      }
+
+      // If legacy plaintext codes were stored, overwrite with hashed codes only
+      if (hadLegacyPlaintext) {
+        try {
+          await setDoc(configDoc, {
+            hashedAdminCodes: Array.from(persistedHashedAdminCodes),
+            updatedAt: new Date().toISOString(),
+          });
+          console.log('🔒 Migrated legacy plaintext admin credentials to HMAC-SHA256 hashes in Firestore.');
+        } catch (e) {
+          console.warn('Could not sanitize legacy admin codes doc:', e);
+        }
       }
     }
 
@@ -263,8 +320,9 @@ export async function getStoredCodes(): Promise<AccessCodeRecord[]> {
     });
     records.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return records;
-  } catch (err) {
-    handleFirestoreError(err, OperationType.LIST, 'access_codes');
+  } catch (err: any) {
+    console.warn('[Firestore] Notice fetching stored codes:', err?.message || err);
+    return [];
   }
 }
 
@@ -436,8 +494,8 @@ export async function getStoredCodesPaginated(
         nextCursor: null,
         hasMore: false,
       };
-    } catch (err) {
-      handleFirestoreError(err, OperationType.LIST, 'access_codes');
+    } catch (err: any) {
+      console.warn('[Firestore] Notice fetching search codes:', err?.message || err);
     }
   }
 
@@ -507,13 +565,41 @@ export async function getStoredCodesPaginated(
       nextCursor,
       hasMore: Boolean(nextCursor) && (page * pageSize < relevantTotal),
     };
-  } catch (err) {
-    handleFirestoreError(err, OperationType.LIST, 'access_codes');
+  } catch (err: any) {
+    console.warn('[Firestore] Notice fetching paginated codes:', err?.message || err);
+    return {
+      codes: [],
+      totalCount: 0,
+      activeCount: 0,
+      expiredCount: 0,
+      page: options.page || 1,
+      pageSize: options.pageSize || 8,
+      totalPages: 0,
+      nextCursor: null,
+      hasMore: false,
+    };
   }
 }
 
 export async function getAccessCodeRecord(codeOrId: string): Promise<AccessCodeRecord | null> {
   const clean = codeOrId.trim().toUpperCase();
+  if (!clean) return null;
+
+  // Master admin codes are managed securely in memory and env, never stored in access_codes
+  if (isMasterAdminCode(clean)) {
+    return {
+      id: clean,
+      code: clean,
+      role: 'master',
+      studentName: 'مالك المنصة',
+      status: 'active',
+      usedCount: 1,
+      createdAt: new Date().toISOString(),
+      expiresAt: null,
+      lastUsedAt: new Date().toISOString(),
+    };
+  }
+
   try {
     // 1. Try direct lookup by code document ID
     const directDoc = doc(db, 'access_codes', clean);
@@ -530,8 +616,13 @@ export async function getAccessCodeRecord(codeOrId: string): Promise<AccessCodeR
     }
 
     return null;
-  } catch (err) {
-    handleFirestoreError(err, OperationType.GET, `access_codes/${clean}`);
+  } catch (err: any) {
+    if (err?.code === 7 || err?.message?.includes('PERMISSION_DENIED') || err?.message?.includes('Missing or insufficient permissions')) {
+      console.warn(`[Firestore] IAM permission notice reading access_codes/${clean}.`);
+      return null;
+    }
+    console.warn(`[Firestore] Notice reading access_codes/${clean}:`, err?.message || err);
+    return null;
   }
 }
 
@@ -549,7 +640,7 @@ export async function verifyCode(inputCode: string): Promise<{
   }
 
   // 1. Check if it's a Master Admin Code
-  if (getAdminCodes().includes(clean)) {
+  if (isMasterAdminCode(clean)) {
     return {
       valid: true,
       role: 'master',
@@ -559,10 +650,89 @@ export async function verifyCode(inputCode: string): Promise<{
   }
 
   // 2. Check codes in Firestore (Teachers & Students)
-  const docRef = doc(db, 'access_codes', clean);
-  const snap = await getDoc(docRef);
+  try {
+    const docRef = doc(db, 'access_codes', clean);
+    const snap = await getDoc(docRef);
 
-  if (!snap.exists) {
+    if (!snap.exists) {
+      return {
+        valid: false,
+        role: 'student',
+        code: clean,
+        message: 'كود التفعيل غير صحيح أو غير مسجل في النظام ❌',
+      };
+    }
+
+    const record = sanitizeAccessCodeRecord(snap.data());
+    const userRole = record.role === 'teacher' ? 'teacher' : 'student';
+
+    // Check if status is revoked or expired
+    if (record.status === 'revoked') {
+      return {
+        valid: false,
+        role: userRole,
+        code: clean,
+        message: 'عذراً، هذا الحساب تم إلغاء تفعيله من قبل الإدارة.',
+      };
+    }
+
+    if (record.status === 'expired') {
+      return {
+        valid: false,
+        role: userRole,
+        code: clean,
+        message: 'عذراً، هذا الكود منتهي الصلاحية.',
+      };
+    }
+
+    // Check expiration date
+    if (record.expiresAt && new Date(record.expiresAt).getTime() < Date.now()) {
+      try {
+        await updateDoc(docRef, { status: 'expired' });
+      } catch (e) {
+        console.warn('Failed to update status to expired:', e);
+      }
+      return {
+        valid: false,
+        role: userRole,
+        code: clean,
+        message: 'عذراً، انتهت فترة صلاحية هذا الكود.',
+      };
+    }
+
+    // Mark usage safely with clean numeric count
+    const now = new Date().toISOString();
+    try {
+      const currentCount = typeof record.usedCount === 'number' ? record.usedCount : 0;
+      await updateDoc(docRef, {
+        usedCount: currentCount + 1,
+        lastUsedAt: now,
+      });
+    } catch (e) {
+      console.warn('Failed to update usedCount:', e);
+    }
+
+    const welcomeMessage = userRole === 'teacher'
+      ? `أهلاً بك يا أستاذ ${record.studentName || ''} 👨‍🏫! تم فتح بوابة المعلم بنجاح.`
+      : `أهلاً بك يا بطل ${record.studentName || ''}! تم التفعيل بنجاح 🎉`;
+
+    return {
+      valid: true,
+      role: userRole,
+      code: record.code,
+      studentName: record.studentName,
+      expiresAt: record.expiresAt,
+      message: welcomeMessage,
+    };
+  } catch (err: any) {
+    if (err?.code === 7 || err?.message?.includes('PERMISSION_DENIED') || err?.message?.includes('Missing or insufficient permissions')) {
+      return {
+        valid: false,
+        role: 'student',
+        code: clean,
+        message: 'كود غير صحيح، أو أن قاعدة البيانات تتطلب ضبط صلاحية IAM (roles/datastore.user) في Google Cloud.',
+      };
+    }
     return {
       valid: false,
       role: 'student',
@@ -570,68 +740,6 @@ export async function verifyCode(inputCode: string): Promise<{
       message: 'كود التفعيل غير صحيح أو غير مسجل في النظام ❌',
     };
   }
-
-  const record = sanitizeAccessCodeRecord(snap.data());
-  const userRole = record.role === 'teacher' ? 'teacher' : 'student';
-
-  // Check if status is revoked or expired
-  if (record.status === 'revoked') {
-    return {
-      valid: false,
-      role: userRole,
-      code: clean,
-      message: 'عذراً، هذا الحساب تم إلغاء تفعيله من قبل الإدارة.',
-    };
-  }
-
-  if (record.status === 'expired') {
-    return {
-      valid: false,
-      role: userRole,
-      code: clean,
-      message: 'عذراً، هذا الكود منتهي الصلاحية.',
-    };
-  }
-
-  // Check expiration date
-  if (record.expiresAt && new Date(record.expiresAt).getTime() < Date.now()) {
-    try {
-      await updateDoc(docRef, { status: 'expired' });
-    } catch (e) {
-      console.warn('Failed to update status to expired:', e);
-    }
-    return {
-      valid: false,
-      role: userRole,
-      code: clean,
-      message: 'عذراً، انتهت فترة صلاحية هذا الكود.',
-    };
-  }
-
-  // Mark usage safely with clean numeric count
-  const now = new Date().toISOString();
-  try {
-    const currentCount = typeof record.usedCount === 'number' ? record.usedCount : 0;
-    await updateDoc(docRef, {
-      usedCount: currentCount + 1,
-      lastUsedAt: now,
-    });
-  } catch (e) {
-    console.warn('Failed to update usedCount:', e);
-  }
-
-  const welcomeMessage = userRole === 'teacher'
-    ? `أهلاً بك يا أستاذ ${record.studentName || ''} 👨‍🏫! تم فتح بوابة المعلم بنجاح.`
-    : `أهلاً بك يا بطل ${record.studentName || ''}! تم التفعيل بنجاح 🎉`;
-
-  return {
-    valid: true,
-    role: userRole,
-    code: record.code,
-    studentName: record.studentName,
-    expiresAt: record.expiresAt,
-    message: welcomeMessage,
-  };
 }
 
 export async function generateCode(
@@ -1076,13 +1184,20 @@ export async function updateMasterCode(
 
 export async function getCodeProgress(code: string): Promise<CodeProgress> {
   const clean = code.trim().toUpperCase();
-  if (getAdminCodes().includes(clean)) {
+  if (isMasterAdminCode(clean)) {
     try {
       const adminSnap = await getDoc(doc(db, 'admin_progress', clean));
       if (adminSnap.exists && adminSnap.data()?.progress) {
         return adminSnap.data().progress as CodeProgress;
       }
     } catch {}
+    return {
+      completedChapters: [],
+      completedQuizzes: [],
+      lastChapterId: 1,
+      challengeCodes: {},
+      lastUpdated: new Date().toISOString(),
+    };
   }
 
   const record = await getAccessCodeRecord(code);

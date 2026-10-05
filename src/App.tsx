@@ -7,6 +7,7 @@ import {
   validateSavedSession,
 } from './utils/activation';
 import type { ActivationState } from './utils/activation';
+import { soundManager } from './utils/soundManager';
 
 const PlatformApp = lazy(() => import('./PlatformApp').then((module) => ({ default: module.PlatformApp })));
 
@@ -25,6 +26,9 @@ export function App() {
   const [activation, setActivation] = useState<ActivationState>(() => isDeviceActivated());
 
   useEffect(() => {
+    // Preload sound assets and initialize audio subsystem
+    soundManager.preloadSounds();
+
     let isMounted = true;
     validateSavedSession().then((updated) => {
       if (isMounted) {

@@ -7,6 +7,7 @@ import { FormattedArabicText } from './FormattedArabicText';
 import { runJavaScript } from '../utils/codeRunner';
 import { validateChallenge, ChallengeValidationResult } from '../utils/challengeValidator';
 import { partSummaryDetails, RuleDetail } from '../data/partSummaryDetails';
+import { useSoundManager } from '../hooks/useSoundManager';
 import {
   Trophy,
   CheckCircle2,
@@ -50,6 +51,7 @@ export const PartSummaryView: React.FC<PartSummaryViewProps> = ({
   const [isRunning, setIsRunning] = useState(false);
   const [output, setOutput] = useState<{ logs: string[]; errors: string[] } | null>(null);
   const [feedback, setFeedback] = useState<ChallengeValidationResult | null>(null);
+  const { playCompletion, playError, playRun } = useSoundManager();
 
   // Instant expandable rule details
   const [expandedRuleIndex, setExpandedRuleIndex] = useState<number | null>(null);
@@ -69,6 +71,7 @@ export const PartSummaryView: React.FC<PartSummaryViewProps> = ({
   };
 
   const handleRunChallenge = async () => {
+    playRun();
     setIsRunning(true);
     const res = await runJavaScript(challengeCode);
     const validation = validateChallenge(
@@ -82,8 +85,13 @@ export const PartSummaryView: React.FC<PartSummaryViewProps> = ({
     setFeedback(validation);
     setIsRunning(false);
 
-    if (validation.passed && onToggleCompleted && !isCompleted) {
-      onToggleCompleted();
+    if (validation.passed) {
+      playCompletion();
+      if (onToggleCompleted && !isCompleted) {
+        onToggleCompleted();
+      }
+    } else {
+      playError();
     }
   };
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { ViewMode } from '../types';
 import { BookOpen, Terminal, Bug, Code2, KeyRound } from 'lucide-react';
+import { soundManager } from '../utils/soundManager';
 
 interface MobileBottomNavProps {
   currentView: ViewMode;
@@ -32,7 +33,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         return (
           <button
             key={item.view}
-            onClick={() => onSelectView(item.view)}
+            onClick={() => {
+              soundManager.playClick();
+              onSelectView(item.view);
+            }}
             aria-current={isActive ? 'page' : undefined}
             className={`flex-1 flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all duration-200 active:scale-95 ${
               isActive

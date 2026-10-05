@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import type { ViewMode, Chapter, Part } from './types';
 import { Header } from './components/Header';
 import { MobileBottomNav } from './components/MobileBottomNav';
@@ -22,6 +22,7 @@ import {
   updateProgressEntry,
 } from './utils/progressSync';
 import { Menu, X } from 'lucide-react';
+import { soundManager } from './utils/soundManager';
 
 const Sidebar = lazy(() => import('./components/Sidebar').then((module) => ({ default: module.Sidebar })));
 const ChapterView = lazy(() => import('./components/ChapterView').then((module) => ({ default: module.ChapterView })));
@@ -279,32 +280,50 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
   };
 
   const toggleChapterCompleted = (chapterId: number) => {
-    setProgressEntries((prev) => updateProgressEntry(prev, `completedChapter:${chapterId}`, !completedChapterIds.includes(chapterId)));
+    const isNowCompleted = !completedChapterIds.includes(chapterId);
+    if (isNowCompleted) {
+      soundManager.playSuccess();
+    }
+    setProgressEntries((prev) => updateProgressEntry(prev, `completedChapter:${chapterId}`, isNowCompleted));
   };
 
   const toggleExamPartCompleted = (partId: number) => {
-    setProgressEntries((prev) => updateProgressEntry(prev, `completedExam:${partId}`, !completedExamPartIds.includes(partId)));
+    const isNowCompleted = !completedExamPartIds.includes(partId);
+    if (isNowCompleted) {
+      soundManager.playSuccess();
+    }
+    setProgressEntries((prev) => updateProgressEntry(prev, `completedExam:${partId}`, isNowCompleted));
   };
 
   const toggleBookmark = (chapterId: number) => {
-    setProgressEntries((prev) => updateProgressEntry(prev, `bookmarkedChapter:${chapterId}`, !bookmarkedChapterIds.includes(chapterId)));
+    const isNowBookmarked = !bookmarkedChapterIds.includes(chapterId);
+    if (isNowBookmarked) {
+      soundManager.playBookmark();
+    } else {
+      soundManager.playClick();
+    }
+    setProgressEntries((prev) => updateProgressEntry(prev, `bookmarkedChapter:${chapterId}`, isNowBookmarked));
   };
 
   const handleSaveNote = (chapterId: number, note: string) => {
+    soundManager.playSuccess();
     setProgressEntries((prev) => updateProgressEntry(prev, `chapterNote:${chapterId}`, note));
   };
 
   const handleOpenPlaygroundWithCode = (code: string) => {
+    soundManager.playClick();
     setPlaygroundCode(code);
     setCurrentView('playground');
   };
 
   const handleSelectBugHunterFromPart = (partId: number) => {
+    soundManager.playClick();
     setSelectedBugHunterPartId(partId);
     setCurrentView('bughunter');
   };
 
   const handleSelectPartExam = (partId: number) => {
+    soundManager.playClick();
     setCurrentView('reader');
     setSelectedPartExamId(partId);
     setIsMobileSidebarOpen(false);
@@ -312,7 +331,11 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
   };
 
   const toggleQuizCompleted = (quizId: string) => {
-    setProgressEntries((prev) => updateProgressEntry(prev, `completedQuiz:${quizId}`, !completedQuizIds.includes(quizId)));
+    const isNowCompleted = !completedQuizIds.includes(quizId);
+    if (isNowCompleted) {
+      soundManager.playSuccess();
+    }
+    setProgressEntries((prev) => updateProgressEntry(prev, `completedQuiz:${quizId}`, isNowCompleted));
   };
 
   const handleUpdateChallengeCode = (chapterId: number, code: string) => {
@@ -329,6 +352,16 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
     bookmarkedCount: bookmarkedChapterIds.length,
   };
   const unlockedBadgesCount = ALL_BADGES.filter((b) => b.isUnlocked(studentStats)).length;
+
+  // Level-Up Audio Detection: play triumphant levelUp fanfare when new badge is unlocked
+  const prevBadgesCountRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!isInitialLoadDone) return;
+    if (prevBadgesCountRef.current !== null && unlockedBadgesCount > prevBadgesCountRef.current) {
+      soundManager.playLevelUp();
+    }
+    prevBadgesCountRef.current = unlockedBadgesCount;
+  }, [unlockedBadgesCount, isInitialLoadDone]);
 
   if (!bookParts.length) {
     return (
@@ -358,6 +391,7 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
       <Header
         currentView={currentView}
         onSelectView={(view) => {
+          soundManager.playClick();
           setCurrentView(view);
           setIsMobileSidebarOpen(false);
         }}
@@ -369,8 +403,14 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
         activeCode={activeCode}
         studentName={studentName}
         onLockPlatform={onLockPlatform}
-        onOpenSearch={() => setIsSearchOpen(true)}
-        onOpenAchievements={() => setIsAchievementsOpen(true)}
+        onOpenSearch={() => {
+          soundManager.playClick();
+          setIsSearchOpen(true);
+        }}
+        onOpenAchievements={() => {
+          soundManager.playBadge();
+          setIsAchievementsOpen(true);
+        }}
         unlockedBadgesCount={unlockedBadgesCount}
       />
 

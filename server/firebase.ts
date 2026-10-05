@@ -1,5 +1,5 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeApp, getApps, getApp, applicationDefault, cert } from 'firebase-admin/app';
+import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,8 +10,42 @@ const configPath = path.resolve(__dirname, '../firebase-applet-config.json');
 const rawConfig = fs.readFileSync(configPath, 'utf8');
 export const firebaseConfig = JSON.parse(rawConfig);
 
-export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+function initAdminApp() {
+  if (getApps().length > 0) {
+    return getApp();
+  }
+
+  const options: {
+    projectId: string;
+    credential?: any;
+  } = {
+    projectId: firebaseConfig.projectId,
+  };
+
+  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (credPath && fs.existsSync(credPath)) {
+    try {
+      const sa = JSON.parse(fs.readFileSync(credPath, 'utf8'));
+      options.credential = cert(sa);
+    } catch (e) {
+      console.warn('⚠️ Could not parse GOOGLE_APPLICATION_CREDENTIALS file, falling back to applicationDefault:', e);
+      try {
+        options.credential = applicationDefault();
+      } catch {}
+    }
+  } else {
+    try {
+      options.credential = applicationDefault();
+    } catch {
+      // In local dev without ADC, initialize with project ID
+    }
+  }
+
+  return initializeApp(options);
+}
+
+export const adminApp = initAdminApp();
+export const db: Firestore = getFirestore(adminApp, firebaseConfig.firestoreDatabaseId);
 
 export const OperationType = {
   CREATE: 'create',
@@ -48,17 +82,37 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
+let connectionVerified = false;
+
 export async function testConnection(): Promise<boolean> {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log('✅ Connected to Firebase Firestore successfully.');
+    const docRef = db.collection('test').doc('connection');
+    const getPromise = docRef.get();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Connection check timeout (2s)')), 2000)
+    );
+    await Promise.race([getPromise, timeoutPromise]);
+    console.log('✅ Connected to Firebase Firestore via Firebase Admin SDK successfully.');
+    connectionVerified = true;
     return true;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firebase client is offline, retrying...');
+  } catch (error: any) {
+    const isPermissionError =
+      error?.code === 7 ||
+      error?.message?.includes('PERMISSION_DENIED') ||
+      error?.message?.includes('Missing or insufficient permissions');
+
+    if (isPermissionError) {
+      console.warn('⚠️ [Firestore Admin SDK] Cloud IAM Permission Notice:');
+      console.warn(`   The deployment runtime identity needs the "roles/datastore.user" IAM role`);
+      console.warn(`   on Google Cloud project: ${firebaseConfig.projectId}.`);
+      console.warn(`   Firestore database ID: ${firebaseConfig.firestoreDatabaseId}`);
     } else {
-      console.log('Firebase connection initialized.');
+      console.warn('⚠️ [Firestore Admin SDK] Connection check notice:', error?.message || error);
     }
-    return true;
+    return false;
   }
+}
+
+export function isConnectionVerified(): boolean {
+  return connectionVerified;
 }

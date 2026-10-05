@@ -8,6 +8,7 @@ import { validateChallenge } from '../utils/challengeValidator';
 import { LiveBrowserPreview } from './LiveBrowserPreview';
 import { FormattedArabicText } from './FormattedArabicText';
 import { ChapterQuiz } from './ChapterQuiz';
+import { soundManager } from '../utils/soundManager';
 import {
   Play,
   RotateCcw,
@@ -126,6 +127,7 @@ export const ChapterView: React.FC<ChapterViewProps> = ({
   };
 
   const handleRunSnippet = async (index: number, code: string) => {
+    soundManager.playRun();
     setRunningSnippetIndex(index);
     const res = await runJavaScript(code);
     setSnippetOutputs((prev) => ({
@@ -133,6 +135,11 @@ export const ChapterView: React.FC<ChapterViewProps> = ({
       [index]: { logs: res.logs, errors: res.errors },
     }));
     setRunningSnippetIndex(null);
+    if (res.errors && res.errors.length > 0) {
+      soundManager.playError();
+    } else {
+      soundManager.playSuccess();
+    }
   };
 
   const handleRunExercise = async (id: string, code: string) => {
@@ -252,12 +259,18 @@ function evaluateChapterChallenge(
     }
 
     setChallengeHtmlPreview(null);
+    soundManager.playRun();
     const res = await runJavaScript(challengeCode);
     setChallengeOutput({ logs: res.logs, errors: res.errors });
 
     const evalResult = evaluateChapterChallenge(chapter.id, challengeCode, res.logs, res.errors);
     setChallengeSuccess(evalResult.passed);
     setChallengeFeedback(evalResult.message);
+    if (evalResult.passed) {
+      soundManager.playCompletion();
+    } else {
+      soundManager.playError();
+    }
   };
 
   return (

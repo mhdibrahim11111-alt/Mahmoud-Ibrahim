@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ALL_BADGES, StudentStats, Badge } from '../types/achievements';
 import { Trophy, X, CheckCircle2, Lock, Sparkles, Award } from 'lucide-react';
+import { useSoundManager } from '../hooks/useSoundManager';
 
 interface AchievementsModalProps {
   isOpen: boolean;
@@ -15,6 +16,14 @@ export const AchievementsModal: React.FC<AchievementsModalProps> = ({
   stats,
   studentName,
 }) => {
+  const { playBadge } = useSoundManager();
+
+  useEffect(() => {
+    if (isOpen) {
+      playBadge();
+    }
+  }, [isOpen, playBadge]);
+
   if (!isOpen) return null;
 
   const unlockedBadges = ALL_BADGES.filter((b) => b.isUnlocked(stats));

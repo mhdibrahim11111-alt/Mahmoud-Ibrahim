@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChapterQuizItem } from '../types';
 import { FormattedArabicText } from './FormattedArabicText';
+import { useSoundManager } from '../hooks/useSoundManager';
 import {
   HelpCircle,
   CheckCircle2,
@@ -29,6 +30,7 @@ export const ChapterQuiz: React.FC<ChapterQuizProps> = ({
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
   const [isFinished, setIsFinished] = useState(false);
+  const { playSuccess, playError, playCompletion } = useSoundManager();
 
   // Automatically reset quiz state whenever the chapter changes
   React.useEffect(() => {
@@ -50,9 +52,17 @@ export const ChapterQuiz: React.FC<ChapterQuizProps> = ({
     const newAnswers = { ...selectedAnswers, [currentQ.id]: optionId };
     setSelectedAnswers(newAnswers);
 
+    const chosenOption = currentQ.options.find((o) => o.id === optionId);
+    if (chosenOption?.isCorrect) {
+      playSuccess();
+    } else {
+      playError();
+    }
+
     // If all questions are answered, mark as completed
     const allAnswered = quiz.every((q) => !!newAnswers[q.id]);
     if (allAnswered) {
+      playCompletion();
       if (onComplete) onComplete();
     }
   };

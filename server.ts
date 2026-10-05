@@ -85,7 +85,9 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   await initCodesStorage();
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+  const isProduction = process.env.NODE_ENV === 'production';
+  // In development, the AI Studio dev server strictly runs on port 3000
+  const PORT = isProduction ? (Number(process.env.PORT) || 3000) : 3000;
 
   // Cloud Run / Reverse Proxy Trust Configuration
   app.set('trust proxy', 1);
@@ -706,7 +708,6 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
   // Serve public assets
   app.use(express.static(path.resolve(__dirname, 'public')));
 
-  const isProduction = process.env.NODE_ENV === 'production';
   if (!isProduction) {
     const vite = await createViteServer({
       server: { middlewareMode: true },

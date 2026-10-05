@@ -1,37 +1,35 @@
 import {
-  collection as firestoreCollection,
-  doc as firestoreDoc,
-  getDoc as firestoreGetDoc,
-  getDocs as firestoreGetDocs,
-  setDoc as firestoreSetDoc,
-  updateDoc as firestoreUpdateDoc,
-  deleteDoc as firestoreDeleteDoc,
-  runTransaction as firestoreRunTransaction,
-  query as firestoreQuery,
-  where as firestoreWhere,
-  orderBy as firestoreOrderBy,
-  limit as firestoreLimit,
-  startAfter as firestoreStartAfter,
-  increment as firestoreIncrement,
-  getCountFromServer as firestoreGetCountFromServer,
   type CollectionReference,
   type DocumentData,
   type DocumentReference,
   type Firestore,
   type OrderByDirection,
   type Query,
-  type QueryConstraint,
   type WhereFilterOp,
-} from 'firebase/firestore';
+  FieldValue,
+} from 'firebase-admin/firestore';
 
-export type { QueryConstraint };
+export type {
+  CollectionReference,
+  DocumentData,
+  DocumentReference,
+  Firestore,
+  OrderByDirection,
+  Query,
+  WhereFilterOp,
+};
+
+export type QueryConstraint = (query: any) => any;
 
 export function collection(db: Firestore, collectionName: string): CollectionReference {
-  return firestoreCollection(db, collectionName);
+  return db.collection(collectionName);
 }
 
-export function doc(db: Firestore, collectionName: string, documentId: string): DocumentReference {
-  return firestoreDoc(db, collectionName, documentId);
+export function doc(dbOrCol: any, collectionOrId: string, documentId?: string): DocumentReference {
+  if (documentId !== undefined) {
+    return (dbOrCol as Firestore).collection(collectionOrId).doc(documentId);
+  }
+  return dbOrCol.doc(collectionOrId);
 }
 
 function wrapSnapshot(snap: any) {
@@ -43,16 +41,26 @@ function wrapSnapshot(snap: any) {
     },
     data: () => snap.data(),
     id: snap.id,
+    ref: snap.ref,
   };
 }
 
 export async function getDoc(reference: DocumentReference) {
-  const snap = await firestoreGetDoc(reference);
+  const snap = await reference.get();
   return wrapSnapshot(snap);
 }
 
 export async function getDocs(reference: CollectionReference | Query) {
-  return firestoreGetDocs(reference);
+  const snap = await reference.get();
+  const wrappedDocs = snap.docs.map((d: any) => wrapSnapshot(d));
+  return {
+    docs: wrappedDocs,
+    empty: snap.empty,
+    size: snap.size,
+    forEach: (callback: (doc: any) => void) => {
+      wrappedDocs.forEach(callback);
+    },
+  };
 }
 
 function cleanUndefined(obj: any): any {
@@ -73,16 +81,16 @@ export async function setDoc(
   options?: { merge?: boolean },
 ) {
   const sanitized = cleanUndefined(data);
-  return options ? firestoreSetDoc(reference, sanitized, options) : firestoreSetDoc(reference, sanitized);
+  return reference.set(sanitized, options || {});
 }
 
 export async function updateDoc(reference: DocumentReference, data: DocumentData) {
   const sanitized = cleanUndefined(data);
-  return firestoreUpdateDoc(reference, sanitized);
+  return reference.update(sanitized);
 }
 
 export async function deleteDoc(reference: DocumentReference) {
-  return firestoreDeleteDoc(reference);
+  return reference.delete();
 }
 
 export function runTransaction<T>(
@@ -94,7 +102,7 @@ export function runTransaction<T>(
     delete: (docRef: DocumentReference) => void;
   }) => Promise<T>,
 ): Promise<T> {
-  return firestoreRunTransaction(db, async (txn) => {
+  return db.runTransaction(async (txn) => {
     return updateFunction({
       get: async (docRef: DocumentReference) => {
         const s = await txn.get(docRef);
@@ -109,35 +117,48 @@ export function runTransaction<T>(
         const sanitized = cleanUndefined(data);
         txn.update(docRef, sanitized);
       },
-      delete: (docRef: DocumentReference) => txn.delete(docRef),
+      delete: (docRef: DocumentReference) => {
+        txn.delete(docRef);
+      },
     });
   });
 }
 
 export function query(reference: CollectionReference | Query, ...constraints: QueryConstraint[]): Query {
-  return firestoreQuery(reference, ...constraints);
+  let q: any = reference;
+  for (const constraint of constraints) {
+    if (typeof constraint === 'function') {
+      q = constraint(q);
+    }
+  }
+  return q as Query;
 }
 
 export function where(field: string, operator: WhereFilterOp, value: unknown): QueryConstraint {
-  return firestoreWhere(field, operator, value);
+  return (q: any) => q.where(field, operator, value);
 }
 
 export function orderBy(field: string, direction?: OrderByDirection): QueryConstraint {
-  return direction ? firestoreOrderBy(field, direction) : firestoreOrderBy(field);
+  return (q: any) => (direction ? q.orderBy(field, direction) : q.orderBy(field));
 }
 
 export function limit(count: number): QueryConstraint {
-  return firestoreLimit(count);
+  return (q: any) => q.limit(count);
 }
 
 export function startAfter(...values: unknown[]): QueryConstraint {
-  return firestoreStartAfter(...values);
+  return (q: any) => q.startAfter(...values);
 }
 
 export function increment(value: number) {
-  return firestoreIncrement(value);
+  return FieldValue.increment(value);
 }
 
 export async function getCountFromServer(reference: CollectionReference | Query) {
-  return firestoreGetCountFromServer(reference);
+  const countSnap = await (reference as any).count().get();
+  return {
+    data: () => ({
+      count: countSnap.data().count,
+    }),
+  };
 }
