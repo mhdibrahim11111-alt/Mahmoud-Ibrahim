@@ -58,8 +58,8 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 text-slate-100 shadow-md shadow-black/30 font-['Cairo',sans-serif]">
       {/* Main Bar */}
-      <div className="w-full px-3 sm:px-6 lg:px-8">
-       <div className="h-16 flex items-center justify-between gap-2 sm:gap-4 w-full">
+      <div className="w-full px-2 sm:px-6 lg:px-8">
+       <div className="h-14 sm:h-16 flex items-center justify-between gap-1 sm:gap-4 w-full">
   {/* Right Brand / Logo */}
   <button
     type="button"
@@ -158,13 +158,13 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
 
           {/* Left Controls: Single Search, Combined Profile & Trophies Badge, PWA */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {/* 1. Global Search Button */}
             {onOpenSearch && (
               <button
                 onClick={onOpenSearch}
                 aria-label="بحث شامل في محتوى الكتاب"
-                className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition text-xs font-semibold shadow-sm active:scale-95"
+                className="min-w-11 min-h-11 flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition text-xs font-semibold shadow-sm active:scale-95"
                 title="بحث شامل في محتوى الكتاب (Ctrl+K)"
               >
                 <Search className="w-4 h-4 text-orange-400 shrink-0" strokeWidth={2.3} />
@@ -180,13 +180,13 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onOpenAchievements}
                 aria-label={`الإنجازات وحساب ${studentName || 'طالب جديد'}`}
-                className="flex items-center bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-orange-500/40 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs gap-1.5 shrink-0 shadow-sm transition active:scale-95"
+                className="min-h-11 min-w-11 flex items-center justify-center bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800 hover:border-orange-500/40 px-2 sm:px-2.5 py-1.5 rounded-xl text-xs gap-1.5 shrink-0 shadow-sm transition active:scale-95"
                 title="اضغط لفتح أوسمة الشرف والإنجازات 🏆"
               >
                 <div className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/40 flex items-center justify-center text-xs shrink-0 font-bold">
                   🏆
                 </div>
-                <span className="text-[11px] font-semibold text-slate-200 max-w-[65px] sm:max-w-[100px] truncate">
+                <span className="hidden sm:inline text-[11px] font-semibold text-slate-200 max-w-[100px] truncate">
                   {studentName || 'طالب جديد'}
                 </span>
                 {unlockedBadgesCount > 0 && (
@@ -224,7 +224,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onLockPlatform}
                 aria-label="قفل المنصة وتسجيل الخروج"
-                className="text-slate-400 hover:text-rose-400 p-1.5 rounded-xl hover:bg-rose-950/30 transition shrink-0"
+                className="min-w-11 min-h-11 flex items-center justify-center text-slate-400 hover:text-rose-400 p-1.5 rounded-xl hover:bg-rose-950/30 transition shrink-0"
                 title="قفل المنصة"
               >
                 <Lock className="w-3.5 h-3.5" strokeWidth={2.3} />

@@ -27,7 +27,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   ];
 
   return (
-    <nav aria-label="التنقل الرئيسي" className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 px-3 py-2 flex items-center justify-around font-['Cairo',sans-serif] shadow-2xl safe-area-bottom h-16">
+    <nav
+      aria-label="التنقل الرئيسي"
+      className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 px-1.5 pt-1.5 pb-[env(safe-area-inset-bottom)] flex items-center justify-around font-['Cairo',sans-serif] shadow-2xl h-[calc(4rem+env(safe-area-inset-bottom))]"
+    >
       {navItems.map((item) => {
         const isActive = currentView === item.view;
         return (
@@ -38,7 +41,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               onSelectView(item.view);
             }}
             aria-current={isActive ? 'page' : undefined}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all duration-200 active:scale-95 ${
+            className={`flex-1 min-w-0 min-h-11 flex flex-col items-center justify-center gap-1 px-0.5 rounded-xl transition-all duration-200 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400 ${
               isActive
                 ? 'text-orange-400 font-bold'
                 : 'text-slate-400 hover:text-slate-200 font-medium'
@@ -47,7 +50,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             <div className={`p-1 rounded-lg transition ${isActive ? 'bg-orange-500/15 text-orange-400' : ''}`}>
               {item.icon}
             </div>
-            <span className="text-[11px] leading-none">{item.label}</span>
+            <span className="max-w-full truncate whitespace-nowrap text-[10px] leading-tight sm:text-[11px]">{item.label}</span>
           </button>
         );
       })}
