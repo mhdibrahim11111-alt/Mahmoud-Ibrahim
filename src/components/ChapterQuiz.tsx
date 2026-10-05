@@ -112,9 +112,6 @@ export const ChapterQuiz: React.FC<ChapterQuizProps> = ({
               <h3 className="text-base sm:text-lg font-black text-white">
                 كويز الفصل السريع: اختبر فهمك
               </h3>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                {quiz.length} {quiz.length === 1 ? 'سؤال' : 'أسئلة'}
-              </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
               تأكد من استيعابك للمفاهيم الأساسية قبل الدخول في التحدي البرمجي العملي!

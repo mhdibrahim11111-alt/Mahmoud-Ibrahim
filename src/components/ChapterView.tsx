@@ -467,7 +467,7 @@ function evaluateChapterChallenge(
 
               return (
                 <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
-                  <div className="bg-slate-900/90 px-4 py-2 flex items-center justify-between border-b border-slate-800 text-xs">
+                  <div className="bg-slate-900/90 px-3 sm:px-4 py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 text-xs">
                     <div className="flex items-center gap-2 text-slate-400 font-mono">
                       {isWebCode ? (
                         <Globe className="w-3.5 h-3.5 text-cyan-400" />
@@ -482,10 +482,10 @@ function evaluateChapterChallenge(
                           : 'كود جافاسكريبت'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="grid grid-cols-2 w-full sm:w-auto sm:flex sm:items-center gap-2">
                       <button
                         onClick={() => onOpenInPlayground(getChainedSnippetCode(idx, sec.codeSnippet!))}
-                        className="text-slate-400 hover:text-white px-2 py-1 rounded hover:bg-slate-800 transition"
+                        className="min-h-11 flex items-center justify-center text-slate-300 hover:text-white px-2 py-1 rounded-lg hover:bg-slate-800 transition touch-manipulation"
                         title="فتح الكود وتعديله في المحرّر"
                       >
                         تعديل في المحرّر
@@ -496,7 +496,7 @@ function evaluateChapterChallenge(
                           onClick={() =>
                             setPreviewSnippetIndex(previewSnippetIndex === idx ? null : idx)
                           }
-                          className={`flex items-center gap-1.5 font-bold px-3 py-1 rounded-lg text-xs transition active:scale-95 shadow ${
+                          className={`min-h-11 flex items-center justify-center gap-1.5 font-bold px-2 sm:px-3 py-1 rounded-lg text-xs transition active:scale-95 shadow ${
                             previewSnippetIndex === idx
                               ? 'bg-cyan-600 text-white'
                               : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'
@@ -511,7 +511,7 @@ function evaluateChapterChallenge(
                         <button
                           onClick={() => handleRunSnippet(idx, sec.codeSnippet!)}
                           disabled={runningSnippetIndex === idx}
-                          className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1 rounded-lg text-xs transition active:scale-95 shadow"
+                          className="min-h-11 flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-2 sm:px-3 py-1 rounded-lg text-xs transition active:scale-95 shadow"
                         >
                           <Play className="w-3 h-3 fill-current" />
                           <span>

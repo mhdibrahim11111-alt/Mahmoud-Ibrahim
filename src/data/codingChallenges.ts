@@ -1,5 +1,5 @@
 /**
- * Coding Challenges for "كود بالمصري"
+ * Coding Challenges for "زكي كود"
  * Practical, fun, and pedagogy-aligned interactive exercises.
  */
 
@@ -32,8 +32,8 @@ export const CODING_CHALLENGES: CodingChallenge[] = [
     difficultyLabel: 'سهل للمبتدئين 🌱',
     points: 10,
     story: 'عايزين نعمل بروفايل لاعب في لعبة. عندك اسم اللعبة مستحيل يتغير (خزنة حديد)، والنقاط بتزيد مع اللعب (صندوق كرتون)!',
-    objective: 'عرّف متغير باسم gameName باستخدام const بقيمة "كود بالمصري"، ومتغير باسم score باستخدام let بقيمة 0، ثم زوّد الـ score بقيمة 50 واطبع الاثنين في الكونسول.',
-    starterCode: `// 1. عرّف خزنة ثابتة لاسم اللعبة باسم gameName وقيمة "كود بالمصري" باستخدام const
+    objective: 'عرّف متغير باسم gameName باستخدام const بقيمة "زكي كود"، ومتغير باسم score باستخدام let بقيمة 0، ثم زوّد الـ score بقيمة 50 واطبع الاثنين في الكونسول.',
+    starterCode: `// 1. عرّف خزنة ثابتة لاسم اللعبة باسم gameName وقيمة "زكي كود" باستخدام const
 
 
 // 2. عرّف صندوق للنقاط باسم score باستخدام let وابدأ بـ 0
@@ -51,13 +51,13 @@ export const CODING_CHALLENGES: CodingChallenge[] = [
       const c = code.replace(/\s+/g, ' ');
       const hasConst = /const\s+gameName\s*=/.test(c);
       const hasLet = /let\s+score\s*=/.test(c);
-      const hasLog = logs.some((l) => l.includes('50')) && logs.some((l) => l.includes('كود بالمصري'));
+      const hasLog = logs.some((l) => l.includes('50')) && logs.some((l) => l.includes('زكي كود'));
 
       if (!hasConst) {
         return {
           passed: false,
           message: 'فين الخزنة؟ اتأكد من تعريف gameName باستخدام const!',
-          hint: 'اكتب: const gameName = "كود بالمصري";',
+          hint: 'اكتب: const gameName = "زكي كود";',
         };
       }
       if (!hasLet) {
@@ -293,7 +293,7 @@ const hero = {
     difficultyLabel: 'تحدي الأبطال 👑',
     points: 30,
     story: 'الـ DOM هو الكوبري السحري اللي بيخلي جافاسكريبت تتحكم في أي عنصر في صفحة الـ HTML وتغير ألوانه ونصوصه لما المستخدم يضغط كليك!',
-    objective: 'حوّل المحرر لوضع HTML، واستخدم addEventListener("click") لتغيير نص عنوان h1 إلى "مبروك يا مبرمج كود بالمصري!".',
+    objective: 'حوّل المحرر لوضع HTML، واستخدم addEventListener("click") لتغيير نص عنوان h1 إلى "مبروك يا مبرمج زكي كود!".',
     starterCode: `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
@@ -310,14 +310,14 @@ const hero = {
     document.getElementById("changeText").addEventListener("click", () => {
       // 1. استخدم document.getElementById لمسك العنصر صاحب الـ id="title"
       
-      // 2. غيّر خاصية innerText للعنصر واكتب: "مبروك يا مبرمج كود بالمصري!"
+      // 2. غيّر خاصية innerText للعنصر واكتب: "مبروك يا مبرمج زكي كود!"
       
     });
   </script>
 </body>
 </html>
 `,
-    solutionHint: 'داخل مستمع النقر، اكتب: document.getElementById("title").textContent = "مبروك يا مبرمج كود بالمصري!";',
+    solutionHint: 'داخل مستمع النقر، اكتب: document.getElementById("title").textContent = "مبروك يا مبرمج زكي كود!";',
     check: (code: string) => {
       const c = code.toLowerCase();
       const hasButton = c.includes('<button') && c.includes('addeventlistener') && c.includes('"click"');
@@ -334,7 +334,7 @@ const hero = {
         return {
           passed: false,
           message: 'محتاجين نمسك العنصر بـ document.getElementById ونغير نصه بـ innerText.',
-          hint: 'اكتب: document.getElementById("title").innerText = "مبروك يا مبرمج كود بالمصري!";',
+          hint: 'اكتب: document.getElementById("title").innerText = "مبروك يا مبرمج زكي كود!";',
         };
       }
       return {

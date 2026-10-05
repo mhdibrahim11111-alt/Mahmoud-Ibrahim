@@ -47,7 +47,7 @@ export const ALL_BADGES: Badge[] = [
   },
   {
     id: 'master-graduate',
-    title: 'خريج كود بالمصري 🎓',
+    title: 'خريج زكي كود 🎓',
     description: 'أنهيت الـ 25 فصلاً بالكامل.. إنجاز أسطوري!',
     icon: '👑',
     category: 'chapters',

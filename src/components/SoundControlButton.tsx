@@ -63,8 +63,9 @@ export const SoundControlButton: React.FC = () => {
         onClick={() => setIsOpen((prev) => !prev)}
         aria-label={`التحكم بالمؤثرات الصوتية (${isMuted ? 'مكتوم' : `${currentPercent}%`})`}
         aria-expanded={isOpen}
+        aria-haspopup="dialog"
         title={isMuted ? 'المؤثرات الصوتية مكتومة (اضغط للضبط)' : `مستوى المؤثرات الصوتية ${currentPercent}%`}
-        className={`flex items-center gap-1.5 p-2 rounded-xl border transition text-xs font-semibold shadow-sm active:scale-95 ${
+        className={`min-w-11 min-h-11 flex items-center justify-center gap-1.5 p-2 rounded-xl border transition text-xs font-semibold shadow-sm active:scale-95 ${
           isMuted || volume === 0
             ? 'bg-slate-900/80 hover:bg-slate-800 border-slate-800 text-slate-500'
             : 'bg-slate-900/90 hover:bg-slate-800 border-slate-800 hover:border-orange-500/40 text-slate-200'

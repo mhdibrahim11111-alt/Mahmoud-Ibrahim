@@ -173,6 +173,22 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+  useEffect(() => {
+    if (!isMobileSidebarOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsMobileSidebarOpen(false);
+    };
+    window.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [isMobileSidebarOpen]);
+
   // New Modals States
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
@@ -476,23 +492,25 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
 
       {/* Mobile Drawer Toggle (Only in Reader Mode) */}
       {currentView === 'reader' && (
-        <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between min-h-[52px]">
+        <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-3 py-1.5 flex items-center justify-between gap-2 min-w-0 min-h-[52px]">
           <button
             type="button"
             onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-            className="min-h-[44px] flex items-center gap-2 text-xs sm:text-sm font-semibold text-amber-400 bg-slate-800 hover:bg-slate-700 active:scale-95 px-3.5 py-2 rounded-xl border border-slate-700 transition touch-manipulation"
+            aria-expanded={isMobileSidebarOpen}
+            aria-controls="mobile-content-drawer"
+            className="min-h-[44px] shrink-0 flex items-center gap-2 text-xs sm:text-sm font-semibold text-amber-400 bg-slate-800 hover:bg-slate-700 active:scale-95 px-3.5 py-2 rounded-xl border border-slate-700 transition touch-manipulation"
           >
             {isMobileSidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-            <span>فهرس الفصول والأجزاء (25 فصلاً)</span>
+            <span>الفهرس</span>
           </button>
-          <span className="text-xs text-slate-400 font-medium">
-            {selectedPartExamId ? `ملخص الجزء ${selectedPartExamId}` : `الفصل: ${currentChapter.id}`}
+          <span className="min-w-0 truncate text-xs text-slate-400 font-medium text-left">
+            {selectedPartExamId ? `ملخص الجزء ${selectedPartExamId}` : currentChapter.title}
           </span>
         </div>
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col lg:flex-row pb-24 sm:pb-28 lg:pb-0">
+      <div className="flex-1 flex flex-col lg:flex-row pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
         {/* Sidebar in Reader Mode */}
         {currentView === 'reader' && (
           <>
@@ -523,11 +541,13 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
             {/* Mobile Sidebar Modal/Overlay */}
             {isMobileSidebarOpen && (
               <div className="fixed inset-0 z-50 lg:hidden flex">
-                <div
+                <button
+                  type="button"
+                  aria-label="إغلاق فهرس المحتوى"
                   className="fixed inset-0 bg-black/70 backdrop-blur-sm"
                   onClick={() => setIsMobileSidebarOpen(false)}
                 />
-                <div className="relative z-10 w-80 max-w-[85%] bg-slate-950 h-full flex flex-col border-l border-slate-800">
+                <div id="mobile-content-drawer" role="dialog" aria-modal="true" aria-label="فهرس المحتوى" className="relative z-10 w-80 max-w-[85%] bg-slate-950 h-full flex flex-col border-l border-slate-800">
                   <div className="p-3.5 border-b border-slate-800 flex items-center justify-between min-h-[56px]">
                     <span className="font-bold text-amber-400 text-sm">فهرس المحتوى</span>
                     <button

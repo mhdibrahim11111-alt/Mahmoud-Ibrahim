@@ -86,7 +86,7 @@ export const part6: Part = {
 
 لغة HTML مش لغة برمجة فيها شروط وحلقات؛ دي لغة "توصيفية (Markup Language)"، بتستخدم "الوسوم (Tags)" عشان تقول للمتصفح: "السطر ده عنوان رئيسي، السطر ده فقرة، والصورة دي حطها هنا!".`,
           codeSnippet: `<!-- مثال بسيط على وسوم HTML -->
-<h1>مرحباً بكم في كود بالمصري!</h1>
+<h1>مرحباً بكم في زكي كود!</h1>
 <p>هنا بنتعلم البرمجة بأسلوب سهل وممتع.</p>`,
         },
         {
@@ -148,7 +148,7 @@ export const part6: Part = {
 <a href="https://google.com">ابحث في جوجل</a>
 
 <!-- img عنصر فارغ ولا يحتاج وسم إغلاق -->
-<img src="logo.png" alt="شعار كود بالمصري">`,
+<img src="logo.png" alt="شعار زكي كود" loading="lazy" decoding="async">`,
           callout: {
             type: 'tip',
             title: 'قاعدة الـ h1 الذهبية 🔍',
@@ -228,7 +228,7 @@ export const part6: Part = {
         hint: 'اكتب وسوم h1 و p و ul/li مباشرة، دون console.log.',
         initialCode: `// اكتب كود طباعة وسوم الـ HTML بالترتيب هنا بنفسك...
 `,
-        solutionCode: `<h1>كود بالمصري</h1>\n<p>أنا مبرمج ويب</p>\n<ul><li>JavaScript</li><li>HTML</li></ul>`,
+        solutionCode: `<h1>زكي كود</h1>\n<p>أنا مبرمج ويب</p>\n<ul><li>JavaScript</li><li>HTML</li></ul>`,
       },
     },
     {
@@ -821,7 +821,7 @@ h1 {
 </head>
 <body>
   <div class="profile-card">
-    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="avatar" alt="صورة المبرمج">
+    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" class="avatar" alt="صورة المبرمج" loading="lazy" decoding="async">
     <h2>أحمد مصطفى</h2>
     <div class="badge">🚀 مطور فرونت إند جافاسكريبت</div>
     <p>أقوم بتحويل الأفكار والتصميمات إلى مواقع ويب وتطبيقات حية وتفاعلية سريعة.</p>

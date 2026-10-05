@@ -29,7 +29,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   return (
     <nav
       aria-label="التنقل الرئيسي"
-      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 px-2 py-1 flex items-center justify-around font-['Cairo',sans-serif] shadow-2xl safe-area-bottom min-h-[64px] h-[calc(4.25rem+env(safe-area-inset-bottom,0px))] touch-manipulation"
+      className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 px-1.5 pt-1.5 pb-[env(safe-area-inset-bottom,0px)] flex items-center justify-around font-['Cairo',sans-serif] shadow-2xl min-h-16 h-[calc(4.25rem+env(safe-area-inset-bottom,0px))] touch-manipulation"
     >
       {navItems.map((item) => {
         const isActive = currentView === item.view;
@@ -42,7 +42,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               onSelectView(item.view);
             }}
             aria-current={isActive ? 'page' : undefined}
-            className={`flex-1 min-h-[52px] min-w-[48px] py-1 px-1 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-150 active:scale-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 select-none ${
+            className={`flex-1 min-w-0 min-h-[52px] py-1 px-0.5 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-150 active:scale-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 select-none touch-manipulation ${
               isActive
                 ? 'text-amber-400 font-bold'
                 : 'text-slate-400 hover:text-slate-200 font-medium'
@@ -57,7 +57,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             >
               {item.icon}
             </div>
-            <span className={`text-[11px] sm:text-xs leading-none transition-transform ${isActive ? 'font-bold' : ''}`}>
+            <span className={`max-w-full truncate whitespace-nowrap text-[10px] sm:text-xs leading-tight transition-transform ${isActive ? 'font-bold' : ''}`}>
               {item.label}
             </span>
           </button>
