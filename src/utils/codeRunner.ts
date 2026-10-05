@@ -121,7 +121,7 @@ export function translateErrorToArabic(rawError: string): string {
   }
   if (rawError.includes('is not defined')) {
     const varName = rawError.split(' ')[0] || 'المتغير';
-    return `${rawError} (الكمبيوتر بيقولك: أنا مش لاقي "${varName}"! اتأكد من كتابة الاسم صح (الحروف الكبيرة والصغيرة)، أو اتأكد إنه متعرّف في نفس النطاق scope).`;
+    return `${rawError} (الكمبيوتر بيقولك: أنا مش لاقي "${varName}"! اتأكد من كتابة الاسم صح (الحروف الكبيرة والصغيرة)، وإنه متعرّف في نفس الكود اللي بتشغّله؛ كل بلوك تشغيل منفصل ومش بيشارك متغيراته مع البلوكات التانية).`;
   }
   if (rawError.includes('Unexpected token')) {
     return `${rawError} (خطأ في بناء الكود SyntaxError: فيه قوس ناقص، أو علامة تنصيص مش مقفولة، أو فاصلة منسية).`;
