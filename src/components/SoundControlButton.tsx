@@ -61,7 +61,6 @@ export const SoundControlButton: React.FC = () => {
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        onDoubleClick={handleToggleMute}
         aria-label={`التحكم بالمؤثرات الصوتية (${isMuted ? 'مكتوم' : `${currentPercent}%`})`}
         aria-expanded={isOpen}
         title={isMuted ? 'المؤثرات الصوتية مكتومة (اضغط للضبط)' : `مستوى المؤثرات الصوتية ${currentPercent}%`}

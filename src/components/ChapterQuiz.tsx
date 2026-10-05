@@ -52,18 +52,18 @@ export const ChapterQuiz: React.FC<ChapterQuizProps> = ({
     const newAnswers = { ...selectedAnswers, [currentQ.id]: optionId };
     setSelectedAnswers(newAnswers);
 
-    const chosenOption = currentQ.options.find((o) => o.id === optionId);
-    if (chosenOption?.isCorrect) {
-      playSuccess();
-    } else {
-      playError();
-    }
-
     // If all questions are answered, mark as completed
     const allAnswered = quiz.every((q) => !!newAnswers[q.id]);
     if (allAnswered) {
       playCompletion();
       if (onComplete) onComplete();
+    } else {
+      const chosenOption = currentQ.options.find((o) => o.id === optionId);
+      if (chosenOption?.isCorrect) {
+        playSuccess();
+      } else {
+        playError();
+      }
     }
   };
 

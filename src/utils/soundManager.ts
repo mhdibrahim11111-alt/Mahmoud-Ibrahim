@@ -28,7 +28,10 @@ class SoundManager {
   private static instance: SoundManager;
 
   private audioCtx: AudioContext | null = null;
-  private volume: number = 0.35; // Comfortable default volume
+  private masterGain: GainNode | null = null;
+  private idleSuspendTimer: ReturnType<typeof setTimeout> | null = null;
+  private activeAudio: Map<HTMLAudioElement, SoundEffectType> = new Map();
+  private volume: number = 0.25; // Comfortable default volume
   private isMuted: boolean = false;
   private listeners: Set<SoundStateListener> = new Set();
 
@@ -83,9 +86,22 @@ class SoundManager {
       const AudioCtxClass =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtxClass) {
-        this.audioCtx = new AudioCtxClass();
+      try {
+        if (AudioCtxClass) this.audioCtx = new AudioCtxClass();
+      } catch {
+        // Audio is optional; playback can still use explicitly supplied audio assets.
       }
+    }
+
+    if (this.audioCtx && !this.masterGain) {
+      this.masterGain = this.audioCtx.createGain();
+      this.masterGain.gain.value = this.isMuted || this.volume === 0 ? 0 : 1;
+      this.masterGain.connect(this.audioCtx.destination);
+    }
+
+    if (this.idleSuspendTimer) {
+      clearTimeout(this.idleSuspendTimer);
+      this.idleSuspendTimer = null;
     }
 
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
@@ -108,19 +124,9 @@ class SoundManager {
       this.assetUrls = { ...this.assetUrls, ...assetMap };
     }
 
-    // Default audio locations (can be placed in public/sounds/)
-    const defaultUrls: Partial<Record<SoundEffectType, string>> = {
-      success: '/sounds/success.mp3',
-      completion: '/sounds/completion.mp3',
-      error: '/sounds/error.mp3',
-      click: '/sounds/click.mp3',
-      run: '/sounds/run.mp3',
-      badge: '/sounds/badge.mp3',
-      bookmark: '/sounds/bookmark.mp3',
-      levelUp: '/sounds/level-up.mp3',
-    };
-
-    const urlsToPreload = { ...defaultUrls, ...this.assetUrls };
+    // Only load assets explicitly provided by the app; absent optional files
+    // should not generate network 404s during startup.
+    const urlsToPreload = this.assetUrls;
 
     (Object.entries(urlsToPreload) as [SoundEffectType, string][]).forEach(([type, url]) => {
       try {
@@ -136,6 +142,10 @@ class SoundManager {
           },
           { once: true }
         );
+        audio.addEventListener('error', () => {
+          this.preloadedAudios.delete(type);
+          this.loadedAssets.delete(type);
+        }, { once: true });
 
         // Pre-fetch
         audio.load();
@@ -160,6 +170,11 @@ class SoundManager {
   public setVolume(volume: number): void {
     const clamped = Math.max(0, Math.min(1, volume));
     this.volume = clamped;
+    this.updateMasterGate();
+    this.activeAudio.forEach((type, audio) => {
+      audio.volume = this.getScaledVolume(type);
+      if (audio.volume === 0) this.stopAudio(audio);
+    });
     try {
       localStorage.setItem(STORAGE_KEY_VOLUME, clamped.toString());
     } catch {}
@@ -168,10 +183,37 @@ class SoundManager {
 
   public setMuted(muted: boolean): void {
     this.isMuted = muted;
+    this.updateMasterGate();
+    if (muted) {
+      this.activeAudio.forEach((_type, audio) => this.stopAudio(audio));
+    }
     try {
       localStorage.setItem(STORAGE_KEY_MUTED, muted.toString());
     } catch {}
     this.notify();
+  }
+
+  private updateMasterGate(): void {
+    if (!this.masterGain || !this.audioCtx) return;
+    this.masterGain.gain.setValueAtTime(
+      this.isMuted || this.volume === 0 ? 0 : 1,
+      this.audioCtx.currentTime
+    );
+  }
+
+  private stopAudio(audio: HTMLAudioElement): void {
+    audio.pause();
+    try { audio.currentTime = 0; } catch {}
+    this.activeAudio.delete(audio);
+  }
+
+  private scheduleContextSuspend(): void {
+    if (!this.audioCtx || typeof window === 'undefined') return;
+    if (this.idleSuspendTimer) clearTimeout(this.idleSuspendTimer);
+    this.idleSuspendTimer = setTimeout(() => {
+      this.idleSuspendTimer = null;
+      if (this.audioCtx?.state === 'running') this.audioCtx.suspend().catch(() => {});
+    }, 5000);
   }
 
   public toggleMute(): boolean {
@@ -256,12 +298,16 @@ class SoundManager {
         // Clone node to allow rapid overlapping triggers
         const clone = preloaded.cloneNode() as HTMLAudioElement;
         clone.volume = scaledVolume;
+        this.activeAudio.set(clone, type);
+        clone.addEventListener('ended', () => this.activeAudio.delete(clone), { once: true });
         const playPromise = clone.play();
         if (playPromise !== undefined) {
           playPromise.catch(() => {
+            this.activeAudio.delete(clone);
             // Autoplay restriction or decode failure; fallback to synth
             this.synthesizeSound(type, scaledVolume);
           });
+          this.scheduleContextSuspend();
           return;
         }
       } catch {
@@ -271,6 +317,7 @@ class SoundManager {
 
     // 2. High-fidelity procedural Web Audio fallback
     this.synthesizeSound(type, scaledVolume);
+    this.scheduleContextSuspend();
   }
 
   /**
@@ -360,7 +407,7 @@ class SoundManager {
             gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
 
             osc.connect(gain);
-            gain.connect(ctx.destination);
+            gain.connect(this.masterGain ?? ctx.destination);
 
             osc.start(startTime);
             osc.stop(startTime + duration);
@@ -387,7 +434,7 @@ class SoundManager {
             gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
 
             osc.connect(gain);
-            gain.connect(ctx.destination);
+            gain.connect(this.masterGain ?? ctx.destination);
 
             osc.start(startTime);
             osc.stop(startTime + duration);
@@ -407,7 +454,7 @@ class SoundManager {
           shimmerGain.gain.exponentialRampToValueAtTime(0.0001, shimmerStartTime + shimmerDuration);
 
           shimmerOsc.connect(shimmerGain);
-          shimmerGain.connect(ctx.destination);
+          shimmerGain.connect(this.masterGain ?? ctx.destination);
 
           shimmerOsc.start(shimmerStartTime);
           shimmerOsc.stop(shimmerStartTime + shimmerDuration);
@@ -436,7 +483,7 @@ class SoundManager {
             gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
 
             osc.connect(gain);
-            gain.connect(ctx.destination);
+            gain.connect(this.masterGain ?? ctx.destination);
 
             osc.start(startTime);
             osc.stop(startTime + duration);
@@ -458,7 +505,7 @@ class SoundManager {
           gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(this.masterGain ?? ctx.destination);
 
           osc.start(now);
           osc.stop(now + duration);
@@ -480,7 +527,7 @@ class SoundManager {
           gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
           osc.connect(gain);
-          gain.connect(ctx.destination);
+          gain.connect(this.masterGain ?? ctx.destination);
 
           osc.start(now);
           osc.stop(now + duration);
@@ -504,7 +551,7 @@ class SoundManager {
             gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
 
             osc.connect(gain);
-            gain.connect(ctx.destination);
+            gain.connect(this.masterGain ?? ctx.destination);
 
             osc.start(start);
             osc.stop(start + duration);
@@ -530,7 +577,7 @@ class SoundManager {
             gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
 
             osc.connect(gain);
-            gain.connect(ctx.destination);
+            gain.connect(this.masterGain ?? ctx.destination);
 
             osc.start(start);
             osc.stop(start + duration);
@@ -556,7 +603,7 @@ class SoundManager {
             gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
 
             osc.connect(gain);
-            gain.connect(ctx.destination);
+            gain.connect(this.masterGain ?? ctx.destination);
 
             osc.start(start);
             osc.stop(start + duration);
@@ -578,7 +625,7 @@ class SoundManager {
             sGain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
 
             sOsc.connect(sGain);
-            sGain.connect(ctx.destination);
+            sGain.connect(this.masterGain ?? ctx.destination);
 
             sOsc.start(start);
             sOsc.stop(start + duration);
