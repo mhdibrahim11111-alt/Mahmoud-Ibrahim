@@ -29,28 +29,37 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   return (
     <nav
       aria-label="التنقل الرئيسي"
-      className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 px-1.5 pt-1.5 pb-[env(safe-area-inset-bottom)] flex items-center justify-around font-['Cairo',sans-serif] shadow-2xl h-[calc(4rem+env(safe-area-inset-bottom))]"
+      className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800 px-1.5 pt-1.5 pb-[env(safe-area-inset-bottom,0px)] flex items-center justify-around font-['Cairo',sans-serif] shadow-2xl min-h-16 h-[calc(4.25rem+env(safe-area-inset-bottom,0px))] touch-manipulation"
     >
       {navItems.map((item) => {
         const isActive = currentView === item.view;
         return (
           <button
             key={item.view}
+            type="button"
             onClick={() => {
               soundManager.playClick();
               onSelectView(item.view);
             }}
             aria-current={isActive ? 'page' : undefined}
-            className={`flex-1 min-w-0 min-h-11 flex flex-col items-center justify-center gap-1 px-0.5 rounded-xl transition-all duration-200 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400 ${
+            className={`flex-1 min-w-0 min-h-[52px] py-1 px-0.5 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-150 active:scale-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 select-none touch-manipulation ${
               isActive
-                ? 'text-orange-400 font-bold'
+                ? 'text-amber-400 font-bold'
                 : 'text-slate-400 hover:text-slate-200 font-medium'
             }`}
           >
-            <div className={`p-1 rounded-lg transition ${isActive ? 'bg-orange-500/15 text-orange-400' : ''}`}>
+            <div
+              className={`p-1.5 rounded-xl transition flex items-center justify-center ${
+                isActive
+                  ? 'bg-amber-500/20 text-amber-400 shadow-sm shadow-amber-500/10'
+                  : 'text-slate-400'
+              }`}
+            >
               {item.icon}
             </div>
-            <span className="max-w-full truncate whitespace-nowrap text-[10px] leading-tight sm:text-[11px]">{item.label}</span>
+            <span className={`max-w-full truncate whitespace-nowrap text-[10px] sm:text-xs leading-tight transition-transform ${isActive ? 'font-bold' : ''}`}>
+              {item.label}
+            </span>
           </button>
         );
       })}

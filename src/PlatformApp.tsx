@@ -100,6 +100,66 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
     }
   });
 
+  // Dynamically load the full detailed lessons for the active part on demand
+  useEffect(() => {
+    if (!bookParts.length) return;
+
+    // Find which part the selectedChapter belongs to
+    const targetPart = bookParts.find((p) => p.chapters.some((c) => c.id === selectedChapterId));
+    if (!targetPart) return;
+
+    // Check if the chapter already has full contentSections loaded
+    const targetChapter = targetPart.chapters.find((c) => c.id === selectedChapterId);
+    if (targetChapter && targetChapter.contentSections && targetChapter.contentSections.length > 0) {
+      return; // Already loaded!
+    }
+
+    let isCancelled = false;
+
+    import('./data/bookData').then(({ loadPartDetails }) => {
+      return loadPartDetails(targetPart.id);
+    }).then((fullPart) => {
+      if (isCancelled) return;
+      setBookParts((prevParts) =>
+        prevParts.map((p) => (p.id === fullPart.id ? fullPart : p))
+      );
+    }).catch((err) => {
+      console.error('Failed to load part details:', err);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedChapterId, bookParts]);
+
+  // Also dynamically load full part if part summary/exam is selected
+  useEffect(() => {
+    if (!bookParts.length || !selectedPartExamId) return;
+    const targetPart = bookParts.find((p) => p.id === selectedPartExamId);
+    if (!targetPart) return;
+
+    const firstCh = targetPart.chapters[0];
+    if (firstCh && firstCh.contentSections && firstCh.contentSections.length > 0) {
+      return;
+    }
+
+    let isCancelled = false;
+    import('./data/bookData').then(({ loadPartDetails }) => {
+      return loadPartDetails(targetPart.id);
+    }).then((fullPart) => {
+      if (isCancelled) return;
+      setBookParts((prevParts) =>
+        prevParts.map((p) => (p.id === fullPart.id ? fullPart : p))
+      );
+    }).catch((err) => {
+      console.error('Failed to load exam part details:', err);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedPartExamId, bookParts]);
+
   const [playgroundCode, setPlaygroundCode] = useState<string>('');
 
   const [selectedBugHunterPartId, setSelectedBugHunterPartId] = useState<number>(() => {
@@ -432,18 +492,18 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
 
       {/* Mobile Drawer Toggle (Only in Reader Mode) */}
       {currentView === 'reader' && (
-        <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-3 py-1.5 flex items-center justify-between gap-2 min-w-0">
+        <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-3 py-1.5 flex items-center justify-between gap-2 min-w-0 min-h-[52px]">
           <button
             type="button"
             onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
             aria-expanded={isMobileSidebarOpen}
             aria-controls="mobile-content-drawer"
-            className="min-h-11 shrink-0 flex items-center gap-2 text-xs font-semibold text-amber-400 bg-slate-800 px-3 rounded-lg border border-slate-700"
+            className="min-h-[44px] shrink-0 flex items-center gap-2 text-xs sm:text-sm font-semibold text-amber-400 bg-slate-800 hover:bg-slate-700 active:scale-95 px-3.5 py-2 rounded-xl border border-slate-700 transition touch-manipulation"
           >
             {isMobileSidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             <span>الفهرس</span>
           </button>
-          <span className="min-w-0 truncate text-xs text-slate-400 text-left">
+          <span className="min-w-0 truncate text-xs text-slate-400 font-medium text-left">
             {selectedPartExamId ? `ملخص الجزء ${selectedPartExamId}` : currentChapter.title}
           </span>
         </div>
@@ -488,13 +548,13 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
                   onClick={() => setIsMobileSidebarOpen(false)}
                 />
                 <div id="mobile-content-drawer" role="dialog" aria-modal="true" aria-label="فهرس المحتوى" className="relative z-10 w-80 max-w-[85%] bg-slate-950 h-full flex flex-col border-l border-slate-800">
-                  <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                  <div className="p-3.5 border-b border-slate-800 flex items-center justify-between min-h-[56px]">
                     <span className="font-bold text-amber-400 text-sm">فهرس المحتوى</span>
                     <button
                       type="button"
                       onClick={() => setIsMobileSidebarOpen(false)}
                       aria-label="إغلاق الفهرس"
-                      className="min-w-11 min-h-11 flex items-center justify-center rounded-lg text-slate-400 hover:text-white"
+                      className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/80 active:scale-90 transition touch-manipulation"
                     >
                       <X className="w-5 h-5" />
                     </button>
