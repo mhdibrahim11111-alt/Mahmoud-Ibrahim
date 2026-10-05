@@ -55,8 +55,11 @@ export const ActivationGate: React.FC<ActivationGateProps> = ({ onActivated }) =
         <div className="text-center space-y-3.5">
           {/* Logo Icon */}
 <img
-  src="/icons/icon-512.png"
+  src="/icons/icon.svg"
   alt="زكي كود"
+  width="160"
+  height="160"
+  decoding="async"
   className="inline-block w-32 h-32 sm:w-40 sm:h-40 rounded-[2rem] object-cover shadow-2xl shadow-orange-500/30 transform hover:scale-105 transition duration-300"
 />
 

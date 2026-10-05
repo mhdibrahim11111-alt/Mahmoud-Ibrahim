@@ -68,8 +68,11 @@ export const Header: React.FC<HeaderProps> = ({
     className="flex items-center gap-2 sm:gap-3 cursor-pointer select-none group shrink-0 rounded-xl text-right"
   >
     <img
-      src="/icons/icon-192.png"
+      src="/icons/icon.svg"
       alt="زكي كود"
+      width={40}
+      height={40}
+      decoding="async"
       className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl object-cover shadow-md shadow-orange-500/25 group-hover:scale-105 transition duration-300 shrink-0"
     />
     <div className="flex flex-col">

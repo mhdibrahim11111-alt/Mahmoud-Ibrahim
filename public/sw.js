@@ -1,12 +1,9 @@
-const CACHE_NAME = 'codemasr-pwa-v2';
+const CACHE_NAME = 'zakicode-pwa-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/icons/icon.svg',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', (event) => {

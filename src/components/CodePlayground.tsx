@@ -1310,7 +1310,7 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
                 </div>
                 <div>
                   <h3 className="font-black text-white text-base sm:text-lg flex items-center gap-2">
-                    <span>تحديات كود بالمصري التفاعلية</span>
+                    <span>تحديات زكي كود التفاعلية</span>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
                       {completedChallengeIds.length} / {CODING_CHALLENGES.length} مكتمل
                     </span>

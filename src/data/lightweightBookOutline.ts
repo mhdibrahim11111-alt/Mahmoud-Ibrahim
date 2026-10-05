@@ -1388,7 +1388,7 @@ export const lightweightBookParts: Part[] = [
           "prompt": "اكتب HTML مباشرة لبطاقة فيها عنوان <h1> باسمك، وفقرة <p> بالنص \"أنا مبرمج ويب\"، وقائمة <ul> فيها مهارتان داخل <li>.",
           "hint": "اكتب وسوم h1 و p و ul/li مباشرة، دون console.log.",
           "initialCode": "// اكتب كود طباعة وسوم الـ HTML بالترتيب هنا بنفسك...\n",
-          "solutionCode": "<h1>كود بالمصري</h1>\n<p>أنا مبرمج ويب</p>\n<ul><li>JavaScript</li><li>HTML</li></ul>"
+          "solutionCode": "<h1>زكي كود</h1>\n<p>أنا مبرمج ويب</p>\n<ul><li>JavaScript</li><li>HTML</li></ul>"
         },
         "quiz": [
           {
