@@ -615,7 +615,14 @@ export async function adminRevokeAllSessions(): Promise<{ success: boolean; mess
       method: 'POST',
       headers: sessionHeaders(true),
     });
-    return await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success && data.sessionToken) {
+      localStorage.setItem(STORAGE_KEY, data.sessionToken);
+    }
+    return {
+      success: !!data.success,
+      message: data.message || (res.ok ? 'تم إبطال جميع الجلسات بنجاح.' : 'تعذر إبطال الجلسات.'),
+    };
   } catch {
     return { success: false, message: 'تعذر الاتصال بالخادم لإبطال الجلسات.' };
   }

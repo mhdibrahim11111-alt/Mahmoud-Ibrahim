@@ -91,9 +91,20 @@ export function readSessionToken(token: string): SessionClaims | null {
   }
 }
 
-export function revokeAllSessions(): void {
+export function setDynamicRevocationEpoch(epoch: number): void {
+  if (typeof epoch === 'number' && Number.isFinite(epoch)) {
+    dynamicRevocationEpoch = Math.max(dynamicRevocationEpoch, epoch);
+  }
+}
+
+export function getDynamicRevocationEpoch(): number {
+  return dynamicRevocationEpoch;
+}
+
+export function revokeAllSessions(): number {
   dynamicRevocationEpoch = Math.floor(Date.now() / 1000);
   revokedSubjects.clear();
+  return dynamicRevocationEpoch;
 }
 
 export function revokeSubjectSessions(subject: string): void {

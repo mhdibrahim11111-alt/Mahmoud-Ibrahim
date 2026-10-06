@@ -58,8 +58,11 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
 
   useEffect(() => {
     let isSubscribed = true;
-    import('./data/bookData').then(({ bookParts: loadedParts }) => {
-      if (isSubscribed) setBookParts(loadedParts);
+    import('./data/bookData').then(({ bookParts: loadedParts, preloadAllCourseParts }) => {
+      if (isSubscribed) {
+        setBookParts(loadedParts);
+        preloadAllCourseParts();
+      }
     }).catch((error) => {
       console.error('Failed to load course content:', error);
       if (isSubscribed) setBookLoadFailed(true);
@@ -305,6 +308,32 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
+
+  // Active session monitoring to instantly kick revoked sessions
+  useEffect(() => {
+    let isCancelled = false;
+    const checkSession = async () => {
+      const state = await validateSavedSession();
+      if (isCancelled) return;
+      if (!state.activated) {
+        onLockPlatform();
+      }
+    };
+
+    const interval = setInterval(checkSession, 30000);
+    const onFocus = () => void checkSession();
+    const onRevokedEvent = () => onLockPlatform();
+
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('codemasr:session-revoked', onRevokedEvent);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('codemasr:session-revoked', onRevokedEvent);
+    };
+  }, [onLockPlatform]);
 
   // Sync to Cloud whenever progress changes, ONLY after initial load is complete
   useEffect(() => {
@@ -635,6 +664,7 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
                 onToggleBookmark={() => toggleBookmark(currentChapter.id)}
                 userNote={chapterNotes[currentChapter.id.toString()] || ''}
                 onSaveUserNote={(note) => handleSaveNote(currentChapter.id, note)}
+                onCompleteQuiz={(chId) => toggleQuizCompleted(chId.toString())}
               />
             )
           )}

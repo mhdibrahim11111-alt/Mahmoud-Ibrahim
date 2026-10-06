@@ -83,3 +83,35 @@ export async function loadChapterWithPart(
     fullPart.chapters.find((c) => c.id === chapterId) || fullPart.chapters[0];
   return { part: fullPart, chapter: fullChapter };
 }
+
+/**
+ * Automatically warm up and precache all course parts in the background
+ * during idle periods for seamless offline review.
+ */
+export function preloadAllCourseParts(): void {
+  const partIds = [1, 2, 3, 4, 5, 6];
+  const schedulePreload = () => {
+    let index = 0;
+    const preloadNext = () => {
+      if (index >= partIds.length) return;
+      const id = partIds[index++];
+      loadPartDetails(id).catch(() => {}).finally(() => {
+        if ('requestIdleCallback' in window) {
+          (window as any).requestIdleCallback(preloadNext, { timeout: 4000 });
+        } else {
+          setTimeout(preloadNext, 1000);
+        }
+      });
+    };
+    preloadNext();
+  };
+
+  if (typeof window !== 'undefined') {
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(schedulePreload, { timeout: 3000 });
+    } else {
+      setTimeout(schedulePreload, 2000);
+    }
+  }
+}
+

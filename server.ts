@@ -29,6 +29,7 @@ import {
   deleteStudentSnippet,
   setStudentFeedback,
   restoreCodesBackup,
+  persistGlobalRevocation,
 } from './server/codeManager.ts';
 import type { AccessCodeRecord } from './server/codeManager.ts';
 import {
@@ -139,10 +140,10 @@ async function startServer() {
 
   // Multi-tier Rate limiters
   const limitCodeAttempts = createRateLimiter({
-    maxAttempts: 10,
+    maxAttempts: 60,
     windowMs: 15 * 60 * 1000,
     prefix: 'auth_verify',
-    errorMessage: 'محاولات كثيرة لتأكيد الكود. الرجاء الانتظار 15 دقيقة.',
+    errorMessage: 'محاولات كثيرة لتأكيد الكود. الرجاء الانتظار دقيقة.',
   });
 
   const limitHintRequests = createRateLimiter({
@@ -496,12 +497,20 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
   });
 
   // 7. Security: Revoke All Active Sessions (Admin only)
-  app.post('/api/admin/revoke-all-sessions', requireAdmin, async (_req, res) => {
-    revokeAllSessions();
+  app.post('/api/admin/revoke-all-sessions', requireAdmin, async (req, res) => {
+    const epoch = revokeAllSessions();
+    await persistGlobalRevocation(epoch);
     secureLog.warn('All active sessions were globally revoked by an administrator.');
+
+    const session = (req as SessionRequest).session!;
+    const adminCode = (req as SessionRequest).sessionCode || session.code || 'MASTER';
+    // Issue a fresh token for the current admin so their session is not disrupted
+    const freshToken = createSessionToken(adminCode, session.role);
+
     return res.json({
       success: true,
-      message: 'تم إبطال جميع الجلسات النشطة بنجاح. سيتعين على جميع المستخدمين تسجيل الدخول مجدداً.',
+      sessionToken: freshToken,
+      message: 'تم إبطال جميع الجلسات النشطة لجميع الطلاب والمعلمين بنجاح 🔒. سيتعين على الجميع تسجيل الدخول مجدداً.',
     });
   });
 
@@ -514,10 +523,11 @@ ${error || 'المستخدم يطلب فحص الكود وتقديم توجيه 
       return res.status(400).json({ success: false, message: 'تعذر إضافة كود المدير الجديد.' });
     }
     if (revokeOldSessions === true) {
-      revokeAllSessions();
+      const epoch = revokeAllSessions();
+      await persistGlobalRevocation(epoch);
     }
     // Issue a fresh new session token signed with the new credentials so the admin session seamlessly stays active
-    const newSessionToken = createSessionToken(cleanCode, 'admin');
+    const newSessionToken = createSessionToken(cleanCode, 'master');
     secureLog.warn('Admin credentials rotated and fresh session token issued.');
     return res.json({
       success: true,

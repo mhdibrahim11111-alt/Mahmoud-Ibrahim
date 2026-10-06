@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 interface ChapterQuizProps {
+  chapterId: number | string;
   quiz: ChapterQuizItem[];
   chapterTitle: string;
   onComplete?: () => void;
@@ -22,26 +23,93 @@ interface ChapterQuizProps {
 }
 
 export const ChapterQuiz: React.FC<ChapterQuizProps> = ({
+  chapterId,
   quiz,
   chapterTitle,
   onComplete,
   onScrollToChallenge,
 }) => {
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
-  const [isFinished, setIsFinished] = useState(false);
+  const storageKey = `zaki_quiz_state_ch_${chapterId}`;
+
+  // Initialize state from localStorage if available
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed.selectedAnswers === 'object') {
+          return parsed.selectedAnswers;
+        }
+      }
+    } catch {}
+    return {};
+  });
+
+  const [isFinished, setIsFinished] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.isFinished === 'boolean') {
+          return parsed.isFinished;
+        }
+      }
+    } catch {}
+    return false;
+  });
+
+  const [currentIdx, setCurrentIdx] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.currentIdx === 'number' && parsed.currentIdx < quiz.length) {
+          return parsed.currentIdx;
+        }
+      }
+    } catch {}
+    return 0;
+  });
+
   const { playSuccess, playError, playCompletion } = useSoundManager();
 
-  // Automatically reset quiz state whenever the chapter changes
+  // Synchronize state changes with localStorage
+  const saveStateToStorage = (answers: Record<string, string>, finished: boolean, idx: number) => {
+    try {
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          selectedAnswers: answers,
+          isFinished: finished,
+          currentIdx: idx,
+          updatedAt: Date.now(),
+        })
+      );
+    } catch {}
+  };
+
+  // Re-sync when chapterId changes
   React.useEffect(() => {
-    setCurrentIdx(0);
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed) {
+          setSelectedAnswers(parsed.selectedAnswers || {});
+          setIsFinished(!!parsed.isFinished);
+          setCurrentIdx(Math.min(parsed.currentIdx || 0, Math.max(0, quiz.length - 1)));
+          return;
+        }
+      }
+    } catch {}
     setSelectedAnswers({});
     setIsFinished(false);
-  }, [chapterTitle, quiz]);
+    setCurrentIdx(0);
+  }, [chapterId, storageKey, quiz.length]);
 
   if (!quiz || quiz.length === 0) return null;
 
-  const currentQ = quiz[currentIdx];
+  const currentQ = quiz[currentIdx] || quiz[0];
   const selectedOptionId = selectedAnswers[currentQ.id];
   const selectedOption = currentQ.options.find((o) => o.id === selectedOptionId);
   const isAnswered = !!selectedOption;
@@ -54,37 +122,74 @@ export const ChapterQuiz: React.FC<ChapterQuizProps> = ({
 
     // If all questions are answered, mark as completed
     const allAnswered = quiz.every((q) => !!newAnswers[q.id]);
+    const chosenOption = currentQ.options.find((o) => o.id === optionId);
+
     if (allAnswered) {
       playCompletion();
+      saveStateToStorage(newAnswers, isFinished, currentIdx);
       if (onComplete) onComplete();
     } else {
-      const chosenOption = currentQ.options.find((o) => o.id === optionId);
       if (chosenOption?.isCorrect) {
         playSuccess();
       } else {
         playError();
       }
+      saveStateToStorage(newAnswers, isFinished, currentIdx);
     }
   };
 
   const handleNext = () => {
     if (currentIdx < quiz.length - 1) {
-      setCurrentIdx((prev) => prev + 1);
+      const nextIdx = currentIdx + 1;
+      setCurrentIdx(nextIdx);
+      saveStateToStorage(selectedAnswers, isFinished, nextIdx);
     } else {
       setIsFinished(true);
+      saveStateToStorage(selectedAnswers, true, currentIdx);
+      if (onComplete) onComplete();
     }
   };
 
   const handlePrev = () => {
     if (currentIdx > 0) {
-      setCurrentIdx((prev) => prev - 1);
+      const prevIdx = currentIdx - 1;
+      setCurrentIdx(prevIdx);
+      saveStateToStorage(selectedAnswers, isFinished, prevIdx);
     }
   };
 
+  // Full Reset
   const handleReset = () => {
     setSelectedAnswers({});
     setCurrentIdx(0);
     setIsFinished(false);
+    try {
+      localStorage.removeItem(storageKey);
+    } catch {}
+  };
+
+  // Retry ONLY Incorrect Questions
+  const wrongQuestions = quiz.filter((q) => {
+    const ansId = selectedAnswers[q.id];
+    if (!ansId) return true;
+    const opt = q.options.find((o) => o.id === ansId);
+    return !opt?.isCorrect;
+  });
+
+  const handleRetryWrongOnly = () => {
+    const updatedAnswers = { ...selectedAnswers };
+    wrongQuestions.forEach((q) => {
+      delete updatedAnswers[q.id];
+    });
+
+    // Find the index of the first wrong question in the original quiz
+    const firstWrongIdx = quiz.findIndex((q) => wrongQuestions.some((wq) => wq.id === q.id));
+    const targetIdx = firstWrongIdx >= 0 ? firstWrongIdx : 0;
+
+    setSelectedAnswers(updatedAnswers);
+    setCurrentIdx(targetIdx);
+    setIsFinished(false);
+    saveStateToStorage(updatedAnswers, false, targetIdx);
   };
 
   // Calculate score
@@ -269,31 +374,72 @@ export const ChapterQuiz: React.FC<ChapterQuizProps> = ({
       ) : (
         /* Quiz Summary / Completion Screen */
         <div className="text-center py-6 space-y-5 animate-fadeIn">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-amber-500 to-indigo-500 text-slate-950 mx-auto flex items-center justify-center text-3xl shadow-xl shadow-indigo-500/20">
-            {correctCount === quiz.length ? '🏆' : '👏'}
-          </div>
+          {(() => {
+            const isPerfect = correctCount === quiz.length;
+            const isPassing = correctCount >= Math.ceil(quiz.length / 2);
+            const hasPartial = correctCount > 0 && !isPassing;
+            const isZero = correctCount === 0;
 
-          <div className="space-y-1">
-            <h4 className="text-lg sm:text-xl font-black text-white">
-              {correctCount === quiz.length
-                ? 'علامة كاملة! استيعاب 10/10 يا بطل 🚀'
-                : `جاوبت على ${correctCount} من ${quiz.length} أسئلة صحيحة!`}
-            </h4>
-            <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
-              {correctCount === quiz.length
-                ? `أنت جاهز تماماً الآن لخوض التحدي البرمجي العملي للفصل: "${chapterTitle}".`
-                : 'أداء ممتاز، يمكنك إعادة المحاولة لتقفيل كل الأسئلة، أو المضي قدماً للتحدي العملي!'}
-            </p>
-          </div>
+            const scoreIcon = isPerfect ? '🏆' : isPassing ? '👏' : hasPartial ? '💡' : '📚';
+
+            const scoreTitle = isPerfect
+              ? 'علامة كاملة! استيعاب 10/10 يا بطل 🚀'
+              : isZero
+              ? `لم توفق في الإجابة على أي سؤال (0 من ${quiz.length})`
+              : correctCount === 1
+              ? `جاوبت على سؤال واحد صحيح من أصل ${quiz.length}`
+              : correctCount === 2
+              ? `جاوبت على سؤالين صحيحين من أصل ${quiz.length}`
+              : `جاوبت على ${correctCount} من أصل ${quiz.length} أسئلة صحيحة!`;
+
+            const scoreSubtitle = isPerfect
+              ? `أنت جاهز تماماً ومستوعب لكل المفاهيم، انطلق لخوض التحدي البرمجي العملي للفصل: "${chapterTitle}".`
+              : isPassing
+              ? 'أداء جيد جداً! يمكنك إعادة المحاولة للحصول على الدرجة الكاملة أو المتابعة للتحدي العملي.'
+              : hasPartial
+              ? 'محاولة طيبة! يُفضّل مراجعة فقرات الفصل السابقة وإعادة الكويز لترسيخ المفاهيم قبل البدء في كتابة الكود.'
+              : 'ولا يهمك، الخطأ أول طريق التعلّم! أعد قراءة شرح الفصل بتمعّن ثم جرّب الكويز مرة أخرى لتثبيت المعلومات.';
+
+            return (
+              <>
+                <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-amber-500 to-indigo-500 text-slate-950 mx-auto flex items-center justify-center text-3xl shadow-xl shadow-indigo-500/20">
+                  {scoreIcon}
+                </div>
+
+                <div className="space-y-1">
+                  <h4 className="text-lg sm:text-xl font-black text-white">
+                    {scoreTitle}
+                  </h4>
+                  <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+                    {scoreSubtitle}
+                  </p>
+                </div>
+              </>
+            );
+          })()}
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            {wrongQuestions.length > 0 && (
+              <button
+                onClick={handleRetryWrongOnly}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/25 transition active:scale-95 animate-pulse"
+                title="إعادة حل الأسئلة التي أخطأت فيها فقط والاحتفاظ بالإجابات الصحيحة"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>
+                  إعادة تجربة الأسئلة الخاطئة فقط ({wrongQuestions.length === 1 ? 'سؤال واحد' : wrongQuestions.length === 2 ? 'سؤالان' : `${wrongQuestions.length} أسئلة`})
+                </span>
+              </button>
+            )}
+
             <button
               onClick={handleReset}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition"
+              title="إعادة الكويز من البداية ومسح جميع الإجابات"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>إعادة الكويز</span>
+              <span>إعادة الكويز كاملاً</span>
             </button>
 
             {onScrollToChallenge && (

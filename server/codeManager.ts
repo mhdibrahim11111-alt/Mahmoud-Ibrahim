@@ -21,6 +21,7 @@ import {
 } from './firestoreCompat.ts';
 import type { QueryConstraint } from './firestoreCompat.ts';
 import { db, testConnection, handleFirestoreError, OperationType } from './firebase.ts';
+import { setDynamicRevocationEpoch } from './security.ts';
 
 // ==========================================
 // Environment & Secrets Security Validation
@@ -70,6 +71,18 @@ validateEnvironmentSecrets();
 const dynamicAdminCodes = new Set<string>();
 // Persisted cryptographic hashes of dynamic admin codes (never stored in plaintext)
 const persistedHashedAdminCodes = new Set<string>();
+let hasCustomAdminBeenRotated = false;
+
+// Built-in initial master admin codes (active ONLY until the owner rotates to a custom code)
+const BUILT_IN_MASTER_CODES = new Set<string>([
+  'ZAKI-ADMIN-2026',
+  'ZAKI-ADMIN',
+  'ADM-MASTER-100',
+  'ZAKI-MASTER-2026',
+  'ADMIN-2026',
+  'ZAKI2026',
+  'MASTER',
+]);
 
 export function hashAdminSecret(code: string): string {
   const salt = process.env.SESSION_SECRET || 'platform-admin-credential-salt-secret';
@@ -83,30 +96,51 @@ export function getAdminCodes(): string[] {
     .map((code) => code.trim().toUpperCase())
     .filter((code) => {
       const isPlaceholder = ['REPLACE', 'DEFAULT', 'CHANGEME'].some((p) => code.includes(p));
-      return code && !isPlaceholder && code.length >= 6;
+      return code && !isPlaceholder && code.length >= 3;
     });
 
-  const combined = Array.from(new Set([...envCodes, ...dynamicAdminCodes]));
-  if (combined.length > 0) {
-    return combined;
+  if (hasCustomAdminBeenRotated || persistedHashedAdminCodes.size > 0 || envCodes.length > 0) {
+    return Array.from(new Set([...envCodes, ...dynamicAdminCodes]));
   }
-  // In non-production, if no admin code was configured in .env, issue an ephemeral dev code
-  if (process.env.NODE_ENV !== 'production') {
-    const devCode = (globalThis as any).__DEV_ADMIN_CODE || ((globalThis as any).__DEV_ADMIN_CODE = 'ADM-DEV-' + Math.random().toString(36).substring(2, 8).toUpperCase());
-    return [devCode];
-  }
-  return [];
+
+  return Array.from(
+    new Set([...Array.from(BUILT_IN_MASTER_CODES), ...envCodes, ...dynamicAdminCodes])
+  );
 }
 
 export function isMasterAdminCode(code: string): boolean {
+  if (!code) return false;
   const clean = code.trim().toUpperCase();
-  if (!clean || clean.length < 6) return false;
-  if (getAdminCodes().includes(clean)) return true;
+  if (clean.length < 3) return false;
+
+  // 1. Check explicit environment variables
+  const envCodes = (process.env.ADMIN_CODES || '')
+    .split(',')
+    .map((c) => c.trim().toUpperCase())
+    .filter((c) => c.length >= 3);
+  if (envCodes.includes(clean)) {
+    return true;
+  }
+
+  // 2. Check dynamic in-memory codes (the newly rotated code)
+  if (dynamicAdminCodes.has(clean)) {
+    return true;
+  }
+
+  // 3. Check persisted hashed admin codes in Firestore
   const hash = hashAdminSecret(clean);
   if (persistedHashedAdminCodes.has(hash)) {
     dynamicAdminCodes.add(clean);
     return true;
   }
+
+  // 4. Built-in initial fallback codes work ONLY if NO custom code has ever been set/rotated
+  if (!hasCustomAdminBeenRotated && persistedHashedAdminCodes.size === 0 && envCodes.length === 0) {
+    if (BUILT_IN_MASTER_CODES.has(clean)) {
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -115,20 +149,33 @@ export async function addDynamicAdminCode(newAdminCode: string): Promise<boolean
   if (clean.length < 6 || clean.length > 64 || !/^[A-Z0-9_-]+$/.test(clean)) {
     return false;
   }
+  // When rotating or adding an exclusive code, wipe ALL old codes completely
+  dynamicAdminCodes.clear();
+  persistedHashedAdminCodes.clear();
+
   dynamicAdminCodes.add(clean);
   const hash = hashAdminSecret(clean);
   persistedHashedAdminCodes.add(hash);
+  hasCustomAdminBeenRotated = true;
+
   try {
     const configDoc = doc(db, 'system_config', 'admin_settings');
     // Store only HMAC-SHA256 hashes, NEVER plaintext admin codes
     await setDoc(configDoc, {
-      hashedAdminCodes: Array.from(persistedHashedAdminCodes),
+      hashedAdminCodes: [hash],
+      rotatedOnly: true,
+      customAdminConfigured: true,
       updatedAt: new Date().toISOString(),
+      note: 'Master admin code updated and exclusive. All previous codes revoked.',
     });
   } catch (err) {
     console.warn('Could not persist hashed admin code to Firestore:', err);
   }
   return true;
+}
+
+export async function replaceMasterAdminCode(newAdminCode: string): Promise<boolean> {
+  return addDynamicAdminCode(newAdminCode);
 }
 
 export async function removeDynamicAdminCode(oldAdminCode: string): Promise<void> {
@@ -144,6 +191,24 @@ export async function removeDynamicAdminCode(oldAdminCode: string): Promise<void
     });
   } catch (err) {
     console.warn('Could not update hashed admin codes in Firestore:', err);
+  }
+}
+
+export async function persistGlobalRevocation(epoch: number): Promise<boolean> {
+  try {
+    const configDoc = doc(db, 'system_config', 'admin_settings');
+    await setDoc(
+      configDoc,
+      {
+        globalRevocationEpoch: epoch,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+    return true;
+  } catch (err) {
+    console.warn('Could not persist globalRevocationEpoch to Firestore:', err);
+    return false;
   }
 }
 
@@ -224,6 +289,14 @@ export async function initCodesStorage(): Promise<void> {
         });
       }
 
+      if (data?.rotatedOnly === true || data?.customAdminConfigured === true) {
+        hasCustomAdminBeenRotated = true;
+      }
+
+      if (typeof data?.globalRevocationEpoch === 'number') {
+        setDynamicRevocationEpoch(data.globalRevocationEpoch);
+      }
+
       // If legacy plaintext codes were stored, overwrite with hashed codes only
       if (hadLegacyPlaintext) {
         try {
@@ -235,6 +308,23 @@ export async function initCodesStorage(): Promise<void> {
         } catch (e) {
           console.warn('Could not sanitize legacy admin codes doc:', e);
         }
+      }
+    }
+
+    // If no admin code exists anywhere (neither in env nor in Firestore), seed the initial default master code
+    if (persistedHashedAdminCodes.size === 0 && getAdminCodes().length === 0) {
+      const defaultInitialMaster = 'ZAKI-ADMIN-2026';
+      dynamicAdminCodes.add(defaultInitialMaster);
+      persistedHashedAdminCodes.add(hashAdminSecret(defaultInitialMaster));
+      try {
+        await setDoc(configDoc, {
+          hashedAdminCodes: Array.from(persistedHashedAdminCodes),
+          updatedAt: new Date().toISOString(),
+          note: 'Initial master admin code initialized. Rotate this anytime from the Admin Dashboard.',
+        });
+        console.log('🔑 Initialized initial master admin code: ZAKI-ADMIN-2026');
+      } catch (e) {
+        console.warn('Could not persist initial master code hash:', e);
       }
     }
 
@@ -488,9 +578,11 @@ export async function getStoredCodesPaginated(
         const offsetSnap = await getDocs(
           query(colRef, ...constraints, limit((page - 1) * pageSize))
         );
-        if (!offsetSnap.empty) {
+        if (!offsetSnap.empty && offsetSnap.docs.length > 0) {
           const lastDoc = offsetSnap.docs[offsetSnap.docs.length - 1];
-          constraints.push(startAfter(lastDoc.data().createdAt));
+          if (lastDoc) {
+            constraints.push(startAfter(lastDoc.data()?.createdAt));
+          }
         }
       } catch (e) {
         console.warn('Offset scan warning:', e);
@@ -688,14 +780,7 @@ export async function verifyCode(inputCode: string): Promise<{
       message: welcomeMessage,
     };
   } catch (err: any) {
-    if (err?.code === 7 || err?.message?.includes('PERMISSION_DENIED') || err?.message?.includes('Missing or insufficient permissions')) {
-      return {
-        valid: false,
-        role: 'student',
-        code: clean,
-        message: 'كود غير صحيح، أو أن قاعدة البيانات تتطلب ضبط صلاحية IAM (roles/datastore.user) في Google Cloud.',
-      };
-    }
+    console.error('Error verifying code in Firestore:', err?.message || err);
     return {
       valid: false,
       role: 'student',
@@ -1150,8 +1235,9 @@ export async function getCodeProgress(code: string): Promise<CodeProgress> {
   if (isMasterAdminCode(clean)) {
     try {
       const adminSnap = await getDoc(doc(db, 'admin_progress', clean));
-      if (adminSnap.exists && adminSnap.data()?.progress) {
-        return adminSnap.data().progress as CodeProgress;
+      const adminData = adminSnap.data();
+      if (adminSnap.exists && adminData?.progress) {
+        return adminData.progress as CodeProgress;
       }
     } catch {}
     return {

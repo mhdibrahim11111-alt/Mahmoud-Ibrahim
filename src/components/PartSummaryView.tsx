@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Part, PartComprehensiveExam } from '../types';
 import { ChapterQuiz } from './ChapterQuiz';
 import { CodeEditor } from './CodeEditor';
@@ -24,7 +25,36 @@ import {
   ChevronUp,
   ExternalLink,
   Lightbulb,
+  Sparkles,
+  Zap,
 } from 'lucide-react';
+
+import type { Variants } from 'framer-motion';
+
+const rulesContainerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+const ruleCardVariants: Variants = {
+  hidden: { opacity: 0, y: 16, scale: 0.97 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: 'spring' as const,
+      damping: 20,
+      stiffness: 280,
+    },
+  },
+};
 
 interface PartSummaryViewProps {
   part: Part;
@@ -131,15 +161,24 @@ export const PartSummaryView: React.FC<PartSummaryViewProps> = ({
 
       {/* Section 1: Part Summary Key Points (الكبسولة البرمجية مع التوضيح الفوري السريع) */}
       {summary.keyPoints && summary.keyPoints.length > 0 && (
-        <section className="bg-slate-900/80 rounded-3xl border border-slate-800 p-5 sm:p-7 space-y-5 shadow-xl">
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="bg-slate-900/80 rounded-3xl border border-slate-800 p-5 sm:p-7 space-y-5 shadow-xl"
+        >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-800 gap-2">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold text-lg shrink-0">
+              <motion.div
+                animate={{ scale: [1, 1.1, 1], rotate: [0, 4, -4, 0] }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold text-lg shrink-0"
+              >
                 💡
-              </div>
+              </motion.div>
               <div>
                 <h2 className="text-base sm:text-lg font-black text-white">
-                  كبسولة الجزء: أهم القواعد والمفاهيم الذهبية
+                  كبسولة الجزء: أهم القواعد والمفاهيم الذهبية والاستنتاجات
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
                   اضغط على أي قاعدة لعرض كود عملي وتوضيح بمثال من الحياة اليومية فوراً!
@@ -152,7 +191,12 @@ export const PartSummaryView: React.FC<PartSummaryViewProps> = ({
           </div>
 
           {/* Cards Grid with Instant Details */}
-          <div className="grid gap-3.5 sm:grid-cols-2">
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={rulesContainerVariants}
+            className="grid gap-3.5 sm:grid-cols-2"
+          >
             {summary.keyPoints.map((point, idx) => {
               const isExpanded = expandedRuleIndex === idx;
               const ruleDetail: RuleDetail =
@@ -163,8 +207,11 @@ export const PartSummaryView: React.FC<PartSummaryViewProps> = ({
                 };
 
               return (
-                <div
+                <motion.div
                   key={idx}
+                  variants={ruleCardVariants}
+                  whileHover={{ scale: 1.012 }}
+                  transition={{ type: 'spring', damping: 18, stiffness: 300 }}
                   className={`rounded-2xl border transition duration-200 overflow-hidden ${
                     isExpanded
                       ? 'bg-slate-950 border-amber-500/50 shadow-xl shadow-amber-500/5 sm:col-span-2'
@@ -204,66 +251,74 @@ export const PartSummaryView: React.FC<PartSummaryViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Expanded Explanation & Code Example */}
-                  {isExpanded && (
-                    <div className="border-t border-slate-800/80 p-4 sm:p-5 bg-gradient-to-b from-slate-900/60 to-slate-950 space-y-4 animate-fadeIn">
-                      {/* Code Snippet Box */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 font-sans">
-                          <span className="flex items-center gap-1.5 text-amber-400 font-bold">
-                            <Terminal className="w-3.5 h-3.5" />
-                            <span>كود جافاسكريبت عملي:</span>
-                          </span>
+                  {/* Expanded Explanation & Code Example with AnimatePresence */}
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.25, ease: 'easeInOut' }}
+                        className="border-t border-slate-800/80 p-4 sm:p-5 bg-gradient-to-b from-slate-900/60 to-slate-950 space-y-4 overflow-hidden"
+                      >
+                        {/* Code Snippet Box */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px] text-slate-400 font-sans">
+                            <span className="flex items-center gap-1.5 text-amber-400 font-bold">
+                              <Terminal className="w-3.5 h-3.5" />
+                              <span>كود جافاسكريبت عملي:</span>
+                            </span>
 
-                          {onOpenInPlayground && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onOpenInPlayground(ruleDetail.codeSnippet);
-                              }}
-                              className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 transition"
-                            >
-                              <span>افتح في محرر الكود 💻</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </button>
-                          )}
+                            {onOpenInPlayground && (
+                              <button
+                                onClick={(e) => {
+                                 e.stopPropagation();
+                                 onOpenInPlayground(ruleDetail.codeSnippet);
+                                }}
+                                className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 transition"
+                              >
+                                <span>افتح في محرر الكود 💻</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="rounded-xl overflow-hidden border border-slate-800 text-xs">
+                            <CodeBlock code={ruleDetail.codeSnippet} />
+                          </div>
                         </div>
 
-                        <div className="rounded-xl overflow-hidden border border-slate-800 text-xs">
-                          <CodeBlock code={ruleDetail.codeSnippet} />
-                        </div>
-                      </div>
+                        {/* Explanation & Real-life Analogy */}
+                        <div className="grid sm:grid-cols-2 gap-3 text-xs leading-relaxed">
+                          {/* Explanation Box */}
+                          <div className="p-3.5 rounded-xl bg-indigo-950/20 border border-indigo-500/25 space-y-1">
+                            <span className="font-bold text-indigo-300 flex items-center gap-1.5">
+                              <Lightbulb className="w-3.5 h-3.5 text-indigo-400" />
+                              <span>الشرح والتوضيح:</span>
+                            </span>
+                            <p className="text-slate-300 font-medium leading-relaxed">
+                              <FormattedArabicText text={ruleDetail.explanation} />
+                            </p>
+                          </div>
 
-                      {/* Explanation & Real-life Analogy */}
-                      <div className="grid sm:grid-cols-2 gap-3 text-xs leading-relaxed">
-                        {/* Explanation Box */}
-                        <div className="p-3.5 rounded-xl bg-indigo-950/20 border border-indigo-500/25 space-y-1">
-                          <span className="font-bold text-indigo-300 flex items-center gap-1.5">
-                            <Lightbulb className="w-3.5 h-3.5 text-indigo-400" />
-                            <span>الشرح والتوضيح:</span>
-                          </span>
-                          <p className="text-slate-300 font-medium leading-relaxed">
-                            <FormattedArabicText text={ruleDetail.explanation} />
-                          </p>
+                          {/* Real-life Analogy Box */}
+                          <div className="p-3.5 rounded-xl bg-amber-950/20 border border-amber-500/25 space-y-1">
+                            <span className="font-bold text-amber-300 flex items-center gap-1.5">
+                              <span>☕ تشبيه من الحياة اليومية:</span>
+                            </span>
+                            <p className="text-slate-300 font-medium leading-relaxed">
+                              <FormattedArabicText text={ruleDetail.realLifeAnalogy} />
+                            </p>
+                          </div>
                         </div>
-
-                        {/* Real-life Analogy Box */}
-                        <div className="p-3.5 rounded-xl bg-amber-950/20 border border-amber-500/25 space-y-1">
-                          <span className="font-bold text-amber-300 flex items-center gap-1.5">
-                            <span>☕ تشبيه من الحياة اليومية:</span>
-                          </span>
-                          <p className="text-slate-300 font-medium leading-relaxed">
-                            <FormattedArabicText text={ruleDetail.realLifeAnalogy} />
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
               );
             })}
-          </div>
-        </section>
+          </motion.div>
+        </motion.section>
       )}
 
       {/* Section 2: Comprehensive Part Quiz (كويز استيعاب الملخص) */}
@@ -278,6 +333,7 @@ export const PartSummaryView: React.FC<PartSummaryViewProps> = ({
 
           <ChapterQuiz
             key={`part-summary-quiz-${summary.id}`}
+            chapterId={summary.id}
             quiz={summary.quiz}
             chapterTitle={summary.title}
             onScrollToChallenge={() => {

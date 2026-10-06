@@ -199,47 +199,108 @@ export function validateChallenge(
       return { passed: true, message: 'حلو! استخدمت Math عشان تطلع نتيجة عشوائية وتطبع الرسالة المناسبة.' };
     }
 
-    case 11: {
+    case 11:
+    case 14:
+    case 'ch14-chal': {
       const valid = /function\s+doubleNumber\s*\(\s*\w+\s*\)/.test(code) && /console\.log\s*\([^)]*\*\s*2\s*\)/.test(code) && /doubleNumber\s*\(\s*7\s*\)/.test(code) && meaningfulLogs.some((l) => l.trim() === '14');
       return { passed: valid, message: valid ? 'ممتاز! الدالة استقبلت 7 وطبعت ضعفها.' : 'عرّف doubleNumber بمعامل، واطبع ضعفه جوه الدالة، وبعدها استدعيها بـ7 عشان تطبع 14.' };
     }
 
-    case 12: {
+    case 12:
+    case 15:
+    case 'ch15-chal': {
       const valid = /function\s+getArea\s*\(/.test(code) && /return\s+\w+\s*\*\s*\w+/.test(code) && /getArea\s*\(\s*5\s*,\s*4\s*\)/.test(code) && meaningfulLogs.some((l) => l.includes('20'));
       return { passed: valid, message: valid ? 'صحيح! حسبت المساحة وأعدت الناتج من الدالة.' : 'اكتب getArea بمعامل للطول ومعامل للعرض، ورجّع حاصل ضربهم، وبعدها جرّب 5 و4 واطبع 20.' };
     }
 
-    case 13: {
+    case 13:
+    case 16:
+    case 'ch16-chal': {
       const localSecret = /function\s+startGame\s*\([^)]*\)\s*\{[\s\S]*?const\s+secretCode\s*=\s*999/.test(code);
       const logged = meaningfulLogs.some((l) => l.includes('اللعبة بدأت'));
       return { passed: localSecret && logged, message: localSecret && logged ? 'جيد! secretCode داخل نطاق startGame.' : 'عرّف secretCode بقيمة 999 جوه startGame واطبع "اللعبة بدأت".' };
     }
 
-    case 14: {
+    case 14:
+    case 17:
+    case 'ch17-chal': {
       const valid = /const\s+secret\s*=\s*6/.test(code) && /const\s+guess\s*=\s*6/.test(code) && /if\s*\(/.test(code) && /else/.test(code) && meaningfulLogs.some((l) => l.includes('مبروك كسبت'));
       return { passed: valid, message: valid ? 'مبروك! التخمين طلع زي الرقم السري وظهرت رسالة الفوز.' : 'عرّف secret وguess بقيمة 6، وافحصهم بـif/else واطبع "مبروك كسبت" لو طلعوا زي بعض.' };
     }
 
-    case 15: {
+    case 18:
+    case 'ch18-chal': {
+      const hasConvert = /function\s+convertToEGP/i.test(code) || /convertToEGP\s*=\s*/i.test(code);
+      const hasService = /function\s+addService/i.test(code) || /addService\s*=\s*/i.test(code);
+      const has5500 = meaningfulLogs.some((l) => l.includes('5500'));
+      if (!hasConvert || !hasService) {
+        return {
+          passed: false,
+          message: 'تأكد من كتابة الدالتين convertToEGP و addService وتمرير الناتج بينهما.',
+        };
+      }
+      if (!has5500) {
+        return {
+          passed: false,
+          message: 'الناتج النهائي يجب أن يحتوي على 5500 بعد تحويل 100 دولار وإضافة 10% خدمة!',
+        };
+      }
+      return {
+        passed: true,
+        message: 'عبقري يا صديقي! 🌟 بنيت الدالتين وتتبعت تمرير البيانات وحسبت الإجمالي 5500 ج.م بنجاح.',
+      };
+    }
+
+    case 15:
+    case 19:
+    case 'ch19-chal': {
       const hasGrades = /\[\s*88\s*,\s*65\s*,\s*92\s*,\s*40\s*,\s*77\s*\]/.test(code);
       const hasEdges = /grades\s*\[\s*0\s*\]/.test(code) && /grades\s*\[\s*grades\.length\s*-\s*1\s*\]/.test(code);
       const printed = meaningfulLogs.some((l) => l.includes('88')) && meaningfulLogs.some((l) => l.includes('77')) && meaningfulLogs.some((l) => l.includes('165'));
       return { passed: hasGrades && hasEdges && printed, message: hasGrades && hasEdges && printed ? 'تمام! استخدمت الفهرس الأول وآخر فهرس وحسبت مجموعهما.' : 'أنشئ grades بالقيم [88, 65, 92, 40, 77] واطبع أول وآخر عنصر ومجموعهما (165).'};
     }
 
-    case 16: {
+    case 16:
+    case 20:
+    case 'ch20-chal': {
       const valid = /for\s*\(\s*(?:const|let)\s+\w+\s+of\s+\w+\s*\)/.test(code) && /\[\s*2\s*,\s*5\s*,\s*8\s*\]/.test(code) &&
         ['4', '10', '16'].every((n) => meaningfulLogs.some((l) => l.includes(n)));
       return { passed: valid, message: valid ? 'عاش! استخدمت for...of وضاعفت كل قيمة.' : 'استخدم for...of مع [2, 5, 8] واطبع ضعف كل رقم: 4 و10 و16.' };
     }
 
-    case 17: {
+    case 17:
+    case 21:
+    case 'ch21-chal': {
       const valid = /for\s*\(/.test(code) && /evenNumbers/.test(code) && /\.push\s*\(/.test(code) && /%\s*2/.test(code) &&
         ['2', '4', '6', '8', '10'].every((n) => meaningfulLogs.some((l) => l.includes(n)));
       return { passed: valid, message: valid ? 'حلو! جمّعت الأعداد الزوجية في مصفوفة باستخدام حلقة وpush.' : 'اعمل evenNumbers، ولف من 1 لـ10، وضيف الأعداد الزوجية بـpush، وبعدها اطبع المصفوفة.' };
     }
 
-    case 24: {
+    case 22:
+    case 'ch22-chal': {
+      const hasFilter = /function\s+filterDiscounts/i.test(code) || /filterDiscounts\s*=\s*/i.test(code);
+      const hasFiltered = meaningfulLogs.some((l) => l.includes('80') && l.includes('45') && l.includes('99'));
+      if (!hasFilter) {
+        return {
+          passed: false,
+          message: 'تأكد من كتابة دالة filterDiscounts التي تستقبل مصفوفة الأسعار وترجع مصفوفة الأسعار الأقل من 100.',
+        };
+      }
+      if (!hasFiltered) {
+        return {
+          passed: false,
+          message: 'المصفوفة المصفاة يجب أن تحتوي على الأسعار الأقل من 100 فقط: [80, 45, 99]!',
+        };
+      }
+      return {
+        passed: true,
+        message: 'ممتاز جداً! 👏 برمجت دالة الفلترة بنجاح وتتبعت عناصر المصفوفة بدقة.',
+      };
+    }
+
+    case 24:
+    case 29:
+    case 'ch29-chal': {
       const valid = /const\s+phone\s*=\s*\{/.test(code) && /brand\s*:\s*["']سامسونج["']/.test(code) && /price\s*:\s*8000/.test(code) &&
         /phone\.brand/.test(code) && /phone\.price/.test(code) && meaningfulLogs.some((l) => l.includes('سامسونج') && l.includes('8000'));
       return { passed: valid, message: valid ? 'ممتاز! أنشأت كائن الهاتف وطبعت خصائصه.' : 'اعمل object اسمه phone فيه brand سامسونج وprice قيمته 8000، وبعدها اطبع phone.brand وphone.price.' };
@@ -347,25 +408,25 @@ export function validateChallenge(
       };
     }
 
-    // Part Capstone 6: Student object method and this
+    // Part Capstone 6: Developer/Student object method and this
     case 'part6-capstone': {
-      const hasStudent = /const\s+student\s*=\s*\{/.test(code);
+      const hasObj = /const\s+(?:developer|student)\s*=\s*\{/.test(code);
       const hasMethod = /introduce\s*\([^)]*\)\s*\{/.test(code) && /this\.name/.test(code);
-      if (!hasStudent || !hasMethod) {
+      if (!hasObj || !hasMethod) {
         return {
           passed: false,
-          message: 'اعمل object اسمه student جواه introduce()، واستخدم this.name عشان تكوّن التحية.',
+          message: 'اعمل object اسمه developer (أو student) جواه introduce()، واستخدم this.name عشان تكوّن التحية.',
         };
       }
-      if (!meaningfulLogs.some((l) => l.includes('أنا سارة'))) {
+      if (!meaningfulLogs.some((l) => l.includes('سارة'))) {
         return {
           passed: false,
-          message: 'استدعي student.introduce() واطبع "أنا سارة".',
+          message: 'استدعِ دالة introduce() واطبع النتيجة في الكونسول.',
         };
       }
       return {
         passed: true,
-        message: 'مبروك خلّصت المسار! عملت object وmethod بتستخدم this بنجاح.',
+        message: 'مبروك ختمت المسار بالكامل! 🎓 أنشأت كائناً واستخدمت this داخل الدالة بنجاح أسطوري.',
       };
     }
 

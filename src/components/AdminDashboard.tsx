@@ -759,31 +759,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             {/* Role Select (Master Only) */}
             {isMaster && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-300 block">اختر نوع الكود والرتبة:</label>
-                <div className="grid grid-cols-2 gap-3 max-w-md">
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
+                  <div className="flex items-center gap-2">
+                    <Key className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>لتغيير كود الإدارة (Master Admin) وإلغاء الأكواد القديمة، استخدم تبويب <strong>مركز الأمان</strong>.</span>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setTargetRole('student')}
-                    className={`p-3 rounded-2xl border text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 ${
-                      targetRole === 'student'
-                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-md'
-                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'
-                    }`}
+                    onClick={() => setActiveTab('security')}
+                    className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold hover:bg-amber-400 transition text-[11px] shrink-0 self-start sm:self-auto"
                   >
-                    <span>🎓 كود طالب (Student)</span>
+                    الانتقال لمركز الأمان 🛡️
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setTargetRole('teacher')}
-                    className={`p-3 rounded-2xl border text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 ${
-                      targetRole === 'teacher'
-                        ? 'bg-purple-500/20 text-purple-300 border-purple-500/50 shadow-md'
-                        : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'
-                    }`}
-                  >
-                    <span>👨‍🏫 كود معلم (Teacher)</span>
-                  </button>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300 block">اختر نوع الكود والرتبة المراد توليدها:</label>
+                  <div className="grid grid-cols-2 gap-3 max-w-md">
+                    <button
+                      type="button"
+                      onClick={() => setTargetRole('student')}
+                      className={`p-3 rounded-2xl border text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 ${
+                        targetRole === 'student'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-md'
+                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'
+                      }`}
+                    >
+                      <span>🎓 كود طالب (Student)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTargetRole('teacher')}
+                      className={`p-3 rounded-2xl border text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 ${
+                        targetRole === 'teacher'
+                          ? 'bg-purple-500/20 text-purple-300 border-purple-500/50 shadow-md'
+                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'
+                      }`}
+                    >
+                      <span>👨‍🏫 كود معلم (Teacher)</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

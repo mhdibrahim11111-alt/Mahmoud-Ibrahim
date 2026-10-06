@@ -5,17 +5,17 @@ interface FormattedArabicTextProps {
   className?: string;
 }
 
-// Only match programming tokens, valid HTML tags, operators, and Latin strings (NOT Arabic conversational quotes)
-const CODE_MATCH_PATTERN =
-  /((?:(?:const|let|var)\s+[a-zA-Z0-9_$]+\s*=\s*[^;]+;?)|(?:[a-zA-Z_$][a-zA-Z0-9_$.]*\s*\([^)]*\))|(?:<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s+[^>]*?)?>)|(?:===|!==|==|!=|>=|<=|&&|\|\|)|(?:\b(?:typeof|NaN|true|false|null|undefined|number|string|boolean)\b)|(?:"[^"\u0600-\u06FF\n]+"|'[^'\u0600-\u06FF\n]+'))/g;
+// Matches code operators, keywords, latin functions/variables (including nested calls like f(g(x))), and parenthesized terms like (Reassignment)
+const CODE_OR_LATIN_PATTERN =
+  /((?:(?:const|let|var)\s+[a-zA-Z0-9_$]+\s*=\s*[^;]+;?)|(?:[a-zA-Z_$][a-zA-Z0-9_$.]*\s*\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\))|(?:\([a-zA-Z0-9_$\s-]+\))|(?:<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s+[^>]*?)?>)|(?:===|!==|==|!=|>=|<=|&&|\|\|)|(?:\b(?:typeof|NaN|true|false|null|undefined|number|string|boolean|const|let|var|console\.log|Array|Object)\b)|(?:"[^"\u0600-\u06FF\n]+"|'[^'\u0600-\u06FF\n]+'))/g;
 
-const IS_CODE_EXACT =
-  /^(?:(?:const|let|var)\s+[a-zA-Z0-9_$]+\s*=\s*[^;]+;?|[a-zA-Z_$][a-zA-Z0-9_$.]*\s*\([^)]*\)|<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s+[^>]*?)?>|===|!==|==|!=|>=|<=|&&|\|\||\b(?:typeof|NaN|true|false|null|undefined|number|string|boolean)\b|"[^"\u0600-\u06FF\n]+"|'[^'\u0600-\u06FF\n]+')$/;
+const IS_EXACT_TOKEN =
+  /^(?:(?:const|let|var)\s+[a-zA-Z0-9_$]+\s*=\s*[^;]+;?|[a-zA-Z_$][a-zA-Z0-9_$.]*\s*\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)|\([a-zA-Z0-9_$\s-]+\)|<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s+[^>]*?)?>|===|!==|==|!=|>=|<=|&&|\|\||\b(?:typeof|NaN|true|false|null|undefined|number|string|boolean|const|let|var|console\.log|Array|Object)\b|"[^"\u0600-\u06FF\n]+"|'[^'\u0600-\u06FF\n]+')$/;
 
 /**
  * Renders Arabic text with embedded English/code snippets properly isolated.
- * Prevents Unicode BiDi punctuation flipping (e.g. colon at beginning of sentence,
- * reversed parentheses like ()Number, and scrambled quotes/semicolons).
+ * Correctly parses markdown bold (**text**), inline code (`code`), and Latin phrases
+ * to prevent Unicode BiDi text reversing or punctuation flipping.
  */
 export const FormattedArabicText: React.FC<FormattedArabicTextProps> = ({
   text,
@@ -23,17 +23,26 @@ export const FormattedArabicText: React.FC<FormattedArabicTextProps> = ({
 }) => {
   if (!text) return null;
 
-  // Append invisible Right-to-Left Mark (\u200F) before/after punctuation
-  // so browsers never flip colons or brackets to the wrong side of an English chip.
-  const formatArabicPunctuation = (str: string) => {
-    return str
-      .replace(/^([):!؟.,،])/g, '\u200F$1')
-      .replace(/([):!؟.,،])$/g, '$1\u200F');
-  };
+  // Render a clean isolated code or Latin chip
+  const renderChip = (content: string, key: string | number) => {
+    // If it's a parenthesized Latin word like (Reassignment)
+    if (content.startsWith('(') && content.endsWith(')')) {
+      return (
+        <React.Fragment key={key}>
+          {'\u200F'}
+          <bdi
+            dir="ltr"
+            className="inline text-slate-300 font-sans mx-1 align-baseline text-xs sm:text-sm font-medium"
+            style={{ unicodeBidi: 'isolate' }}
+          >
+            {content}
+          </bdi>
+          {'\u200F'}
+        </React.Fragment>
+      );
+    }
 
-  const renderCodeChip = (codeContent: string, key: string | number) => {
-    const hasArabic = /[\u0600-\u06FF]/.test(codeContent);
-
+    const hasArabic = /[\u0600-\u06FF]/.test(content);
     if (hasArabic) {
       return (
         <span
@@ -41,50 +50,73 @@ export const FormattedArabicText: React.FC<FormattedArabicTextProps> = ({
           dir="rtl"
           className="inline font-sans font-bold text-amber-300 bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-800 text-xs sm:text-sm mx-0.5 align-baseline select-text shadow-sm"
         >
-          {codeContent}
+          {content}
         </span>
       );
     }
 
     return (
       <React.Fragment key={key}>
+        {'\u200F'}
         <bdi
           dir="ltr"
-          className="inline font-mono font-medium text-amber-300 bg-slate-900/95 px-1.5 py-0.5 rounded border border-slate-800 text-[11px] sm:text-[13px] mx-0.5 align-baseline select-text shadow-sm whitespace-nowrap"
+          className="inline font-mono font-semibold text-amber-300 bg-slate-900/95 px-1.5 py-0.5 rounded border border-slate-800 text-[11px] sm:text-[13px] mx-0.5 align-baseline select-text shadow-sm whitespace-nowrap"
           style={{ unicodeBidi: 'isolate' }}
         >
-          {codeContent}
+          {content}
         </bdi>
         {'\u200F'}
       </React.Fragment>
     );
   };
 
-  // 1. First split by explicit markdown backticks `code`
-  const backtickParts = text.split(/(`[^`]+`)/g);
+  // Helper to parse text for code tokens and Latin words
+  const parseTokens = (plainText: string, keyPrefix: string) => {
+    const parts = plainText.split(CODE_OR_LATIN_PATTERN);
+    return parts.map((sub, sIdx) => {
+      if (IS_EXACT_TOKEN.test(sub.trim())) {
+        return renderChip(sub.trim(), `${keyPrefix}-tok-${sIdx}`);
+      }
+      return (
+        <span key={`${keyPrefix}-txt-${sIdx}`}>
+          {sub}
+        </span>
+      );
+    });
+  };
+
+  // 1. Split text by explicit markdown bold (**...**)
+  const boldParts = text.split(/(\*\*[^*]+\*\*)/g);
 
   return (
     <span className={`inline ${className}`} dir="rtl">
-      {backtickParts.map((part, pIdx) => {
-        if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
-          const rawCode = part.slice(1, -1);
-          return renderCodeChip(rawCode, `bt-${pIdx}`);
+      {boldParts.map((boldPart, bIdx) => {
+        // If it's a bold chunk
+        if (boldPart.startsWith('**') && boldPart.endsWith('**') && boldPart.length > 4) {
+          const innerBold = boldPart.slice(2, -2);
+          // Check for backticks inside bold
+          const backtickParts = innerBold.split(/(`[^`]+`)/g);
+          return (
+            <strong key={`b-${bIdx}`} className="font-bold text-amber-200">
+              {backtickParts.map((btPart, pIdx) => {
+                if (btPart.startsWith('`') && btPart.endsWith('`') && btPart.length > 2) {
+                  return renderChip(btPart.slice(1, -1), `b-${bIdx}-bt-${pIdx}`);
+                }
+                return parseTokens(btPart, `b-${bIdx}-p-${pIdx}`);
+              })}
+            </strong>
+          );
         }
 
-        // 2. In normal text, split by detected code snippets
-        const subTokens = part.split(CODE_MATCH_PATTERN);
-
+        // 2. Not bold: split by backticks (`...`)
+        const backtickParts = boldPart.split(/(`[^`]+`)/g);
         return (
-          <React.Fragment key={`p-${pIdx}`}>
-            {subTokens.map((sub, sIdx) => {
-              if (IS_CODE_EXACT.test(sub.trim())) {
-                return renderCodeChip(sub.trim(), `token-${pIdx}-${sIdx}`);
+          <React.Fragment key={`nb-${bIdx}`}>
+            {backtickParts.map((btPart, pIdx) => {
+              if (btPart.startsWith('`') && btPart.endsWith('`') && btPart.length > 2) {
+                return renderChip(btPart.slice(1, -1), `nb-${bIdx}-bt-${pIdx}`);
               }
-              return (
-                <span key={`txt-${pIdx}-${sIdx}`}>
-                  {formatArabicPunctuation(sub)}
-                </span>
-              );
+              return parseTokens(btPart, `nb-${bIdx}-p-${pIdx}`);
             })}
           </React.Fragment>
         );

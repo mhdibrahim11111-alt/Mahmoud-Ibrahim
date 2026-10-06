@@ -1,4 +1,19 @@
 import {
+  collection as firestoreCollection,
+  doc as firestoreDoc,
+  getDoc as firestoreGetDoc,
+  getDocs as firestoreGetDocs,
+  setDoc as firestoreSetDoc,
+  updateDoc as firestoreUpdateDoc,
+  deleteDoc as firestoreDeleteDoc,
+  runTransaction as firestoreRunTransaction,
+  query as firestoreQuery,
+  where as firestoreWhere,
+  orderBy as firestoreOrderBy,
+  limit as firestoreLimit,
+  startAfter as firestoreStartAfter,
+  increment as firestoreIncrement,
+  getCountFromServer as firestoreGetCountFromServer,
   type CollectionReference,
   type DocumentData,
   type DocumentReference,
@@ -6,8 +21,9 @@ import {
   type OrderByDirection,
   type Query,
   type WhereFilterOp,
-  FieldValue,
-} from 'firebase-admin/firestore';
+  type QueryConstraint,
+  type DocumentSnapshot,
+} from 'firebase/firestore';
 
 export type {
   CollectionReference,
@@ -17,19 +33,18 @@ export type {
   OrderByDirection,
   Query,
   WhereFilterOp,
+  QueryConstraint,
 };
 
-export type QueryConstraint = (query: any) => any;
-
-export function collection(db: Firestore, collectionName: string): CollectionReference {
-  return db.collection(collectionName);
+export function collection(dbOrCol: any, collectionName: string): CollectionReference {
+  return firestoreCollection(dbOrCol, collectionName);
 }
 
 export function doc(dbOrCol: any, collectionOrId: string, documentId?: string): DocumentReference {
   if (documentId !== undefined) {
-    return (dbOrCol as Firestore).collection(collectionOrId).doc(documentId);
+    return firestoreDoc(dbOrCol, collectionOrId, documentId);
   }
-  return dbOrCol.doc(collectionOrId);
+  return firestoreDoc(dbOrCol, collectionOrId);
 }
 
 function wrapSnapshot(snap: any) {
@@ -39,20 +54,20 @@ function wrapSnapshot(snap: any) {
     get exists() {
       return isExisting;
     },
-    data: () => snap.data(),
+    data: () => (typeof snap.data === 'function' ? snap.data() : undefined),
     id: snap.id,
     ref: snap.ref,
   };
 }
 
 export async function getDoc(reference: DocumentReference) {
-  const snap = await reference.get();
+  const snap = await firestoreGetDoc(reference);
   return wrapSnapshot(snap);
 }
 
 export async function getDocs(reference: CollectionReference | Query) {
-  const snap = await reference.get();
-  const wrappedDocs = snap.docs.map((d: any) => wrapSnapshot(d));
+  const snap = await firestoreGetDocs(reference as any);
+  const wrappedDocs = snap.docs.map((d) => wrapSnapshot(d));
   return {
     docs: wrappedDocs,
     empty: snap.empty,
@@ -81,16 +96,16 @@ export async function setDoc(
   options?: { merge?: boolean },
 ) {
   const sanitized = cleanUndefined(data);
-  return reference.set(sanitized, options || {});
+  return firestoreSetDoc(reference, sanitized, options || {});
 }
 
 export async function updateDoc(reference: DocumentReference, data: DocumentData) {
   const sanitized = cleanUndefined(data);
-  return reference.update(sanitized);
+  return firestoreUpdateDoc(reference, sanitized);
 }
 
 export async function deleteDoc(reference: DocumentReference) {
-  return reference.delete();
+  return firestoreDeleteDoc(reference);
 }
 
 export function runTransaction<T>(
@@ -102,7 +117,7 @@ export function runTransaction<T>(
     delete: (docRef: DocumentReference) => void;
   }) => Promise<T>,
 ): Promise<T> {
-  return db.runTransaction(async (txn) => {
+  return firestoreRunTransaction(db, async (txn) => {
     return updateFunction({
       get: async (docRef: DocumentReference) => {
         const s = await txn.get(docRef);
@@ -125,37 +140,31 @@ export function runTransaction<T>(
 }
 
 export function query(reference: CollectionReference | Query, ...constraints: QueryConstraint[]): Query {
-  let q: any = reference;
-  for (const constraint of constraints) {
-    if (typeof constraint === 'function') {
-      q = constraint(q);
-    }
-  }
-  return q as Query;
+  return firestoreQuery(reference as any, ...constraints);
 }
 
 export function where(field: string, operator: WhereFilterOp, value: unknown): QueryConstraint {
-  return (q: any) => q.where(field, operator, value);
+  return firestoreWhere(field, operator, value);
 }
 
 export function orderBy(field: string, direction?: OrderByDirection): QueryConstraint {
-  return (q: any) => (direction ? q.orderBy(field, direction) : q.orderBy(field));
+  return firestoreOrderBy(field, direction);
 }
 
 export function limit(count: number): QueryConstraint {
-  return (q: any) => q.limit(count);
+  return firestoreLimit(count);
 }
 
 export function startAfter(...values: unknown[]): QueryConstraint {
-  return (q: any) => q.startAfter(...values);
+  return firestoreStartAfter(...values);
 }
 
 export function increment(value: number) {
-  return FieldValue.increment(value);
+  return firestoreIncrement(value);
 }
 
 export async function getCountFromServer(reference: CollectionReference | Query) {
-  const countSnap = await (reference as any).count().get();
+  const countSnap = await firestoreGetCountFromServer(reference as any);
   return {
     data: () => ({
       count: countSnap.data().count,

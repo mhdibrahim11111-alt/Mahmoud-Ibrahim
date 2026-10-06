@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Chapter } from '../types';
 import { runJavaScript } from '../utils/codeRunner';
 import { CodeBlock } from './CodeBlock';
@@ -28,6 +29,9 @@ import {
   Eye,
   Bookmark,
   Star,
+  Brain,
+  Lightbulb,
+  Zap,
 } from 'lucide-react';
 
 interface ChapterViewProps {
@@ -45,7 +49,49 @@ interface ChapterViewProps {
   onToggleBookmark?: () => void;
   userNote?: string;
   onSaveUserNote?: (note: string) => void;
+  onCompleteQuiz?: (chapterId: number) => void;
 }
+
+import type { Variants } from 'framer-motion';
+
+// Framer Motion animation variants for conclusions and analytical cards
+const conclusionsContainerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+const conclusionItemVariants: Variants = {
+  hidden: { opacity: 0, y: 16, scale: 0.96 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: 'spring' as const,
+      damping: 20,
+      stiffness: 280,
+    },
+  },
+};
+
+const sectionFadeVariants: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: {
+      delay: Math.min(i * 0.06, 0.4),
+      duration: 0.35,
+      ease: 'easeOut' as const,
+    },
+  }),
+};
 
 export const ChapterView: React.FC<ChapterViewProps> = ({
   chapter,
@@ -62,6 +108,7 @@ export const ChapterView: React.FC<ChapterViewProps> = ({
   onToggleBookmark,
   userNote = '',
   onSaveUserNote,
+  onCompleteQuiz,
 }) => {
   // Personal notes state
   const [noteText, setNoteText] = useState(userNote);
@@ -233,14 +280,14 @@ function evaluateChapterChallenge(
   const handleTestChallenge = async () => {
     if (!challengeCode.trim()) return;
     const lang = detectCodeLanguage(challengeCode);
-    const isWeb = lang === 'html' || lang === 'css' || chapter.id === 18 || chapter.id === 19;
+    const isWeb = lang === 'html' || lang === 'css' || (chapter.partId === 6 && chapter.id !== 29);
 
     if (isWeb) {
-      const effectiveLang = lang === 'css' || chapter.id === 19 ? 'css' : 'html';
+      const effectiveLang = lang === 'css' || chapter.id === 24 || chapter.id === 26 || chapter.id === 27 ? 'css' : 'html';
       const previewDoc = buildHtmlPreviewDocument(challengeCode, effectiveLang);
       setChallengeHtmlPreview(previewDoc);
 
-      if (chapter.id === 18) {
+      if (chapter.id === 23) {
         const hasH1 = /<h1\b[^>]*>.*?<\/h1>/is.test(challengeCode);
         const hasP = /<p\b[^>]*>.*?<\/p>/is.test(challengeCode);
         const hasUl = /<ul\b[^>]*>[\s\S]*?<\/ul>/is.test(challengeCode);
@@ -260,7 +307,7 @@ function evaluateChapterChallenge(
           setChallengeSuccess(false);
           setChallengeFeedback(msg);
         }
-      } else if (chapter.id === 19) {
+      } else if (chapter.id === 24) {
         const highlightRule = challengeCode.match(/\.highlight\s*\{([\s\S]*?)\}/i)?.[1] ?? '';
         const hasHighlight = /(?:^|;)\s*color\s*:\s*yellow\s*(?:;|$)/i.test(highlightRule);
         if (hasHighlight) {
@@ -279,7 +326,7 @@ function evaluateChapterChallenge(
           setChallengeSuccess(false);
           setChallengeFeedback(msg);
         }
-      } else if (chapter.id === 20) {
+      } else if (chapter.id === 25) {
         const labelFor = challengeCode.match(/<label\b[^>]*\bfor=["']([^"']+)["']/i)?.[1];
         const inputId = challengeCode.match(/<input\b[^>]*\bid=["']([^"']+)["']/i)?.[1];
         const valid = /<form\b/i.test(challengeCode) && labelFor && labelFor === inputId &&
@@ -289,30 +336,37 @@ function evaluateChapterChallenge(
         setChallengeOutput({ logs: valid ? [msg] : [], errors: valid ? [] : [msg] });
         setChallengeSuccess(Boolean(valid));
         setChallengeFeedback(msg);
-      } else if (chapter.id === 21) {
+      } else if (chapter.id === 26) {
         const hasRule = /button\s*\{[\s\S]*?border-radius\s*:\s*12px\s*;?[\s\S]*?\}/i.test(challengeCode);
         const msg = hasRule ? 'حلو! قاعدة button بتدوّر الحواف بمقدار 12px.' : 'اكتب قاعدة button فيها border-radius: 12px;.';
         setChallengeOutput({ logs: hasRule ? [msg] : [], errors: hasRule ? [] : [msg] });
         setChallengeSuccess(hasRule);
         setChallengeFeedback(msg);
-      } else if (chapter.id === 22) {
+      } else if (chapter.id === 27) {
         const hasRule = /body\s*\{[\s\S]*?background-color\s*:\s*#ffffff\s*;?[\s\S]*?\}/i.test(challengeCode);
         const msg = hasRule ? 'تمام! خليت خلفية body بيضا بكود Hex.' : 'اكتب body { background-color: #ffffff; }.';
         setChallengeOutput({ logs: hasRule ? [msg] : [], errors: hasRule ? [] : [msg] });
         setChallengeSuccess(hasRule);
         setChallengeFeedback(msg);
-      } else if (chapter.id === 23) {
+      } else if (chapter.id === 28) {
         const valid = /class=["']product-card["']/i.test(challengeCode) && /<h2\b/i.test(challengeCode) &&
           /<p\b/i.test(challengeCode) && /<button\b/i.test(challengeCode) && /\.product-card\s*\{/i.test(challengeCode);
         const msg = valid ? 'بطاقة المنتج كاملة: HTML للمحتوى وقاعدة CSS للشكل.' : 'ضيف بطاقة class="product-card" فيها h2 وفقرة وزر، واكتب قاعدة CSS للمحدد .product-card.';
         setChallengeOutput({ logs: valid ? [msg] : [], errors: valid ? [] : [msg] });
         setChallengeSuccess(valid);
         setChallengeFeedback(msg);
-      } else if (chapter.id === 25) {
+      } else if (chapter.id === 30) {
         const valid = /<button\b/i.test(challengeCode) && /<p\b[^>]*\bid=["']status["']/i.test(challengeCode) &&
           /addEventListener\s*\(\s*["']click["']/i.test(challengeCode) && /isOn\s*=\s*!isOn/.test(challengeCode) &&
           /textContent/.test(challengeCode) && /النور مضاء/.test(challengeCode) && /النور مطفي/.test(challengeCode);
         const msg = valid ? 'ممتاز! الزر بيبدّل قيمة Boolean وبيغيّر نص الفقرة لما نضغط عليه.' : 'ضيف زر وفقرة id="status"، واربط click عشان يبدّل isOn ويغيّر textContent للنصين المطلوبين.';
+        setChallengeOutput({ logs: valid ? [msg] : [], errors: valid ? [] : [msg] });
+        setChallengeSuccess(valid);
+        setChallengeFeedback(msg);
+      } else if (chapter.id === 31) {
+        const valid = /addEventListener\s*\(\s*["']input["']/i.test(challengeCode) &&
+          /<input\b/i.test(challengeCode) && (/<p\b/i.test(challengeCode) || /<span\b/i.test(challengeCode));
+        const msg = valid ? '🎉 رائع جداً! ربطت حدث input بتحديث عدد الحروف على الفور!' : 'تأكد من إضافة حقل input وفقرة لعرض العداد، وربط حدث input بـ addEventListener لتحديث طول النص.';
         setChallengeOutput({ logs: valid ? [msg] : [], errors: valid ? [] : [msg] });
         setChallengeSuccess(valid);
         setChallengeFeedback(msg);
@@ -363,8 +417,86 @@ function evaluateChapterChallenge(
     );
   }
 
+  const isAnalyticalReview =
+    chapter.title.includes('المراجعة التحليلية') ||
+    chapter.title.includes('مراجعة تحليلية') ||
+    chapter.title.includes('المراجعة والربط') ||
+    chapter.title.includes('مراجعة') ||
+    chapter.subtitle?.includes('تحليل') ||
+    chapter.subtitle?.includes('المراجعة التحليلية') ||
+    chapter.id === 5 ||
+    chapter.id === 18 ||
+    chapter.id === 22 ||
+    chapter.id === 31;
+
   return (
-    <article className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-6 sm:space-y-8 animate-fadeIn overflow-hidden w-full pb-32 sm:pb-36 lg:pb-12">
+    <motion.article
+      key={`chapter-article-${chapter.id}`}
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: 'easeOut' }}
+      className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-6 sm:space-y-8 overflow-hidden w-full pb-32 sm:pb-36 lg:pb-12"
+    >
+      {/* Analytical Review Glow Banner */}
+      {isAnalyticalReview && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: -10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: 'spring', damping: 18, stiffness: 220 }}
+          className="relative overflow-hidden rounded-3xl p-5 sm:p-6 bg-gradient-to-r from-amber-500/20 via-indigo-600/20 to-cyan-500/20 border-2 border-amber-500/40 shadow-2xl shadow-amber-500/10"
+        >
+          {/* Animated background ambient aura */}
+          <motion.div
+            animate={{
+              opacity: [0.15, 0.35, 0.15],
+              scale: [1, 1.08, 1],
+            }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute -right-10 -top-10 w-48 h-48 bg-amber-500/30 rounded-full blur-3xl pointer-events-none"
+          />
+
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-4">
+              <motion.div
+                animate={{
+                  rotate: [0, 6, -6, 0],
+                  scale: [1, 1.08, 1],
+                }}
+                transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+                className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 flex items-center justify-center text-2xl shadow-lg shrink-0 font-black"
+              >
+                🧠
+              </motion.div>
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/30">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    المراجعة والربط التحليلي الشامل
+                  </span>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-200 border border-indigo-500/30 font-bold">
+                    Interactive Analytical Review
+                  </span>
+                </div>
+                <h2 className="text-base sm:text-lg font-black text-white">
+                  محطة استنتاج وتتبع مسار الكود واكتشاف الأخطاء وتثبيت القواعد
+                </h2>
+                <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                  استعرض الاستنتاجات البرمجية أدناه وتحليل سيناريوهات التنفيذ خطوة بخطوة 🔍⚡
+                </p>
+              </div>
+            </div>
+
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              className="self-start sm:self-center px-3.5 py-2 rounded-xl bg-slate-900/90 border border-amber-500/30 text-xs font-bold text-amber-300 flex items-center gap-2 shadow-md shrink-0"
+            >
+              <Zap className="w-4 h-4 text-amber-400 animate-bounce" />
+              <span>تحليل استنتاجي</span>
+            </motion.div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Chapter Top Breadcrumb & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
@@ -409,32 +541,96 @@ function evaluateChapterChallenge(
         </div>
       </div>
 
-      {/* Chapter Summary Cards */}
+      {/* Chapter Summary / Conclusions Cards with Framer Motion Stagger */}
       {chapter.summaryPoints.length > 0 && (
-        <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-5 shadow-inner">
-          <h3 className="text-xs font-bold text-orange-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-orange-400" strokeWidth={2.3} />
-            أهم النقاط اللي هتطلع بيها من الفصل ده:
-          </h3>
-          <ul className="grid sm:grid-cols-2 gap-2.5 text-xs sm:text-sm text-slate-300">
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={conclusionsContainerVariants}
+          className={`rounded-3xl border p-5 sm:p-6 shadow-xl relative overflow-hidden ${
+            isAnalyticalReview
+              ? 'bg-gradient-to-b from-slate-900/95 via-slate-900/90 to-slate-950 border-amber-500/40 shadow-amber-500/5'
+              : 'bg-slate-900/90 border-slate-800 shadow-inner'
+          }`}
+        >
+          <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/80">
+            <div className="flex items-center gap-2.5">
+              <motion.div
+                animate={{ scale: [1, 1.12, 1] }}
+                transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                className={`p-2 rounded-xl ${
+                  isAnalyticalReview
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                }`}
+              >
+                {isAnalyticalReview ? (
+                  <Brain className="w-4 h-4 text-amber-400" strokeWidth={2.3} />
+                ) : (
+                  <BookOpen className="w-4 h-4 text-orange-400" strokeWidth={2.3} />
+                )}
+              </motion.div>
+              <div>
+                <h3 className="text-xs sm:text-sm font-black text-amber-300 uppercase tracking-wider flex items-center gap-2">
+                  <span>
+                    {isAnalyticalReview
+                      ? 'الاستنتاجات والنقاط التحليلية الذهبية للفصل:'
+                      : 'أهم النقاط والاستنتاجات اللي هتطلع بيها من الفصل:'}
+                  </span>
+                  {isAnalyticalReview && <span className="text-base">💡</span>}
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  تظهر النقاط أدناه تدريجياً لترسيخ المفاهيم وتحليلها بدقة:
+                </p>
+              </div>
+            </div>
+            <span className="text-[11px] font-bold text-amber-300 bg-amber-500/15 px-3 py-1 rounded-full border border-amber-500/30 shrink-0">
+              {chapter.summaryPoints.length} استنتاجات
+            </span>
+          </div>
+
+          <motion.ul variants={conclusionsContainerVariants} className="grid sm:grid-cols-2 gap-3 text-xs sm:text-sm text-slate-300">
             {chapter.summaryPoints.map((point, idx) => (
-              <li key={idx} className="flex items-start gap-2 bg-slate-950/50 p-2.5 rounded-xl border border-slate-800/80">
-                <span className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 font-bold flex items-center justify-center text-xs shrink-0 mt-0.5 border border-orange-500/30">
+              <motion.li
+                key={idx}
+                variants={conclusionItemVariants}
+                whileHover={{ scale: 1.018, y: -2 }}
+                transition={{ type: 'spring', damping: 18, stiffness: 320 }}
+                className={`flex items-start gap-3 p-3.5 rounded-2xl border transition duration-200 cursor-default shadow-sm ${
+                  isAnalyticalReview
+                    ? 'bg-slate-950/80 border-amber-500/30 hover:border-amber-400/70 hover:bg-slate-950 hover:shadow-md hover:shadow-amber-500/10'
+                    : 'bg-slate-950/60 border-slate-800/90 hover:border-slate-700 hover:bg-slate-950'
+                }`}
+              >
+                <span
+                  className={`w-6 h-6 rounded-xl font-black flex items-center justify-center text-xs shrink-0 mt-0.5 border ${
+                    isAnalyticalReview
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm shadow-amber-500/20'
+                      : 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+                  }`}
+                >
                   {idx + 1}
                 </span>
-                <span className="leading-relaxed flex-1 text-right" dir="rtl">
+                <span className="leading-relaxed flex-1 text-right font-medium" dir="rtl">
                   <FormattedArabicText text={point} />
                 </span>
-              </li>
+              </motion.li>
             ))}
-          </ul>
-        </div>
+          </motion.ul>
+        </motion.div>
       )}
 
       {/* Chapter Sections */}
       <div className="space-y-8">
         {chapter.contentSections.map((sec, idx) => (
-          <section key={idx} className="space-y-4">
+          <motion.section
+            key={idx}
+            custom={idx}
+            initial="hidden"
+            animate="visible"
+            variants={sectionFadeVariants}
+            className="space-y-4"
+          >
             <h2 className="text-base sm:text-xl font-bold text-slate-100 flex items-start gap-2.5 leading-snug sm:leading-relaxed">
               <span className="w-1.5 sm:w-2 h-5 bg-orange-500 rounded-full shrink-0 mt-0.5 sm:mt-1 shadow-sm shadow-orange-500/40"></span>
               <span className="flex-1 min-w-0">
@@ -447,16 +643,27 @@ function evaluateChapterChallenge(
             </div>
 
             {/* Live HTML Preview if applicable */}
-            {sec.type === 'html_preview' && sec.htmlCode && (
-              <div className="space-y-2">
+            {sec.type === 'html_preview' && (sec.codeSnippet || sec.htmlCode) && (
+              <div className="space-y-2.5 my-4">
                 <div className="text-xs font-semibold text-slate-400 flex items-center justify-between">
-                  <span>معاينة حية للمتصفح (HTML Preview):</span>
-                  <span className="text-[11px] text-amber-400 font-mono">Live Rendering</span>
+                  <span className="flex items-center gap-1.5 text-cyan-400 font-bold">
+                    <Globe className="w-4 h-4" />
+                    <span>معاينة حية للمتصفح (HTML Preview) — تطبيق تفاعلي يعمل مباشرة:</span>
+                  </span>
+                  <span className="text-[11px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    Live Rendering ⚡
+                  </span>
                 </div>
-                <div
-                  className="rounded-xl overflow-hidden shadow-lg"
-                  dangerouslySetInnerHTML={{ __html: sec.htmlCode }}
-                />
+                <div className="rounded-2xl overflow-hidden shadow-2xl border border-slate-700">
+                  <LiveBrowserPreview
+                    htmlContent={buildHtmlPreviewDocument(
+                      sec.codeSnippet || sec.htmlCode || '',
+                      'html'
+                    )}
+                    title={sec.heading || 'معاينة صفحة الويب'}
+                    height="320px"
+                  />
+                </div>
               </div>
             )}
 
@@ -581,7 +788,10 @@ function evaluateChapterChallenge(
 
             {/* Callout Box */}
             {sec.callout && (
-              <div
+              <motion.div
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
                 className={`p-4 rounded-2xl border flex items-start gap-3 ${
                   sec.callout.type === 'celebration'
                     ? 'bg-amber-950/20 border-amber-500/40 text-amber-200'
@@ -603,9 +813,9 @@ function evaluateChapterChallenge(
                     <FormattedArabicText text={sec.callout.content} />
                   </p>
                 </div>
-              </div>
+              </motion.div>
             )}
-          </section>
+          </motion.section>
         ))}
       </div>
 
@@ -753,8 +963,10 @@ function evaluateChapterChallenge(
       {chapter.quiz && chapter.quiz.length > 0 && (
         <ChapterQuiz
           key={`chapter-quiz-${chapter.id}`}
+          chapterId={chapter.id}
           quiz={chapter.quiz}
           chapterTitle={chapter.title}
+          onComplete={onCompleteQuiz ? () => onCompleteQuiz(chapter.id) : undefined}
           onScrollToChallenge={() => {
             const el = document.getElementById('chapter-challenge-section');
             if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -868,7 +1080,7 @@ function evaluateChapterChallenge(
                     onChange={handleChallengeChange}
                     onRun={handleTestChallenge}
                     placeholder="// اكتب كودك هنا..."
-                    isWebMode={chapter.id === 18 || chapter.id === 19}
+                    isWebMode={chapter.partId === 6 && chapter.id !== 29}
                     className="h-60 sm:h-72"
                   />
                 </Suspense>
@@ -1027,6 +1239,6 @@ function evaluateChapterChallenge(
           <div></div>
         )}
       </div>
-    </article>
+    </motion.article>
   );
 };

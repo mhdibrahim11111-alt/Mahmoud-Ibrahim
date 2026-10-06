@@ -5,14 +5,14 @@ export const part6: Part = {
   title: 'الجزء السادس: من الكود للصفحة (HTML وCSS وDOM)',
   subtitle: 'لوحة التحكم اللي بتشغّل صفحة الويب التفاعلية',
   description:
-    'بناء هيكل الصفحة بـ HTML، تزيينها وتنسيقها بـ CSS، كائنات الـ Objects، والتحكم الحي بالصفحة وأحداث النقر عبر الـ DOM.',
+    'بناء هيكل الصفحة بـ HTML، تزيينها وتنسيقها بـ CSS، كائنات الـ Objects، والتحكم الحي بالصفحة وأحداث النقر عبر الـ DOM، ومراجعة تحليلية لتتبع تفاعل عناصر الويب.',
   iconName: 'Globe',
   bugHunter: {
     id: 'bug-part-6',
     partId: 6,
-    title: 'كويز: مكان السكريبت القاتل في الـ Head',
+    title: 'صائد الأخطاء: مكان السكريبت القاتل في الـ Head 🐛',
     context:
-      'الكود ده المفروض يغير نص العنوان لما تدوس على الزرار، لكنه مبيشتغلش إطلاقاً وبيطلع Cannot read properties of null في الكونسول!',
+      'الكود ده المفروض يغير نص العنوان لما تدوس على الزرار، لكنه مبيشتغلش إطلاقاً وبيطلع خطأ TypeError: Cannot read properties of null في الكونسول!',
     problemCode: `<!DOCTYPE html>
 <html>
   <head>
@@ -22,20 +22,20 @@ export const part6: Part = {
       const button = document.getElementById("changeButton");
 
       button.addEventListener("click", function () {
-        heading.textContent = "تم التغيير!";
+        heading.textContent = "تم التغيير بنجاح! ✨";
       });
     </script>
   </head>
   <body>
     <h1 id="title">العنوان الأصلي</h1>
-    <button id="changeButton">غيّر</button>
+    <button id="changeButton">غيّر العنوان</button>
   </body>
 </html>`,
     bugLineNumber: 4,
     bugDescription:
-      'تنفيذ كود JavaScript في <head> قبل أن يتم إنشاء عناصر <body> في الـ DOM.',
+      'تنفيذ كود JavaScript في <head> قبل أن يرسم المتصفح عناصر <body> في شجرة الـ DOM.',
     whyItHappens:
-      'المتصفح يقرأ الصفحة من الأعلى للأسفل. عندما وصل لكود السكريبت في <head>، لم تكن عناصر <body> قد ظهرت بعد في الذاكرة، لذلك document.getElementById("changeButton") رجعت null، وعند محاولة إضافة مستمع للأحداث اعترض المتصفح بأن button غير موجود!',
+      'المتصفح بيقرأ الصفحة من فوق لتحت سطر بسطر يا صديقي. لما وصل لكود السكريبت في <head>، مكانتش عناصر <body> ظهرت لسه في الذاكرة! عشان كده document.getElementById("changeButton") رجعت null، ولما حاول الكود يركب مستمع للأحداث على null اشتكى المتصفح فوراً ووقف البرنامج! الحل السحري هو نقل السكريبت لقبل إغلاق </body> مباشرة.',
     fixedCode: `<!DOCTYPE html>
 <html>
   <head>
@@ -43,58 +43,58 @@ export const part6: Part = {
   </head>
   <body>
     <h1 id="title">العنوان الأصلي</h1>
-    <button id="changeButton">غيّر</button>
+    <button id="changeButton">غيّر العنوان</button>
 
-    <!-- وضع السكريبت قبل إغلاق body مباشرة -->
+    <!-- وضع السكريبت في نهاية body بعد رسم العناصر -->
     <script>
       const heading = document.getElementById("title");
       const button = document.getElementById("changeButton");
 
       button.addEventListener("click", function () {
-        heading.textContent = "تم التغيير!";
+        heading.textContent = "تم التغيير بنجاح! ✨";
       });
     </script>
   </body>
 </html>`,
-    expectedCorrectOutput: `عند النقر على الزرار يتغير العنوان فوراً إلى: "تم التغيير!"`,
+    expectedCorrectOutput: `عند النقر على الزرار يتغير العنوان فوراً إلى: "تم التغيير بنجاح! ✨"`,
     hints: [
-      'متى يتم تحميل عناصر body بالنسبة لعناصر head؟',
+      'متى يتم تحميل عناصر body بالنسبة لعناصر head أثناء قراءة المتصفح؟',
       'ماذا ترجع getElementById إذا كان العنصر لم يُرسم بعد في الصفحة؟',
-      'انقل وسم <script> إلى ما قبل إغلاق </body> مباشرة.',
+      'انقل وسم <script> إلى ما قبل إغلاق </body> مباشرة ليجد كل العناصر جاهزة.',
     ],
   },
   chapters: [
     {
-      id: 18,
+      id: 23,
       partId: 6,
       partTitle: 'الجزء السادس: من الكود للصفحة',
-      title: 'الفصل 18: أساسيات HTML (1)',
+      title: 'الفصل 23: أساسيات HTML (1) — الهيكل العظمي',
       subtitle: 'هيكل الصفحة، الوسوم، العناوين، القوائم، والصور',
       summaryPoints: [
-        'HTML (HyperText Markup Language) هي لغة هيكلة صفحات الويب، وهي العظم الأساسي لكل المواقع.',
+        'HTML (HyperText Markup Language) هي لغة هيكلة صفحات الويب، وهي الهيكل العظمي لأي موقع في العالم.',
         'العناصر بتتكتب بالوسوم: وسم الفتح <tag> والمحتوى ووسم الإغلاق </tag>.',
-        'الهيكل الثابت لأي صفحة يبدأ بـ <!DOCTYPE html> ويحتوي على <head> للمعلومات و <body> لما يراه الزائر.',
-        'عائلة العناوين من <h1> للأكبر إلى <h6> للأصغر، والفقرات <p>، والقوائم <ul> و <ol>.',
+        'الهيكل الثابت لأي صفحة يبدأ بـ <!DOCTYPE html> ويحتوي على <head> للمعلومات والبيانات الخفية، و <body> لكل ما يراه الزائر.',
+        'عائلة العناوين من <h1> للأكبر والأهم إلى <h6> للأصغر، والفقرات <p>، والقوائم <ul> و <ol>.',
       ],
       contentSections: [
         {
-          heading: 'تشبيه العظم واللحم واللبس: يعني إيه HTML؟',
-          text: `لو فكرت في أي صفحة ويب في العالم زي جسم الإنسان:
-- الـ HTML هو "الهيكل العظمي": بيحدد مكان الرأس (العنوان)، ومكان الأذرع (الأزرار)، ومكان القفص الصدري (المحتوى). بدون عظم، الجسم هينهار!
+          heading: 'تشبيه العظم واللحم واللبس: يعني إيه HTML؟ 🦴',
+          text: `لو فكرت في أي صفحة ويب في العالم زي جسم الإنسان يا صديقي:
+- الـ HTML هو "الهيكل العظمي": بيحدد مكان الجمجمة (العنوان)، ومكان الأذرع (الأزرار)، ومكان القفص الصدري (المحتوى). بدون عظم، الجسم هينهار ككتلة لحم مفرومة!
 - الـ CSS هو "الملابس والمكياج والديكور": بيلون ويجمل وينسق المظهر الخارجي.
 - الـ JavaScript هو "المخ والأعصاب والحركة": بيخلي الصفحة تتفاعل وتتحرك وترد على نقرات المستخدم.
 
-لغة HTML مش لغة برمجة فيها شروط وحلقات؛ دي لغة "توصيفية (Markup Language)"، بتستخدم "الوسوم (Tags)" عشان تقول للمتصفح: "السطر ده عنوان رئيسي، السطر ده فقرة، والصورة دي حطها هنا!".`,
+لغة HTML مش لغة برمجة فيها شروط وحلقات؛ دي لغة "توصيفية (Markup Language)"، بتستخدم "الوسوم (Tags)" المحصورة بين علامتي < > عشان تقول للمتصفح: "السطر ده عنوان رئيسي، السطر ده فقرة، والصورة دي حطها هنا!".`,
           codeSnippet: `<!-- مثال بسيط على وسوم HTML -->
-<h1>مرحباً بكم في زكي كود!</h1>
-<p>هنا بنتعلم البرمجة بأسلوب سهل وممتع.</p>`,
+<h1>مرحباً بكم في منصة زكي كود! 👋</h1>
+<p>هنا بنتعلم البرمجة بأسلوب سهل وممتع ومبسط.</p>`,
         },
         {
           heading: 'الهيكل المقدس لأي صفحة ويب في العالم 🏛️',
-          text: `أي صفحة ويب بتبدأ بهيكل ثابت من 4 عناصر رئيسية لا غنى عنها:
-1. <!DOCTYPE html>: رسالة للمتصفح بتقول له "الصفحة دي مكتوبة بأحدث إصدار HTML5".
+          text: `أي صفحة ويب قياسية بتبدأ بهيكل ثابت من 4 عناصر رئيسية لا غنى عنها:
+1. <!DOCTYPE html>: رسالة للمتصفح بتقول له "الصفحة دي مكتوبة بأحدث معايير HTML5".
 2. <html> ... </html>: الحاوية الكبرى (Root) اللي بتضم كل محتويات الصفحة.
-3. <head> ... </head>: غرفة التحكم السرية؛ فيها عنوان الصفحة اللي بيظهر في التاب فوق <title> والترميز وربط الخطوط، ومبيظهرش منها حاجة في الصفحة نفسها!
+3. <head> ... </head>: غرفة التحكم السرية؛ فيها عنوان الصفحة اللي بيظهر في التاب فوق <title> والترميز وربط الخطوط، ومبيظهرش منها حاجة داخل الصفحة نفسها!
 4. <body> ... </body>: خشبة المسرح! كل حاجة الزائر بيشوفها بعينه (نصوص، صور، فيديوهات، أزرار) لازم تعيش هنا.`,
           codeSnippet: `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -104,13 +104,13 @@ export const part6: Part = {
   </head>
   <body>
     <h1>أهلاً بالعالم! 👋</h1>
-    <p>هذه أول صفحة ويب أقوم ببرمجتها بنفسي.</p>
+    <p>هذه أول صفحة ويب أقوم ببرمجتها وتصميمها بنفسي.</p>
   </body>
 </html>`,
         },
         {
           heading: 'عائلة العناوين والفقرات والقوائم المنظمة',
-          text: `تنظيم المحتوى بيعتمد على وسوم محددة:
+          text: `تنظيم المحتوى بيعتمد على وسوم دلالية واضحة:
 - العناوين (Headings): من <h1> (أهم وأكبر عنوان في الصفحة) لحد <h6> (أصغر عنوان فرعي).
 - الفقرات النصية (Paragraphs): وسم <p> لكتابة الأسطر والفقرات العادية.
 - القوائم المنظمة:
@@ -138,46 +138,57 @@ export const part6: Part = {
         },
         {
           heading: 'إضافة الصور <img> والروابط <a> والوسوم الذاتية',
-          text: `وسم الصورة <img> عنصر فارغ (void element)، يعني مش بنكتبله وسم إغلاق </img>.
+          text: `وسم الصورة <img> عنصر فارغ ذاتي الإغلاق (void element)، يعني مش بنكتبله وسم إغلاق </img>.
 بيحتاج خاصيتين (Attributes) مهمين:
 - src: مسار أو رابط الصورة على الإنترنت.
-- alt: نص بديل وصف بديل يفيد قارئات الشاشة، ويظهر مكان الصورة إذا تعذر تحميلها.
+- alt: نص بديل يصف الصورة لمحركات البحث وقارئات الشاشة للمكفوفين، ويظهر مكان الصورة إذا تعذر تحميلها.
 
 أما الروابط <a> (Anchor) فبتحتاج خاصية href لتحديد الصفحة التي سينتقل إليها المستخدم عند النقر.`,
           codeSnippet: `<!-- رابط ينتقل لموقع خارجي -->
 <a href="https://google.com">ابحث في جوجل</a>
 
-<!-- img عنصر فارغ ولا يحتاج وسم إغلاق -->
-<img src="logo.png" alt="شعار زكي كود" loading="lazy" decoding="async">`,
+<!-- صورة مع نص بديل دقيق -->
+<img src="logo.png" alt="شعار منصة زكي كود" loading="lazy">`,
           callout: {
             type: 'tip',
             title: 'قاعدة الـ h1 الذهبية 🔍',
             content:
-              'رتّب العناوين بشكل يوضّح أقسام الصفحة: h1 للعنوان الرئيسي، وبعده h2 وh3 للعناوين الفرعية. المهم العنوان يبقى معبّر وترتيبه منطقي؛ مفيش عدد ثابت لازم من وسوم h1.',
+              'رتّب العناوين بشكل يوضّح أقسام الصفحة يا صديقي: h1 للعنوان الرئيسي الكبير، وبعده h2 و h3 للعناوين الفرعية. التنظيم الهرمي ده بيخلي موقعك يتصدر نتائج محركات البحث بسهولة!',
           },
         },
       ],
       exercises: [
         {
-          id: 'ch18-ex1',
-          title: 'التمرين 1: قائمة التسوق',
-          code: `<ul>\n  <li>تفاح</li>\n  <li>موز</li>\n</ul>`,
-          expectedOutput: 'معاينة قائمة غير مرتبة فيها التفاح والموز.',
-          explanation: 'كود HTML منظم لقائمة غير مرتبة.',
+          id: 'ch23-ex1',
+          title: 'التمرين 1: قائمة المشتريات النقطية',
+          code: `<ul>
+  <li>تفاح</li>
+  <li>موز</li>
+  <li>برتقال</li>
+</ul>`,
+          expectedOutput: 'معاينة قائمة نقطية تحتوي على تفاح وموز وبرتقال.',
+          explanation: 'استخدام ul لإنشاء قائمة غير مرتبة مع li لكل عنصر.',
+        },
+        {
+          id: 'ch23-ex2',
+          title: 'التمرين 2: رابط موقع مع صورة',
+          code: `<a href="https://example.com">
+  <img src="photo.jpg" alt="صورة توضيحية">
+</a>`,
+          expectedOutput: 'معاينة رابط قابل للنقر يحيط بالصورة.',
+          explanation: 'وضع img داخل وسم a يجعل الصورة نفسها قابلة للنقر كرابط.',
         },
       ],
       quiz: [
         {
-          id: 'ch18-q1',
-          question:
-            'إيه الفرق الأساسي بين وسوم العناوين <h1> والفقرات <p> في HTML؟',
+          id: 'ch23-q1',
+          question: 'إيه الفرق الأساسي بين وسوم العناوين <h1> والفقرات <p> في HTML يا صديقي؟',
           options: [
             {
               id: 'a',
-              text: '<h1> لعنوان رئيسي عريض وهام، بينما <p> للفقرات النصية العادية',
+              text: '<h1> لعنوان رئيسي عريض وهام دلالياً، بينما <p> للفقرات النصية العادية',
               isCorrect: true,
-              explanation:
-                'صح جداً! 📝 h1 اختصار Heading 1 وهو أهم عنوان في الصفحة، و p اختصار Paragraph.',
+              explanation: 'صح جداً وبرافو عليك! 📝 h1 اختصار Heading 1 وهو أهم عنوان في الصفحة، و p اختصار Paragraph.',
             },
             {
               id: 'b',
@@ -187,29 +198,27 @@ export const part6: Part = {
             },
             {
               id: 'c',
-              text: 'مفيش فرق في المعنى الدلالي',
+              text: 'مفيش أي فرق بينهم',
               isCorrect: false,
-              explanation:
-                'المتصفحات ومحركات البحث بتعتمد على العناوين لتنظيم وفهم هيكل الصفحة.',
+              explanation: 'المتصفحات ومحركات البحث بتعتمد على العناوين لتنظيم وفهم هيكل الصفحة.',
             },
           ],
         },
         {
-          id: 'ch18-q2',
-          question: 'لكتابة قائمة نقطية غير مرتبة بنستخدم وسم:',
+          id: 'ch23-q2',
+          question: 'لكتابة قائمة نقطية غير مرتبة (Bullet Points) بنستخدم وسم إيه؟',
           options: [
             {
               id: 'a',
               text: '<ul> مع <li>',
               isCorrect: true,
-              explanation:
-                'برافو! 🎯 ul اختصار Unordered List و li اختصار List Item.',
+              explanation: 'برافو! 🎯 ul اختصار Unordered List و li اختصار List Item.',
             },
             {
               id: 'b',
               text: '<ol> مع <li>',
               isCorrect: false,
-              explanation: '<ol> مخصصة للقوائم الرقمية المرتبة (Ordered).',
+              explanation: '<ol> مخصصة للقوائم الرقمية المرتبة (Ordered 1, 2, 3).',
             },
             {
               id: 'c',
@@ -219,39 +228,68 @@ export const part6: Part = {
             },
           ],
         },
+        {
+          id: 'ch23-q3',
+          question: 'أين يجب وضع العناصر التي نريد للزائر أن يراها ويتفاعل معها على الشاشة؟',
+          options: [
+            {
+              id: 'a',
+              text: 'داخل وسم <body> ... </body>',
+              isCorrect: true,
+              explanation: 'إجابة نموذجية يا صديقي! 🌟 body هي خشبة المسرح المرئية بالكامل للزائر.',
+            },
+            {
+              id: 'b',
+              text: 'داخل وسم <head> ... </head>',
+              isCorrect: false,
+              explanation: 'وسم head مخصص للبيانات الوصفية والعناوين الخفية فقط.',
+            },
+            {
+              id: 'c',
+              text: 'خارج وسم <html> في أي مكان',
+              isCorrect: false,
+              explanation: 'كل شيء يجب أن يكون داخل وسم html.',
+            },
+          ],
+        },
       ],
       challenge: {
-        id: 'ch18-chal',
+        id: 'ch23-chal',
         title: 'وريني شطارتك 🧠: كارت المبرمج في HTML',
         prompt:
-          'اكتب HTML مباشرة لبطاقة فيها عنوان <h1> باسمك، وفقرة <p> بالنص "أنا مبرمج ويب"، وقائمة <ul> فيها مهارتان داخل <li>.',
-        hint: 'اكتب وسوم h1 و p و ul/li مباشرة، دون console.log.',
-        initialCode: `// اكتب كود طباعة وسوم الـ HTML بالترتيب هنا بنفسك...
+          'اكتب كود HTML مباشر لبطاقة فيها عنوان <h1> باسمك، وفقرة <p> بالنص "أنا مبرمج ويب"، وقائمة <ul> فيها مهارتان داخل <li>.',
+        hint: 'اكتب وسوم h1 و p و ul/li مباشرة دون console.log.',
+        initialCode: `<!-- اكتب وسوم الـ HTML بالترتيب هنا بنفسك... -->
 `,
-        solutionCode: `<h1>زكي كود</h1>\n<p>أنا مبرمج ويب</p>\n<ul><li>JavaScript</li><li>HTML</li></ul>`,
+        solutionCode: `<h1>زكي كود</h1>
+<p>أنا مبرمج ويب</p>
+<ul>
+  <li>JavaScript</li>
+  <li>HTML</li>
+</ul>`,
       },
     },
     {
-      id: 19,
+      id: 24,
       partId: 6,
       partTitle: 'الجزء السادس: من الكود للصفحة',
-      title: 'الفصل 19: أساسيات CSS (1)',
+      title: 'الفصل 24: أساسيات CSS (1) — الألوان والمظهر',
       subtitle: 'تلوين وتنسيق: اللون، الخلفية، والخطوط',
       summaryPoints: [
-        'CSS (Cascading Style Sheets) هي لغة الأناقة والجمال المسؤولة عن تنسيق صفحات الويب.',
+        'CSS (Cascading Style Sheets) هي لغة الأناقة والجمال المسؤولة عن تزيين وتنسيق صفحات الويب.',
         'قاعدة CSS بتتكون من: المحدد (Selector) والخاصية (Property) والقيمة (Value).',
-        'التحكم في الألوان: color للخطوط، و background-color لخلفية العنصر.',
-        'تنسيق الخطوط: font-size للحجم، و text-align للمحاذاة، و font-family لنوع الخط.',
+        'التحكم في الألوان: color للخطوط والنصوص، و background-color لخلفية العنصر أو الصفحة.',
+        'تنسيق الخطوط: font-size للحجم، و text-align للمحاذاة، و font-family لنوع وشكل الخط.',
       ],
       contentSections: [
         {
-          heading: 'تشبيه مصمم الديكور والملابس الشيك: يعني إيه CSS؟',
-          text: `لو HTML بنى لك شقة على الطوب الأحمر..
+          heading: 'تشبيه مصمم الديكور والملابس الشيك: يعني إيه CSS؟ 🎨',
+          text: `لو HTML بنى لك شقة على الطوب الأحمر يا صديقي..
 هل هتقعد فيها وتعيش وهي على المحارة كده؟ مستحيل!
 إنت محتاج نقاش يدهن الحوائط بألوان مبهجة، ومهندس ديكور يركب الإضاءة والستائر والباركيه!
 مهندس الديكور ده هو بالظبط "لغة CSS".
 CSS هي المسؤولة عن تحويل صفحة الويب من صفحة رمادية كئيبة شكلها زي ورقة وورد سنة 1995، إلى موقع عصري ساحر جذاب زي فيسبوك أو يوتيوب!`,
-          codeSnippet: `/* جعل كل العناوين باللون البرتقالي وحجم كبير */
+          codeSnippet: `/* جعل كل العناوين باللون البرتقالي ومحاذاة في المنتصف */
 h1 {
   color: orange;
   font-size: 28px;
@@ -261,9 +299,9 @@ h1 {
         {
           heading: 'قاعدة CSS الذهبية (The CSS Rule): فك الشفرة',
           text: `أي كود CSS في الكون بيتكتب بقاعدة واحدة ثابتة:
-1. المحدّد (Selector): بنشاور على العنصر اللي عايزين نلونه (مثلاً: h1 أو p أو button).
+1. المحدّد (Selector): بنشاور على العنصر اللي عايزين نلونه (مثلاً: h1 أو p أو button أو .card).
 2. الأقواس المعقوصة { }: بنفتح قوسين نحط جواهم كل التعديلات.
-3. الخاصية والقيمة (Property: Value;): بنكتب اسم الخاصية (زي color)، ثم نقطتين، ثم القيمة. الفاصلة المنقوطة تفصل بين التصريحات، ويُستحسن وضعها في النهاية رغم أنها اختيارية بعد آخر تصريح.`,
+3. الخاصية والقيمة (Property: Value;): بنكتب اسم الخاصية (زي color)، ثم نقطتين، ثم القيمة متبوعة بفاصلة منقوطة (;).`,
           codeSnippet: `p {
   color: #38bdf8;          /* لون النص سماوي جميل */
   background-color: #0f172a; /* لون الخلفية كحلي داكن */
@@ -272,7 +310,7 @@ h1 {
 }`,
         },
         {
-          heading: 'التحكم في الألوان والخطوط مع معاينة حية 🎨',
+          heading: 'التحكم في الألوان والخطوط مع معاينة حية 🌈',
           text: `من أشهر خواص CSS اللي هتستخدمها كل يوم:
 - color: لون الكلام نفسه.
 - background-color: لون الصندوق أو خلفية الصفحة.
@@ -312,30 +350,43 @@ h1 {
             type: 'warning',
             title: 'إياك ونسيان الفاصلة المنقوطة (;)! ⛔',
             content:
-              'الفاصلة المنقوطة بتفصل تعليمات CSS عن بعض. الأفضل تحطها بعد كل تعليمة، حتى الأخيرة، عشان تسهّل الإضافة بعدين؛ ولو اتشالت من آخر تعليمة بس، القاعدة لسه شغالة.',
+              'الفاصلة المنقوطة بتفصل تعليمات CSS عن بعضها. نسيانها بين خاصيتين ممكن يخلي المتصفح يتلخبط ويتجاهل تنسيق الصفحة بالكامل!',
           },
         },
       ],
       exercises: [
         {
-          id: 'ch19-ex1',
-          title: 'التمرين 1: تنسيق الفقرة في CSS',
-          code: `p { color: red; font-size: 20px; }`,
+          id: 'ch24-ex1',
+          title: 'التمرين 1: تنسيق الفقرة باللون الأحمر',
+          code: `p {
+  color: red;
+  font-size: 20px;
+}`,
           expectedOutput: 'معاينة فقرة بخط أحمر حجمه 20px.',
-          explanation: 'قاعدة CSS واضحة تحدد اللون والحجم للفقرة.',
+          explanation: 'تطبيق خاصيتي color و font-size على الفقرة.',
+        },
+        {
+          id: 'ch24-ex2',
+          title: 'التمرين 2: محاذاة العنوان وتلوين الخلفية',
+          code: `h1 {
+  background-color: #334155;
+  color: white;
+  text-align: center;
+}`,
+          expectedOutput: 'معاينة عنوان بخلفية رمادية داكنة ونصوص بيضاء متوسطة.',
+          explanation: 'توسيط العنوان مع خلفية مميزة.',
         },
       ],
       quiz: [
         {
-          id: 'ch19-q1',
+          id: 'ch24-q1',
           question: 'خاصية CSS المسؤولة عن تغيير لون خلفية العنصر هي:',
           options: [
             {
               id: 'a',
               text: 'background-color',
               isCorrect: true,
-              explanation:
-                'صح جداً! 👏 color للنص، بينما background-color للخلفية.',
+              explanation: 'صح جداً وبرافو عليك! 👏 color للنص، بينما background-color للخلفية.',
             },
             {
               id: 'b',
@@ -345,65 +396,91 @@ h1 {
             },
             {
               id: 'c',
-              text: 'bg',
+              text: 'bg-font',
               isCorrect: false,
-              explanation: 'bg مجرد اختصار في بعض المكتبات لكن في CSS الصافي هي background-color.',
+              explanation: 'الخاصية القياسية الرسمية هي background-color.',
             },
           ],
         },
         {
-          id: 'ch19-q2',
-          question: 'لتوسيط النص في منتصف الصفحة أفقياً نستخدم:',
+          id: 'ch24-q2',
+          question: 'لتوسيط النص في منتصف الصفحة أفقياً نستخدم أنهي خاصية يا صديقي؟',
           options: [
             {
               id: 'a',
               text: 'text-align: center;',
               isCorrect: true,
-              explanation:
-                'برافو! 🎯 text-align بتتحكم في محاذاة الكلمات (center / right / left).',
+              explanation: 'برافو! 🎯 text-align بتتحكم في محاذاة الكلمات (center / right / left).',
             },
             {
               id: 'b',
               text: 'align: middle;',
               isCorrect: false,
-              explanation: 'خاصية align قديمة وغير قياسية.',
+              explanation: 'خاصية align قديمة وغير قياسية في CSS.',
             },
             {
               id: 'c',
               text: 'font-center: true;',
               isCorrect: false,
-              explanation: 'لا توجد خاصية بهذا الاسم.',
+              explanation: 'لا توجد خاصية بهذا الاسم إطلاقاً.',
+            },
+          ],
+        },
+        {
+          id: 'ch24-q3',
+          question: 'ما هو دور المحدّد (Selector) في قاعدة CSS؟',
+          options: [
+            {
+              id: 'a',
+              text: 'يحدد العنصر أو الفئة (Class) المستهدفة للتلوين والتنسيق في صفحة HTML',
+              isCorrect: true,
+              explanation: 'إجابة ممتازة! 🎯 Selector يشير للعنصر المراد تزيينه بدقة.',
+            },
+            {
+              id: 'b',
+              text: 'يحذف العناصر غير المرغوبة من الصفحة',
+              isCorrect: false,
+              explanation: 'CSS لا يحذف عناصر من شجرة الـ DOM.',
+            },
+            {
+              id: 'c',
+              text: 'ينشئ وسوماً جديدة في HTML',
+              isCorrect: false,
+              explanation: 'إنشاء الوسوم وظيفة كود HTML وليس CSS.',
             },
           ],
         },
       ],
       challenge: {
-        id: 'ch19-chal',
+        id: 'ch24-chal',
         title: 'وريني شطارتك 🧠: كود التنسيق الملكي',
         prompt:
-          'اكتب قاعدة CSS للمحدد .highlight تجعل لون النص أصفر باستخدام color: yellow.',
-        hint: '.highlight { color: yellow; }',
-        initialCode: `// اكتب كود طباعة قاعدة CSS لـ h1 هنا بنفسك...
+          'اكتب قاعدة CSS للكلاس .highlight تجعل لون النص أصفر باستخدام color: yellow ولون الخلفية أسود باستخدام background-color: black.',
+        hint: '.highlight { color: yellow; background-color: black; }',
+        initialCode: `/* اكتب قاعدة CSS لكلاس highlight هنا بنفسك... */
 `,
-        solutionCode: `.highlight { color: yellow; }`,
+        solutionCode: `.highlight {
+  color: yellow;
+  background-color: black;
+}`,
       },
     },
     {
-      id: 20,
+      id: 25,
       partId: 6,
       partTitle: 'الجزء السادس: من الكود للصفحة',
-      title: 'الفصل 20: تقسيم الصفحة والمدخلات (HTML 2)',
+      title: 'الفصل 25: تقسيم الصفحة والمدخلات (HTML 2) — النماذج والحاويات',
       subtitle: 'حاويات div ومدخلات input وأزرار button',
       summaryPoints: [
-        'وسم <div> هو الصندوق والحاوية الأكثر استخداماً على الإطلاق لتجميع وتقسيم أجزاء الصفحة.',
+        'وسم <div> هو الصندوق والحاوية الأكثر استخداماً على الإطلاق لتجميع وتقسيم أجزاء الصفحة لكتل منظمة.',
         'وسم <input> بيسمح باستقبال بيانات من المستخدم (نصوص، أرقام، كلمات سر، تواريخ).',
         'خاصية placeholder بتعرض نصاً إرشادياً رمادياً يختفي فور بدء الكتابة.',
-        'وسم <button> يمثل زر الإجراء والنقر، و <label> لتسمية الحقول بوضوح.',
+        'وسم <button> يمثل زر الإجراء والنقر، و <label> لتسمية الحقول وربطها برقم id الخاص بكل حقل.',
       ],
       contentSections: [
         {
-          heading: 'الصناديق السحرية: وسم <div> وتقسيم الصفحة',
-          text: `لو عندك شقة واسعة بدون أي جدران أو غرف.. هتكون فوضى!
+          heading: 'الصناديق السحرية: وسم <div> وتقسيم الصفحة 📦',
+          text: `لو عندك شقة واسعة بدون أي جدران أو غرف.. هتكون فوضى عارمة!
 عشان كده بنبني حوائط نقسم بيها الشقة لمطبخ وصالة وأوضة نوم.
 في HTML، الحائط والصندوق ده هو وسم <div> (اختصار لـ Division أو قسم).
 الـ <div> ملوش شكل مرئي بنفسه، هو "كرتونة فاضية شفافة" بنحط جواها عناصر مترابطة عشان نقدر ننسقهم ككتلة واحدة ونديهم خلفية وهوامش وترتيب مميز!`,
@@ -418,9 +495,9 @@ h1 {
 العنصر المسؤول عن ده هو وسم <input> (وهو ذاتي الإغلاق).
 السر كله في خاصية type:
 - type="text": حقل لكتابة نص عادي.
-- type="password": بيخفي الحروف وهي بتتكتب، لكنه مش بيشفّرها ولا بيحميها لوحده.
-- type="number": حقل للأرقام؛ ممكن يقبل كسور أو إشارات حسب إعداداته والمتصفح.
-- type="email": بيفحص شكل البريد بشكل مبدئي، بس مش بيتأكد إن العنوان حقيقي أو بتاع المستخدم.`,
+- type="password": بيخفي الحروف بنقاط سرية لحماية الخصوصية.
+- type="number": حقل يقبل الأرقام فقط.
+- type="email": بيفحص شكل البريد الإلكتروني ووجود علامة @.`,
           codeSnippet: `<input type="text" placeholder="اكتب اسمك بالكامل">
 <input type="password" placeholder="أدخل كلمة المرور">
 <input type="number" min="1" max="100" placeholder="العمر">`,
@@ -457,24 +534,34 @@ h1 {
       ],
       exercises: [
         {
-          id: 'ch20-ex1',
-          title: 'التمرين 1: حقل كلمة المرور',
-          code: `<label for="password">كلمة المرور</label>\n<input id="password" name="password" type="password" placeholder="كلمة المرور">`,
-          expectedOutput: 'معاينة حقل كلمة مرور مع تسمية مرتبطة به.',
-          explanation: 'الإخفاء بصري فقط؛ اربط label بالحقل باستخدام for و id.',
+          id: 'ch25-ex1',
+          title: 'التمرين 1: حقل كلمة المرور المشفر بصرياً',
+          code: `<label for="password">كلمة المرور:</label>
+<input id="password" name="password" type="password" placeholder="••••••••">`,
+          expectedOutput: 'معاينة حقل كلمة مرور يخفي الأحرف المدخلة.',
+          explanation: 'type="password" يخفي الحروف بنقاط سرية.',
+        },
+        {
+          id: 'ch25-ex2',
+          title: 'التمرين 2: زر الإجراء مع حاوية div',
+          code: `<div class="actions">
+  <button type="button">إلغاء</button>
+  <button type="submit">حفظ التعديلات</button>
+</div>`,
+          expectedOutput: 'معاينة زرين داخل حاوية واحدة.',
+          explanation: 'تجميع الأزرار في div يسهل توزيعها وتنسيقها.',
         },
       ],
       quiz: [
         {
-          id: 'ch20-q1',
-          question: 'لو عايزين نعمل حقل إدخال يخفي الحروف اللي بتتكتب بنقاط سرية، بنحدد type إيه؟',
+          id: 'ch25-q1',
+          question: 'لو عايزين نعمل حقل إدخال يخفي الحروف اللي بتتكتب بنقاط سرية، بنحدد type إيه يا صديقي؟',
           options: [
             {
               id: 'a',
               text: 'type="password"',
               isCorrect: true,
-              explanation:
-                'صح! 🔒 نوع password يخفي الأحرف على الشاشة، لكنه لا يشفّر قيمة الحقل.',
+              explanation: 'صح! 🔒 نوع password يخفي الأحرف على الشاشة بنقاط سرية لحماية الخصوصية.',
             },
             {
               id: 'b',
@@ -490,33 +577,85 @@ h1 {
             },
           ],
         },
+        {
+          id: 'ch25-q2',
+          question: 'ما فائدة ربط وسم <label for="xyz"> مع حقل <input id="xyz">؟',
+          options: [
+            {
+              id: 'a',
+              text: 'عند النقر على النص في label يتم تفعيل الحقل وتوجيه المؤشر داخله فوراً',
+              isCorrect: true,
+              explanation: 'برافو عليك يا صديقي! 🎯 ميزة رائعة لتحسين تجربة المستخدم وسهولة الوصول.',
+            },
+            {
+              id: 'b',
+              text: 'يغير لون الحقل للون الأزرق',
+              isCorrect: false,
+              explanation: 'الألوان مسؤولة عنها لغة CSS.',
+            },
+            {
+              id: 'c',
+              text: 'يحفظ كلمة المرور في قاعدة البيانات',
+              isCorrect: false,
+              explanation: 'الحفظ مسؤولية السيرفر وقواعد البيانات.',
+            },
+          ],
+        },
+        {
+          id: 'ch25-q3',
+          question: 'ما هو دور خاصية placeholder في حقول الإدخال؟',
+          options: [
+            {
+              id: 'a',
+              text: 'عرض نص إرشادي رمادي يختفي فور أن يبدأ المستخدم في الكتابة',
+              isCorrect: true,
+              explanation: 'ممتاز جداً! 💡 placeholder يعطي تلميحاً سريعاً عما يجب كتابته.',
+            },
+            {
+              id: 'b',
+              text: 'قفل الحقل ومنع الكتابة فيه',
+              isCorrect: false,
+              explanation: 'قفل الحقل وظيفته خاصية disabled.',
+            },
+            {
+              id: 'c',
+              text: 'تكبير حجم الخط',
+              isCorrect: false,
+              explanation: 'تغيير الحجم يتم عبر font-size في CSS.',
+            },
+          ],
+        },
       ],
       challenge: {
-        id: 'ch20-chal',
+        id: 'ch25-chal',
         title: 'وريني شطارتك 🧠: نموذج بريد إلكتروني',
         prompt:
           'اكتب نموذج HTML فيه label مرتبط بحقل بريد باستخدام for و id، وحقل type="email"، وزر إرسال.',
         hint: 'اجعل قيمة label for مساوية لـ id الحقل، واستخدم button type="submit".',
-        initialCode: `// اكتب كود طباعة وسم الزرار هنا بنفسك...
+        initialCode: `<!-- اكتب نموذج البريد الإلكتروني هنا بنفسك... -->
 `,
-        solutionCode: `<form><label for="email">البريد الإلكتروني</label><input id="email" name="email" type="email"><button type="submit">إرسال</button></form>`,
+        solutionCode: `<form>
+  <label for="email">البريد الإلكتروني</label>
+  <input id="email" name="email" type="email" placeholder="example@mail.com">
+  <button type="submit">إرسال</button>
+</form>`,
       },
     },
     {
-      id: 21,
+      id: 26,
       partId: 6,
       partTitle: 'الجزء السادس: من الكود للصفحة',
-      title: 'الفصل 21: تزيين الأزرار وتأثيرات الفأرة (CSS 2)',
+      title: 'الفصل 26: تزيين الأزرار وتأثيرات الفأرة (CSS 2) — Box Model & Hover',
       subtitle: 'الحواف الدائرية، الظلال، و:hover',
       summaryPoints: [
         'نموذج الصندوق (Box Model) يتكون من: المحتوى، والحشوة الداخلية (padding)، والحدود (border)، والهامش الخارجي (margin).',
-        'خاصية border-radius تحول الحواف الحادة لأركان ناعمة دائرية جذابة.',
+        'خاصية border-radius تحول الحواف الحادة لأركان ناعمة دائرية جذابة وعصرية.',
         'تأثير :hover هو ساحر تفاعل الفأرة؛ يغير اللون والشكل فور مرور الماوس فوق الزر.',
         'خاصية cursor: pointer تجعل مؤشر الماوس يتحول لشكل اليد المشيرة للدلالة على قابلية النقر.',
       ],
       contentSections: [
         {
-          heading: 'صندوق الملاكمة (The Box Model): تشبيه مخدات الكرتونة',
+          heading: 'صندوق الملاكمة (The Box Model): تشبيه مخدات الكرتونة 📦',
           text: `كل عنصر في صفحة الويب عبارة عن "صندوق مستطيل"، والصندوق ده جواه 4 طبقات:
 1. المحتوى (Content): النص أو الأيقونة نفسها.
 2. الحشوة الداخلية (Padding): المخدات الإسفنجية اللي بتبعد النص عن حافة الصندوق عشان ميبقاش لازق ومخنوق.
@@ -550,7 +689,7 @@ h1 {
 }`,
         },
         {
-          heading: 'سحر تفاعل الفأرة: الـ :hover والتحولات الناعمة',
+          heading: 'سحر تفاعل الفأرة: الـ :hover والتحولات الناعمة ✨',
           text: `عشان المستخدم يحس إن الموقع عايش ومتفاعل معاه، بنستخدم الـ Pseudo-class السحرية :hover.
 :hover معناها: "لما المستخدم يمرر سهم الفأرة فوق الزرار.. نفذ التنسيقات دي فوراً!".
 ومع خاصية transition: 0.3s، التغيير مش هيحصل فجأة وبشكل فج، بل هيحصل بحركة انسيابية ناعمة تبهر العين!`,
@@ -577,66 +716,135 @@ h1 {
       ],
       exercises: [
         {
-          id: 'ch21-ex1',
-          title: 'التمرين 1: تأثير المرور hover',
-          code: `button:hover { background-color: darkblue; }`,
-          expectedOutput: 'معاينة قاعدة CSS التي تغيّر خلفية الزر عند المرور عليه.',
-          explanation: 'تغيير لون الزر عند مرور مؤشر الفأرة.',
+          id: 'ch26-ex1',
+          title: 'التمرين 1: تأثير المرور hover مع تدوير الحواف',
+          code: `button {
+  border-radius: 8px;
+  background-color: blue;
+  color: white;
+  transition: background-color 0.3s;
+}
+button:hover {
+  background-color: darkblue;
+}`,
+          expectedOutput: 'معاينة زر بحواف دائرية يتغير لونه عند المرور عليه.',
+          explanation: 'دمج border-radius مع :hover للحصول على زر تفاعلي عصري.',
+        },
+        {
+          id: 'ch26-ex2',
+          title: 'التمرين 2: الفرق بين padding و margin',
+          code: `.card {
+  padding: 20px; /* مسافة داخلية */
+  margin: 15px;  /* مسافة خارجية */
+  border: 1px solid #475569;
+}`,
+          expectedOutput: 'معاينة بطاقة بمساحات داخلية وخارجية مريحة.',
+          explanation: 'padding يوسع الصندوق من الداخل و margin يبعده عن العناصر المجاورة.',
         },
       ],
       quiz: [
         {
-          id: 'ch21-q1',
-          question: 'خاصية border-radius وظيفتها إيه في CSS؟',
+          id: 'ch26-q1',
+          question: 'خاصية border-radius وظيفتها إيه بالظبط في CSS يا صديقي؟',
           options: [
             {
               id: 'a',
               text: 'تدوير حواف وأركان الصندوق لجعلها منحنية وناعمة',
               isCorrect: true,
-              explanation:
-                'صح جداً! 👏 كل ما تزود القيمة (مثلاً 20px أو 50%) كل ما الحواف تكون دائرية أكتر.',
+              explanation: 'صح جداً! 👏 كل ما تزود القيمة (مثلاً 12px أو 50%) كل ما الحواف تكون دائرية أكثر.',
             },
             {
               id: 'b',
               text: 'تغيير لون الحدود',
               isCorrect: false,
-              explanation: 'لون الحدود بيتم بـ border-color.',
+              explanation: 'لون الحدود بيتم عبر border-color.',
             },
             {
               id: 'c',
               text: 'مسح محتوى الصندوق',
               isCorrect: false,
-              explanation: 'لا تؤثر على المحتوى.',
+              explanation: 'لا تؤثر على المحتوى الداخلي إطلاقاً.',
+            },
+          ],
+        },
+        {
+          id: 'ch26-q2',
+          question: 'إيه الفرق الجوهري بين padding و margin في نموذج الصندوق (Box Model)؟',
+          options: [
+            {
+              id: 'a',
+              text: 'padding مسافة داخلية بين المحتوى والحدود، بينما margin مسافة خارجية تبعد الصندوق عن جيرانه',
+              isCorrect: true,
+              explanation: 'تحليل دقيق وممتاز يا صديقي! 🌟 padding جوه الصندوق و margin بره السور.',
+            },
+            {
+              id: 'b',
+              text: 'padding للخلفية و margin للنص',
+              isCorrect: false,
+              explanation: 'الاثنان مسافات ومساحات فراغ، أحدهما داخلي والآخر خارجي.',
+            },
+            {
+              id: 'c',
+              text: 'مفيش فرق في المعنى والاستخدام',
+              isCorrect: false,
+              explanation: 'الفرق جوهري ويحدد توزيع الصفحة بالكامل.',
+            },
+          ],
+        },
+        {
+          id: 'ch26-q3',
+          question: 'تأثير :hover في CSS بيشتغل إمتى بالظبط؟',
+          options: [
+            {
+              id: 'a',
+              text: 'أول ما المستخدم يمرر سهم الفأرة فوق العنصر',
+              isCorrect: true,
+              explanation: 'برافو عليك! 🎯 :hover هي المسؤولة عن رد الفعل البصري لمرور الماوس.',
+            },
+            {
+              id: 'b',
+              text: 'عند إغلاق المتصفح',
+              isCorrect: false,
+              explanation: 'لا علاقة له بإغلاق الصفحة.',
+            },
+            {
+              id: 'c',
+              text: 'فقط على شاشات الهواتف بدون ماوس',
+              isCorrect: false,
+              explanation: 'يعمل بالأساس مع أجهزة الكمبيوتر التي تستخدم مؤشر فأرة.',
             },
           ],
         },
       ],
       challenge: {
-        id: 'ch21-chal',
+        id: 'ch26-chal',
         title: 'وريني شطارتك 🧠: حواف الزرار المستديرة',
         prompt:
-          'اكتب قاعدة CSS مباشرة تجعل أزرار button بحواف دائرية (border-radius: 12px;).',
-        hint: 'button { border-radius: 12px; }',
-        initialCode: `// اكتب كود تدوير حواف الأزرار هنا بنفسك...
+          'اكتب قاعدة CSS مباشرة تجعل أزرار button بحواف دائرية (border-radius: 12px;) ومؤشر ماوس بشكل اليد (cursor: pointer;).',
+        hint: 'button { border-radius: 12px; cursor: pointer; }',
+        initialCode: `/* اكتب كود تدوير حواف الأزرار هنا بنفسك... */
 `,
-        solutionCode: `button { border-radius: 12px; }`,
+        solutionCode: `button {
+  border-radius: 12px;
+  cursor: pointer;
+}`,
       },
     },
     {
-      id: 22,
+      id: 27,
       partId: 6,
       partTitle: 'الجزء السادس: من الكود للصفحة',
-      title: 'الفصل 22: ألوان الشاشات RGB و Hex والشفافية (CSS 3)',
-      subtitle: 'خلط درجات الضوء: أحمر، أخضر، أزرق',
+      title: 'الفصل 27: ألوان الشاشات RGB و Hex والشفافية (CSS 3)',
+      subtitle: 'خلط درجات الضوء: أحمر، أخضر، أزرق والتدرجات',
       summaryPoints: [
         'شاشات الموبايل والكمبيوتر بتصنع ملايين الألوان بخلط 3 أنوار ضوئية: Red و Green و Blue.',
         'نظام rgb(r, g, b) يقبل أرقاماً من 0 إلى 255 لكل لون.',
         'نظام rgba(r, g, b, a) يضيف معامل الشفافية Alpha من 0 (شفاف تماماً) إلى 1 (معتم).',
-        'شفرات الهكس (Hex Codes) تستخدم علامة # متبوعة بـ 6 خانات هكساديسيمال (#ff6600).',
+        'شفرات الهكس (Hex Codes) تستخدم علامة # متبوعة بـ 6 خانات هكساديسيمال (#ff6600)، والتدرجات بـ linear-gradient.',
       ],
       contentSections: [
         {
-          heading: 'كيف تفهم الشاشات الألوان؟ خلط أضواء RGB',
+          heading: 'كيف تفهم الشاشات الألوان؟ خلط أضواء RGB 💡',
           text: `في حصة الرسم بالمدرسة، كنت بتخلط الألوان بالفرشاة..
 لكن شاشات الإلكترونيات مش بتخلط دهانات، بتخلط "أنوار ضوء"!
 كل بكسل على شاشتك بيتكون من 3 لمبات ميكروسكوبية ملونة:
@@ -657,7 +865,7 @@ h1 {
 }`,
         },
         {
-          heading: 'الشفافية وزجاج الهواتف مع RGBA (Glassmorphism)',
+          heading: 'الشفافية وزجاج الهواتف مع RGBA (Glassmorphism) 🪟',
           text: `لو عايز تعمل خلفية نصف شفافة تبين الصورة اللي تحتها بنعومة (زي تصميمات الآيفون وويندوز الحديثة Glassmorphism):
 بنضيف حرف رابع اسمه Alpha: نظام RGBA!
 الحرف A بياخد قيمة عشرية بين 0 و 1:
@@ -689,30 +897,42 @@ h1 {
           type: 'html_preview',
           htmlCode: `<div class="p-6 rounded-2xl shadow-xl max-w-sm mx-auto text-white text-center font-sans" style="background: linear-gradient(135deg, #f59e0b, #ef4444);" dir="rtl">
   <h3 class="text-xl font-bold mb-1">تدرج لوني ساحر (Gradient)</h3>
-  <p class="text-xs text-amber-100">دمج الألوان شفرات Hex بانسيابية فائقة تجذب انتباه المستخدم فوراً.</p>
+  <p class="text-xs text-amber-100">دمج الألوان بشفرات Hex بانسيابية فائقة تجذب انتباه المستخدم فوراً.</p>
 </div>`,
         },
       ],
       exercises: [
         {
-          id: 'ch22-ex1',
+          id: 'ch27-ex1',
           title: 'التمرين 1: لون نصف شفاف بـ rgba',
-          code: `div { background-color: rgba(0, 0, 0, 0.5); }`,
-          expectedOutput: 'معاينة قاعدة CSS بخلفية سوداء شفافة.',
-          explanation: 'خلفية سوداء بنصف شفافية.',
+          code: `div {
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+}`,
+          expectedOutput: 'معاينة صندوق بخلفية سوداء نصف شفافة.',
+          explanation: 'معامل Alpha بقيمة 0.5 يجعل الخلفية شفافة بنسبة 50%.',
+        },
+        {
+          id: 'ch27-ex2',
+          title: 'التمرين 2: تدرج لوني جذاب',
+          code: `.card {
+  background: linear-gradient(to right, #2563eb, #9333ea);
+  color: white;
+}`,
+          expectedOutput: 'معاينة تدرج لوني انسيابي من الأزرق إلى البنفسجي.',
+          explanation: 'linear-gradient يدمج لونين بانسيابية فائقة.',
         },
       ],
       quiz: [
         {
-          id: 'ch22-q1',
-          question: 'الحرف A في نظام الألوان rgba بيرمز لإيه؟',
+          id: 'ch27-q1',
+          question: 'الحرف A في نظام الألوان rgba بيرمز لإيه يا صديقي؟',
           options: [
             {
               id: 'a',
-              text: 'Alpha: معامل الشفافية بين 0 و 1',
+              text: 'Alpha: معامل الشفافية بين 0 (شفاف تماماً) و 1 (معتم)',
               isCorrect: true,
-              explanation:
-                'صح جداً! 👏 Alpha هي اللي بتخليك تشوف ما وراء العنصر.',
+              explanation: 'صح جداً! 👏 Alpha هي اللي بتخليك تشوف العناصر والصور اللي وراء الصندوق.',
             },
             {
               id: 'b',
@@ -724,38 +944,89 @@ h1 {
               id: 'c',
               text: 'Aqua: درجة اللون المائي',
               isCorrect: false,
-              explanation: 'اسم المعامل هو Alpha.',
+              explanation: 'اسم المعامل الرسمي هو Alpha.',
+            },
+          ],
+        },
+        {
+          id: 'ch27-q2',
+          question: 'في نظام RGB، لما نضبط كل القيم على 255: rgb(255, 255, 255) بنحصل على لون إيه؟',
+          options: [
+            {
+              id: 'a',
+              text: 'اللون الأبيض النقي (لأن كل اللمبات الضوئية تعمل بأقصى طاقة)',
+              isCorrect: true,
+              explanation: 'إجابة نموذجية وبرافو عليك! 💡 في الضوء خلط كل الألوان بأعلى طاقة يعطي اللون الأبيض.',
+            },
+            {
+              id: 'b',
+              text: 'اللون الأسود',
+              isCorrect: false,
+              explanation: 'الأسود هو إطفاء كل اللمبات rgb(0, 0, 0).',
+            },
+            {
+              id: 'c',
+              text: 'اللون الرمادي الفاتح',
+              isCorrect: false,
+              explanation: 'الرمادي ينتج عند تساوي القيم بأرقام متوسطة مثل rgb(128, 128, 128).',
+            },
+          ],
+        },
+        {
+          id: 'ch27-q3',
+          question: 'شفرة الهكس #ff0000 تمثل أي لون؟',
+          options: [
+            {
+              id: 'a',
+              text: 'الأحمر الخالص (لأن خانتي Red في الحد الأقصى ff والباقي 00)',
+              isCorrect: true,
+              explanation: 'تحليل عبقري! 🎯 أول خانتين للـ Red وقيمتهما ff تعني 255 بالهكس.',
+            },
+            {
+              id: 'b',
+              text: 'الأخضر',
+              isCorrect: false,
+              explanation: 'الأخضر هو #00ff00.',
+            },
+            {
+              id: 'c',
+              text: 'الأزرق',
+              isCorrect: false,
+              explanation: 'الأزرق هو #0000ff.',
             },
           ],
         },
       ],
       challenge: {
-        id: 'ch22-chal',
-        title: 'وريني شطارتك 🧠: شفرة الهكس الخالصة',
+        id: 'ch27-chal',
+        title: 'وريني شطارتك 🧠: شفرة الهكس الخالصة والتدرج',
         prompt:
-          'اكتب قاعدة CSS مباشرة تجعل لون خلفية الصفحة body أبيض باستخدام شفرة Hex وهي #ffffff.',
-        hint: 'body { background-color: #ffffff; }',
-        initialCode: `// اكتب كود تلوين خلفية body بالهكس الأبيض هنا بنفسك...
+          'اكتب قاعدة CSS للكلاس .hero-banner تجعل الخلفية تدرجاً لونياً linear-gradient(to right, #0f172a, #1e293b) ولون النص أبيض #ffffff.',
+        hint: '.hero-banner { background: linear-gradient(to right, #0f172a, #1e293b); color: #ffffff; }',
+        initialCode: `/* اكتب كود التدرج اللوني هنا بنفسك... */
 `,
-        solutionCode: `body { background-color: #ffffff; }`,
+        solutionCode: `.hero-banner {
+  background: linear-gradient(to right, #0f172a, #1e293b);
+  color: #ffffff;
+}`,
       },
     },
     {
-      id: 23,
+      id: 28,
       partId: 6,
       partTitle: 'الجزء السادس: من الكود للصفحة',
-        title: 'الفصل 23: بناء بطاقة ملف شخصي (مشروع عملي)',
-        subtitle: 'دمج HTML وCSS في بطاقة شخصية',
+      title: 'الفصل 28: بناء بطاقة ملف شخصي (مشروع عملي)',
+      subtitle: 'دمج HTML وCSS في بطاقة شخصية متكاملة',
       summaryPoints: [
         'دمج HTML و CSS لبناء كارت بروفايل مبرمج احترافي كامل (Portfolio Card).',
-        'توسيط البطاقة وضبط عرضها لتناسب الشاشات الصغيرة.',
-        'استخدام الخطوط والصور والظلال والأزرار التفاعلية في مشروع واحد.',
+        'توسيط البطاقة وضبط عرضها واستجابتها لتناسب مختلف مقاسات الشاشات.',
+        'استخدام الخطوط والصور والظلال والأزرار التفاعلية في مشروع تطبيقي متكامل.',
         'فحص الصفحة والتأكد من توافق الألوان والتنسيقات في بيئة المتصفح الحقيقية.',
       ],
       contentSections: [
         {
           heading: 'تجميع كل المهارات في مشروع حقيقي متكامل 🚀',
-          text: `مبروك وصولك لهذه المحطة الذهبية!
+          text: `مبروك وصولك لهذه المحطة الذهبية يا صديقي!
 في الفصول السابقة اتعلمنا:
 - هيكلة الصفحات بالوسوم والعناوين والقوائم (HTML).
 - حقول الإدخال والأزرار والصناديق <div>.
@@ -763,14 +1034,7 @@ h1 {
 - الحواف الدائرية وتأثيرات :hover وظلال الصناديق.
 - أنظمة الألوان RGB و Hex والتدرجات.
 
-الآن هنبني نموذج بطاقة ملف شخصي. هذا مثال تدريبي لدمج HTML وCSS، ويمكنك تطويره لاحقاً وإضافة رابط تواصل حقيقي قبل نشره.
-
-في CSS هنا استخدمنا Flexbox عشان نوسّط المحتوى:
-- display: flex بيشغّل ترتيب العناصر المرن جوه الحاوية.
-- justify-content بيوسّط العناصر أفقياً.
-- align-items بيوسّطها رأسياً.
-- min-height: 100vh بيخلي الحاوية بطول الشاشة.
-- width: min(...) بيحط حد أقصى للعرض وبيسيب مساحة على الموبايل.`,
+الآن هنبني نموذج بطاقة ملف شخصي لمبرمج. هذا مثال تدريبي لدمج HTML و CSS وتطبيق المهارات في مشروع جذاب وواقعي.`,
           codeSnippet: `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -845,74 +1109,148 @@ h1 {
 </div>`,
           callout: {
             type: 'celebration',
-            title: 'إنجاز تاريخي! 🏆',
+            title: 'إنجاز تاريخي يا باشمهندس! 🏆',
             content:
-              'بهذا الكارت إنت أصبحت رسمياً مطور ويب! صنعت هيكلاً ونظمت محتواه، ونسقته بأحدث معايير الأناقة البصرية. والخطوة القادمة هي ربط JavaScript بالصفحة لتنبض بالحياة!',
+              'بهذا الكارت إنت أصبحت رسمياً مطور واجهات ويب! صنعت هيكلاً متيناً، ونسقته بأحدث معايير الأناقة البصرية. والخطوة القادمة هي ربط JavaScript بالصفحة لتنبض بالحياة!',
           },
         },
       ],
       exercises: [
         {
-          id: 'ch23-ex1',
+          id: 'ch28-ex1',
           title: 'التمرين 1: هيكل بطاقة البروفايل',
-          code: `<div class="card"><h2>اسم المبرمج</h2><p>نبذة</p></div>`,
-          expectedOutput: 'معاينة بطاقة فيها اسم المبرمج ونبذة.',
-          explanation: 'تجميع الكارت في حاوية div واحدة.',
+          code: `<div class="card">
+  <h2>اسم المبرمج</h2>
+  <p>نبذة سريعة عن المهارات</p>
+  <button>تواصل</button>
+</div>`,
+          expectedOutput: 'معاينة بطاقة مجمعة تحتوي على الاسم والنبذة والزر.',
+          explanation: 'تجميع عناصر الكارت في حاوية div واحدة لتسهيل التنسيق.',
+        },
+        {
+          id: 'ch28-ex2',
+          title: 'التمرين 2: تدوير الصورة الرمزية (Avatar)',
+          code: `.avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+}`,
+          expectedOutput: 'معاينة صورة دائرية بالكامل.',
+          explanation: 'border-radius: 50% مع أبعاد متساوية يحول أي صورة إلى دائرة كاملة.',
         },
       ],
       quiz: [
         {
-          id: 'ch23-q1',
-          question: 'ليه بنجمع عناصر البروفايل (الصورة، الاسم، الزر) جوه div واحدة؟',
+          id: 'ch28-q1',
+          question: 'ليه بنجمع عناصر البروفايل (الصورة، الاسم، الزر) جوه div واحدة يا صديقي؟',
           options: [
             {
               id: 'a',
               text: 'عشان ننسق الكارت ككتلة واحدة ونديله خلفية وهوامش وظلال مشتركة',
               isCorrect: true,
-              explanation:
-                'صح جداً! 👏 الـ div بتلم العناصر في عائلة واحدة منظمة.',
+              explanation: 'صح جداً! 👏 الـ div بتلم العناصر في عائلة واحدة منظمة يسهل تحريكها وتنسيقها.',
             },
             {
               id: 'b',
               text: 'لأن المتصفح يرفض عرض أكثر من عنصر بدون div',
               isCorrect: false,
-              explanation: 'المتصفح يعرض العناصر عادي، لكن التجميع يوفر التحكم والتنسيق.',
+              explanation: 'المتصفح يعرض العناصر عادي، لكن التجميع يوفر التحكم الهندسي.',
             },
             {
               id: 'c',
               text: 'لتسريع الإنترنت عند المستخدم',
               isCorrect: false,
-              explanation: 'لا علاقة للوسوم بسرعة الاتصال.',
+              explanation: 'لا علاقة للوسوم بسرعة اتصال الإنترنت.',
+            },
+          ],
+        },
+        {
+          id: 'ch28-q2',
+          question: 'إزاي نحول أي صورة مربعة لشكل دائري كامل في CSS؟',
+          options: [
+            {
+              id: 'a',
+              text: 'border-radius: 50%; مع ضبط العرض والارتفاع بقيم متساوية',
+              isCorrect: true,
+              explanation: 'برافو عليك! 🎯 نسبة 50% تنحني بالأركان لتلتقي في دائرة كاملة.',
+            },
+            {
+              id: 'b',
+              text: 'circle: true;',
+              isCorrect: false,
+              explanation: 'لا توجد خاصية بهذا الاسم في CSS.',
+            },
+            {
+              id: 'c',
+              text: 'text-align: circle;',
+              isCorrect: false,
+              explanation: 'text-align لمحاذاة النصوص فقط.',
+            },
+          ],
+        },
+        {
+          id: 'ch28-q3',
+          question: 'خاصية box-shadow بتضيف إيه للعنصر؟',
+          options: [
+            {
+              id: 'a',
+              text: 'ظل واقعي حول الصندوق يعطيه عمقاً وبعداً ثلاثياً ثلاثي الأبعاد',
+              isCorrect: true,
+              explanation: 'ممتاز! 💡 الظلال هي سر التصميمات العصرية التي تبدو طافية فوق الصفحة.',
+            },
+            {
+              id: 'b',
+              text: 'صندوقاً جديداً داخل الصفحة',
+              isCorrect: false,
+              explanation: 'هي خاصية مظهر وظل فقط.',
+            },
+            {
+              id: 'c',
+              text: 'تغيير نوع الخط',
+              isCorrect: false,
+              explanation: 'نوع الخط مسؤول عنه font-family.',
             },
           ],
         },
       ],
       challenge: {
-        id: 'ch23-chal',
+        id: 'ch28-chal',
         title: 'وريني شطارتك 🧠: كارت المنتج المتكامل',
         prompt:
-          'اكتب بطاقة منتج HTML بكلاس product-card، فيها عنوان h2 وفقرة وزر شراء، وأضف قاعدة CSS واحدة لتنسيق البطاقة.',
-        hint: '<style>.product-card { padding: 16px; }</style><article class="product-card"><h2>ساعة ذكية</h2><p>خفيفة وعملية</p><button>شراء</button></article>',
-        initialCode: `// اكتب كود طباعة كارت المنتج هنا بنفسك...
+          'اكتب بطاقة منتج HTML بكلاس product-card، فيها عنوان h2 وفقرة وزر شراء، وأضف قاعدة CSS لتنسيق البطاقة بخلفية رمادية وحواف دائرية.',
+        hint: '<style>.product-card { padding: 16px; background: #1e293b; border-radius: 12px; color: white; }</style><article class="product-card"><h2>ساعة ذكية</h2><p>خفيفة وعملية</p><button>شراء</button></article>',
+        initialCode: `<!-- اكتب كود كارت المنتج والتنسيق هنا بنفسك... -->
 `,
-        solutionCode: `<style>.product-card { padding: 16px; background: #eee; }</style><article class="product-card"><h2>ساعة ذكية</h2><p>خفيفة وعملية</p><button>شراء</button></article>`,
+        solutionCode: `<style>
+  .product-card {
+    padding: 16px;
+    background: #1e293b;
+    border-radius: 12px;
+    color: white;
+  }
+</style>
+<article class="product-card">
+  <h2>ساعة ذكية</h2>
+  <p>خفيفة وعملية</p>
+  <button>شراء</button>
+</article>`,
       },
     },
     {
-      id: 24,
+      id: 29,
       partId: 6,
       partTitle: 'الجزء السادس: من الكود للصفحة',
-      title: 'الفصل 24: الكائنات (Objects)',
-      subtitle: 'بطاقة التعريف: مفتاح وقيمة (Key: Value)',
+      title: 'الفصل 29: الكائنات (Objects) — كبسولة البيانات والسلوكيات',
+      subtitle: 'بطاقة التعريف: مفتاح وقيمة (Key: Value) والـ Methods',
       summaryPoints: [
-        'الكائن (Object) هو كبسولة بيانات بتجمع كل المعلومات المتعلقة بكيان واحد (طالب، سيارة، منتج).',
+        'الكائن (Object) هو كبسولة بيانات بتجمع كل المعلومات المتعلقة بكيان واحد (طالب، سيارة، منتج، مستخدم).',
         'يتكون الكائن من أزواج { key: value } محصورة بين قوسين معقوصين ومفصولة بفواصل.',
-        'الوصول للخصائص: طريقة النقطة (Dot notation: student.name) أو الأقواس (student["age"]).',
-        'الدوال داخل الكائنات تسمى Methods، وكلمة this تشير لنفس الكائن الحالي.',
+        'الوصول للخصائص: طريقة النقطة (Dot notation: student.name) أو الأقواس المربعة (student["age"]).',
+        'الدوال داخل الكائنات تسمى Methods، وكلمة this تشير لنفس الكائن الحالي المستدعي.',
       ],
       contentSections: [
         {
-          heading: 'تشبيه بطاقة الرقم القومي أو بروفايل البطل في اللعبة',
+          heading: 'تشبيه بطاقة الرقم القومي أو بروفايل البطل في اللعبة 🪪',
           text: `في المصفوفات كنا بنحط البيانات في رف مرقم [0, 1, 2]..
 لكن لو عندك بيانات شخص: اسمه، وسنه، ومحافظته، ورقمه القومي:
 هل يعقل تقول person[0] person[1] person[2]؟ لو نسيت مين فيهم الصفر ومين الواحد هتتلخبط كل حساباتك!
@@ -961,7 +1299,7 @@ student.city = "الإسكندرية";
 console.log(student);`,
         },
         {
-          heading: 'الدوال داخل الكائنات (Methods) وكلمة this السحرية',
+          heading: 'الدوال داخل الكائنات (Methods) وكلمة this السحرية ✨',
           text: `الكائن مش بس بيحفظ بيانات صامتة.. ده كمان يقدر "يعمل أفعال وتصرفات"!
 لما نحط دالة جوه كائن، بنسميها "ميثود (Method)".
 وداخل الدالة دي، بنستخدم كلمة this للإشارة إلى نفس الكائن الحالي عشان نقرأ بياناته:`,
@@ -989,35 +1327,53 @@ user.greet();                    // أهلاً، أنا مصطفى`,
       ],
       exercises: [
         {
-          id: 'ch24-ex1',
-          title: 'التمرين 1: قراءة خصائص الكائن',
+          id: 'ch29-ex1',
+          title: 'التمرين 1: قراءة وتعديل خصائص الكائن',
           code: `const car = { brand: "تويوتا", year: 2022 };
+car.year = 2024;
 console.log(car.brand);
 console.log(car["year"]);`,
-          expectedOutput: `تويوتا\n2022`,
-          explanation: 'القراءة بالنقطة وبالأقواس المربعة.',
+          expectedOutput: `تويوتا\n2024`,
+          explanation: 'تعديل الخاصية ثم قراءتها بالنقطة وبالأقواس المربعة.',
+        },
+        {
+          id: 'ch29-ex2',
+          title: 'التمرين 2: دالة Method داخل كائن حساب بنكي',
+          code: `const account = {
+  owner: "كريم",
+  balance: 1000,
+  deposit(amount) {
+    this.balance += amount;
+    return this.balance;
+  }
+};
+console.log(account.deposit(500));`,
+          expectedOutput: `1500`,
+          explanation: 'الدالة تعدل رصيد الكائن الحالي عبر this.balance.',
         },
       ],
       quiz: [
         {
-          id: 'ch24-q1',
-          question: 'كلمة this جوه دالة موجودة في كائن بتشير لمين؟',
-          codeSnippet:
-            'const user = {\n  name: "كريم",\n  sayHello() {\n    console.log("أهلاً، أنا " + this.name);\n  }\n};',
+          id: 'ch29-q1',
+          question: 'كلمة this جوه دالة موجودة في كائن بتشير لمين يا صديقي؟',
+          codeSnippet: `const user = {
+  name: "كريم",
+  sayHello() {
+    console.log("أهلاً، أنا " + this.name);
+  }
+};`,
           options: [
             {
               id: 'a',
               text: 'بتشير لنفس الكائن الحالي (user) اللي الدالة شغالة جواه',
               isCorrect: true,
-              explanation:
-                'صح جداً! 👏 this بتسمح للدالة تقرأ وتعدل خواص الكائن نفسه بسهولة.',
+              explanation: 'صح جداً! 👏 this بتسمح للدالة تقرأ وتعدل خواص الكائن نفسه بسهولة.',
             },
             {
               id: 'b',
               text: 'بتشير لمتصفح الويب بالكامل',
               isCorrect: false,
-              explanation:
-                'لو استدعيت الدالة كـ method للكائن، this بتشير للكائن نفسه.',
+              explanation: 'لو استدعيت الدالة كـ method للكائن، this بتشير للكائن نفسه.',
             },
             {
               id: 'c',
@@ -1028,22 +1384,20 @@ console.log(car["year"]);`,
           ],
         },
         {
-          id: 'ch24-q2',
-          question: 'إزاي نستدعي دالة sayHello المعرفة جوه الكائن user؟',
+          id: 'ch29-q2',
+          question: 'إزاي بنستدعي دالة sayHello المعرفة جوه الكائن user؟',
           options: [
             {
               id: 'a',
               text: 'user.sayHello()',
               isCorrect: true,
-              explanation:
-                'برافو! 🎯 اسم الكائن يليه نقطة ثم اسم الدالة وقوسين الاستدعاء ().',
+              explanation: 'برافو! 🎯 اسم الكائن يليه نقطة ثم اسم الدالة وقوسين الاستدعاء ().',
             },
             {
               id: 'b',
               text: 'sayHello()',
               isCorrect: false,
-              explanation:
-                'الدالة مش معرّفة عالمياً، بل مربوطة بداخل الكائن user.',
+              explanation: 'الدالة مش معرّفة عالمياً، بل مربوطة بداخل الكائن user.',
             },
             {
               id: 'c',
@@ -1053,9 +1407,33 @@ console.log(car["year"]);`,
             },
           ],
         },
+        {
+          id: 'ch29-q3',
+          question: 'ماذا يرجع الكود عند محاولة قراءة خاصية غير موجودة في الكائن (مثل hero.speed)؟',
+          options: [
+            {
+              id: 'a',
+              text: 'undefined (لأن المفتاح غير موجود في بطاقة الكائن)',
+              isCorrect: true,
+              explanation: 'ممتاز! 💡 تماماً مثل محاولة قراءة عنصر خارج حدود المصفوفة، ترجع جافاسكريبت undefined.',
+            },
+            {
+              id: 'b',
+              text: 'null',
+              isCorrect: false,
+              explanation: 'null تدل على تفريغ مقصود وليست القيمة التلقائية لغياب الخاصية.',
+            },
+            {
+              id: 'c',
+              text: '0',
+              isCorrect: false,
+              explanation: '0 قيمة رقمية حقيقية وليست دلالة على عدم وجود المفتاح.',
+            },
+          ],
+        },
       ],
       challenge: {
-        id: 'ch24-chal',
+        id: 'ch29-chal',
         title: 'وريني شطارتك 🧠: كائن هاتف المحمول',
         prompt:
           'أنشئ كائناً const phone يحمل الخاصيتين brand: "سامسونج" و price: 8000. ثم اطبع في الكونسول: "الموبايل: سامسونج بسعر: 8000".',
@@ -1070,20 +1448,20 @@ console.log("الموبايل: " + phone.brand + " بسعر: " + phone.price);`,
       },
     },
     {
-      id: 25,
+      id: 30,
       partId: 6,
       partTitle: 'الجزء السادس: من الكود للصفحة',
-      title: 'الفصل 25: شجرة الـ DOM والأحداث (Events)',
-      subtitle: 'ربط JavaScript بالصفحة: النقر والتفاعل',
+      title: 'الفصل 30: شجرة الـ DOM والأحداث (Events) — الساحر والتفاعل',
+      subtitle: 'ربط JavaScript بالصفحة: النقر والتفاعل الحي',
       summaryPoints: [
         'الـ DOM (Document Object Model) هو الشجرة التي يرى بها JavaScript عناصر صفحة HTML ويتحكم فيها.',
-        'الدالة document.getElementById() تمسك أي عنصر بالمعرف الفريد بتاعه.',
+        'الدالة document.getElementById() تمسك أي عنصر بالمعرف الفريد (ID) بتاعه.',
         'تعديل النصوص بـ textContent وتعديل التنسيقات بـ style.',
         'مراقبة تصرفات المستخدم عبر addEventListener("click", callback) لتشغيل الكود فور النقر.',
       ],
       contentSections: [
         {
-          heading: 'تشبيه المخرج المسرحي: يعني إيه شجرة الـ DOM؟',
+          heading: 'تشبيه المخرج المسرحي: يعني إيه شجرة الـ DOM؟ 🎭',
           text: `تخيل مسرحية فيها ممثلين وديكور وإضاءة، وفي مخرج واقف في الكواليس بيده ميكروفون:
 "يا ممثل رقم 1 غير لبسك، يا ممثل رقم 2 اصرخ واجري، يا مسؤول الإضاءة طفي النور!".
 المخرج ده في عالم الويب هو "لغة JavaScript".
@@ -1100,7 +1478,7 @@ myHeading.textContent = "أهلاً بك يا بطل البرمجة!";
 myHeading.style.color = "orange";`,
         },
         {
-          heading: 'مراقبة نقرات المستخدم: الأحداث (Events & addEventListener)',
+          heading: 'مراقبة نقرات المستخدم: الأحداث (Events & addEventListener) 🖱️',
           text: `صفحة الويب الحية مش صفحة ميتة تقرأها زي الجريدة.. دي صفحة بترد عليك لما تدوس عليها!
 النقر على زر، حركة الفأرة، الكتابة في حقل، التمرير لأسفل.. كل دي اسمها "أحداث (Events)".
 عشان نخلي زرار ينفذ كود لما المستخدم ينقر عليه، بنركب له "مستمع للأحداث (Event Listener)":
@@ -1119,20 +1497,43 @@ btn.addEventListener("click", function() {
           text: `تعال نبني معاً تطبيقاً تفاعلياً مصغراً: عداد تسبيح / نقرات (Click Counter).
 كل ما المستخدم يدوس على الزرار، العداد يزيد بمقدار 1 ويتحدث الرقم على الشاشة فوراً:`,
           codeSnippet: `<!DOCTYPE html>
-<html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; align-items: center; min-height: 240px; margin: 0; text-align: center; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 24px; max-width: 300px; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    h3 { font-size: 14px; font-weight: 600; color: #94a3b8; margin: 0 0 8px; }
+    .counter { font-size: 3.5rem; font-weight: 900; color: #fbbf24; margin: 10px 0; font-family: monospace; }
+    button.btn-count { width: 100%; padding: 14px; background: linear-gradient(135deg, #10b981, #14b8a6); color: #020617; border: none; border-radius: 14px; font-weight: 800; font-size: 15px; cursor: pointer; transition: transform 0.1s, filter 0.2s; font-family: inherit; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
+    button.btn-count:active { transform: scale(0.97); }
+    button.btn-count:hover { filter: brightness(1.1); }
+    button.btn-reset { margin-top: 10px; background: transparent; border: 1px solid #475569; color: #94a3b8; font-size: 12px; padding: 6px 12px; border-radius: 8px; cursor: pointer; width: 100%; font-family: inherit; }
+    button.btn-reset:hover { background: #334155; color: white; }
+  </style>
+</head>
 <body>
-  <div style="text-align: center;">
-    <h2>عدد التسبيحات: <span id="count">0</span></h2>
-    <button id="counterBtn">سبّح 📿</button>
+  <div class="card">
+    <h3>عداد التسبيح التفاعلي 📿</h3>
+    <div id="count" class="counter">0</div>
+    <button id="counterBtn" class="btn-count">سبّح (انقر هنا) 📿</button>
+    <button id="resetBtn" class="btn-reset">إعادة ضبط العداد</button>
   </div>
 
   <script>
     let counter = 0;
     const countDisplay = document.getElementById("count");
     const counterButton = document.getElementById("counterBtn");
+    const resetButton = document.getElementById("resetBtn");
 
     counterButton.addEventListener("click", function() {
       counter++;
+      countDisplay.textContent = counter;
+    });
+
+    resetButton.addEventListener("click", function() {
+      counter = 0;
       countDisplay.textContent = counter;
     });
   </script>
@@ -1140,9 +1541,9 @@ btn.addEventListener("click", function() {
 </html>`,
           type: 'html_preview',
           htmlCode: `<div class="p-6 bg-slate-900 border border-slate-700 rounded-2xl max-w-xs mx-auto text-center shadow-2xl font-sans" dir="rtl">
-  <h3 class="text-sm font-semibold text-slate-400 mb-2">عداد التسبيح التفاعلي</h3>
-  <div class="text-4xl font-extrabold text-amber-400 mb-4 font-mono">33</div>
-  <button class="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold rounded-xl shadow-lg transition text-sm cursor-pointer">
+  <h3 class="text-sm font-semibold text-slate-400 mb-2">عداد التسبيح التفاعلي 📿</h3>
+  <div id="count" class="text-4xl font-extrabold text-amber-400 mb-4 font-mono">0</div>
+  <button id="counterBtn" class="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold rounded-xl shadow-lg transition text-sm cursor-pointer">
     سبّح (انقر هنا) 📿
   </button>
   <p class="text-[11px] text-slate-500 mt-3">JavaScript يراقب الحدث ويحدث الـ DOM في التو واللحظة.</p>
@@ -1157,24 +1558,38 @@ btn.addEventListener("click", function() {
       ],
       exercises: [
         {
-          id: 'ch25-ex1',
-          title: 'التمرين 1: تغيير النص في الـ DOM',
-          code: `<h1 id="title">العنوان القديم</h1>\n<button id="change">غيّر النص</button>\n<script>\n  document.getElementById("change").addEventListener("click", () => {\n    document.getElementById("title").textContent = "جديد";\n  });\n</script>`,
+          id: 'ch30-ex1',
+          title: 'التمرين 1: تغيير النص في الـ DOM عند النقر',
+          code: `<h1 id="title">العنوان القديم</h1>
+<button id="change">غيّر النص</button>
+<script>
+  document.getElementById("change").addEventListener("click", () => {
+    document.getElementById("title").textContent = "تم التحديث بنجاح! 🎉";
+  });
+</script>`,
           expectedOutput: 'معاينة صفحة يتغير عنوانها عند النقر على الزر.',
           explanation: 'اربط حدث النقر ثم حدّث textContent للعنوان.',
+        },
+        {
+          id: 'ch30-ex2',
+          title: 'التمرين 2: تبديل الألوان بـ style',
+          code: `const box = document.getElementById("box");
+box.style.backgroundColor = "green";
+box.style.color = "white";`,
+          expectedOutput: 'معاينة صندوق تحول لونه للأخضر ونصه للأبيض.',
+          explanation: 'خاصية style تسمح بتعديل قواعد CSS مباشرة من كود JavaScript.',
         },
       ],
       quiz: [
         {
-          id: 'ch25-q1',
-          question: 'الدالة المسؤولة عن مراقبة نقرات الماوس على زر هي:',
+          id: 'ch30-q1',
+          question: 'الدالة المسؤولة عن مراقبة نقرات الماوس على زر هي أنهي دالة يا صديقي؟',
           options: [
             {
               id: 'a',
               text: 'button.addEventListener("click", callback)',
               isCorrect: true,
-              explanation:
-                'ممتاز! 🎯 addEventListener هي المعيار الذهبي لمراقبة أي تفاعل من المستخدم في الويب.',
+              explanation: 'ممتاز! 🎯 addEventListener هي المعيار الذهبي لمراقبة أي تفاعل من المستخدم في الويب.',
             },
             {
               id: 'b',
@@ -1191,15 +1606,14 @@ btn.addEventListener("click", function() {
           ],
         },
         {
-          id: 'ch25-q2',
+          id: 'ch30-q2',
           question: 'معامل الحدث (event / e) اللي بنستلمه جوه دالة النقر.. جواه إيه؟',
           options: [
             {
               id: 'a',
-              text: 'معلومات تفصيلية عن الحدث، زي العنصر المنقور (e.target) ومكان الماوس',
+              text: 'معلومات تفصيلية عن الحدث، زي العنصر المنقور (e.target) ومكان مؤشر الفأرة',
               isCorrect: true,
-              explanation:
-                'عاش يا بطل! 👏 كائن الحدث كنز معلومات بيفيدك تعرف المستخدم عمل إيه وفين بالظبط.',
+              explanation: 'عاش يا بطل! 👏 كائن الحدث كنز معلومات بيفيدك تعرف المستخدم عمل إيه وفين بالظبط.',
             },
             {
               id: 'b',
@@ -1211,24 +1625,333 @@ btn.addEventListener("click", function() {
               id: 'c',
               text: 'كلمة السر الخاصة بالمتصفح',
               isCorrect: false,
-              explanation: 'لا يحتوي على أي بيانات حساسة.',
+              explanation: 'لا يحتوي على أي بيانات سرية أو حساسة.',
+            },
+          ],
+        },
+        {
+          id: 'ch30-q3',
+          question: 'ما هي الخاصية المستخدمة لتعديل النص الداخلي لعنصر HTML بأمان؟',
+          options: [
+            {
+              id: 'a',
+              text: 'element.textContent',
+              isCorrect: true,
+              explanation: 'صح جداً! 📝 textContent هي الطريقة القياسية والآمنة لتغيير وقراءة النصوص.',
+            },
+            {
+              id: 'b',
+              text: 'element.writeText',
+              isCorrect: false,
+              explanation: 'لا توجد خاصية بهذا الاسم لتعديل العناصر.',
+            },
+            {
+              id: 'c',
+              text: 'element.fontText',
+              isCorrect: false,
+              explanation: 'الخاصية الصحيحة هي textContent.',
             },
           ],
         },
       ],
       challenge: {
-        id: 'ch25-chal',
+        id: 'ch30-chal',
         title: 'وريني شطارتك 🧠: مبدل حالة النور (Light Switch)',
         prompt:
           'اكتب صفحة HTML فيها زر وفقرة. استخدم addEventListener("click") ومتغير boolean لتبديل نص الفقرة بين "النور مضاء" و "النور مطفي" عند كل نقرة.',
         hint: 'عرّف isOn واربِط الزر بـ addEventListener، ثم بدّل القيمة والنص عبر textContent.',
-        initialCode: `// اكتب كود دالة تبديل النور وفحص الحالة بنفسك هنا...
+        initialCode: `<!-- اكتب كود دالة تبديل النور وفحص الحالة بنفسك هنا... -->
 `,
-        solutionCode: `<!doctype html><html lang="ar" dir="rtl"><body><button id="toggle">بدّل النور</button><p id="status">النور مطفي</p><script>let isOn = false;
-document.getElementById("toggle").addEventListener("click", () => {
-  isOn = !isOn;
-  document.getElementById("status").textContent = isOn ? "النور مضاء" : "النور مطفي";
-});</script></body></html>`,
+        solutionCode: `<!doctype html>
+<html lang="ar" dir="rtl">
+<body>
+  <button id="toggle">بدّل النور</button>
+  <p id="status">النور مطفي</p>
+
+  <script>
+    let isOn = false;
+    document.getElementById("toggle").addEventListener("click", () => {
+      isOn = !isOn;
+      document.getElementById("status").textContent = isOn ? "النور مضاء 💡" : "النور مطفي 🌑";
+    });
+  </script>
+</body>
+</html>`,
+      },
+    },
+    {
+      id: 31,
+      partId: 6,
+      partTitle: 'الجزء السادس: من الكود للصفحة',
+      title: 'الفصل 31: مراجعة تحليلية وتتبع تفاعل الويب (Web & DOM Tracing)',
+      subtitle: 'تتبع دورة حياة الصفحة، تدفق الأحداث، وفخاخ الـ DOM الشائعة',
+      summaryPoints: [
+        'التتبع الذهني لتسلسل تحميل الصفحة: من تحليل HTML وبناء شجرة الـ DOM حتى تشغيل كود JavaScript.',
+        'تتبع تدفق أحداث المستخدم (Event Lifecycle) وتحديث واجهة المستخدم فورياً.',
+        'مصفوفة الفخاخ القاتلة في برمجة الويب: مكان وضع السكريبت، أخطاء Cannot read properties of null، والفصل المعماري النظيف بين HTML و CSS و JS.',
+      ],
+      contentSections: [
+        {
+          heading: 'تتبع مسار تشغيل صفحة الويب في الذاكرة (Lifecycle Tracing) 🔄',
+          text: `تعال نمشي خطوة بخطوة في عقل المتصفح أول ما المستخدم يكتب رابط موقعك ويدوس Enter:
+1. المتصفح يحمل ملف HTML ويبدأ يقرأه من أول سطر لآخر سطر (Parsing).
+2. يحول الوسوم لكائنات حية في شجرة الـ DOM بالذاكرة.
+3. يحمل ملفات CSS ويبني شجرة التنسيقات (CSSOM) ويدمجها مع الـ DOM لرسم الصفحة على الشاشة (Render Tree).
+4. ينفذ كود JavaScript اللي بيتحكم في الشجرة ويراقب أحداث المستخدم!`,
+          codeSnippet: `// تسلسل العمليات الهندسي:
+// 1. هيكل HTML موجود في DOM
+const statusDisplay = document.getElementById("status");
+
+// 2. مستمع الحدث جاهز للمراقبة
+let clickCount = 0;
+document.getElementById("btn").addEventListener("click", () => {
+  clickCount++;
+  // 3. تحديث فوري لشجرة الـ DOM
+  statusDisplay.textContent = "النقرات: " + clickCount;
+});`,
+        },
+        {
+          heading: 'مصفوفة الفخاخ القاتلة في تطوير الويب (Web Debug Checklist) 🛠️',
+          text: `قبل ما ترفع أي صفحة ويب للإنترنت يا باشمهندس، راجع القائمة دي:
+1. هل وضعت <script> قبل إغلاق </body>؟ (لو حطيته في <head> بدون defer العناصر هترجع null!).
+2. هل تأكدت من تطابق اسم الـ id بين كود HTML و getElementById؟ (تطابق الحروف الكبيرة والصغيرة Case Sensitivity).
+3. هل ربطت label بالـ id المظبوط للحقل؟
+4. هل تأكدت من إغلاق كل وسوم HTML وفاصلة CSS المنقوطة (;)؟`,
+          codeSnippet: `// تجنب الفخ الشائع:
+const myElement = document.getElementById("user-name"); // تأكد من الـ id بالضبط!
+if (myElement) {
+  myElement.textContent = "مرحباً يا بطل!";
+} else {
+  console.warn("العنصر غير موجود في شجرة الـ DOM!");
+}`,
+          callout: {
+            type: 'insight',
+            title: 'المثلث الذهبي لتطوير الويب 📐',
+            content:
+              'HTML للهيكل والبناء 🧱\nCSS للأناقة والجمال 🎨\nJavaScript للمخ والتفاعل 🧠\nالتناغم بين الثلاثة هو اللي بيصنع كل المواقع العظمى في العالم!',
+          },
+        },
+        {
+          heading: 'تطبيق التتبع الشامل: تطبيق المهام المصغر (Mini To-Do App) 📝',
+          text: `تعال ندمج كل مفاهيم الجزء السادس في مشروع حي مصغر:
+استقبال نص من input، إضافته كعنصر li جديد للقائمة، ومسح الحقل بعد الإضافة:`,
+          codeSnippet: `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0b1120; color: #f8fafc; padding: 24px; margin: 0; text-align: right; }
+    .card { background: #0f172a; border: 1px solid #1e293b; border-radius: 18px; padding: 20px; max-width: 380px; margin: 0 auto; box-shadow: 0 15px 30px rgba(0,0,0,0.6); }
+    h3 { color: #f59e0b; margin: 0 0 14px; font-size: 1.15rem; font-weight: 800; display: flex; align-items: center; gap: 6px; }
+    .input-row { display: flex; gap: 8px; margin-bottom: 14px; }
+    input { flex: 1; padding: 10px 14px; border-radius: 10px; border: 1px solid #334155; background: #1e293b; color: #f8fafc; font-size: 13px; font-family: inherit; }
+    input:focus { outline: none; border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2); }
+    button.add-btn { padding: 10px 18px; background: #f59e0b; color: #020617; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer; transition: 0.15s; font-family: inherit; }
+    button.add-btn:hover { background: #fbbf24; }
+    ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+    li { background: #1e293b; border: 1px solid #334155; padding: 10px 12px; border-radius: 10px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: 0.15s; }
+    li:hover { border-color: #475569; }
+    li.done span { text-decoration: line-through; opacity: 0.45; }
+    .del-btn { background: #ef4444; color: white; border: none; border-radius: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-weight: bold; }
+    .del-btn:hover { background: #dc2626; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h3>قائمة مهامي التفاعلية 📝</h3>
+    <div class="input-row">
+      <input id="taskInput" placeholder="اكتب مهمتك..." value="مراجعة مسار جافاسكريبت">
+      <button id="addBtn" class="add-btn">إضافة</button>
+    </div>
+    <ul id="taskList">
+      <li><span>فهم متغيرات let و const</span><button class="del-btn">حذف</button></li>
+      <li><span>إتقان الحلقات والدوال</span><button class="del-btn">حذف</button></li>
+      <li><span>ربط JavaScript بشجرة الـ DOM</span><button class="del-btn">حذف</button></li>
+    </ul>
+  </div>
+
+  <script>
+    const input = document.getElementById("taskInput");
+    const addBtn = document.getElementById("addBtn");
+    const list = document.getElementById("taskList");
+
+    function addTask() {
+      const text = input.value.trim();
+      if (text !== "") {
+        const li = document.createElement("li");
+        const span = document.createElement("span");
+        span.textContent = text;
+
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "حذف";
+        delBtn.className = "del-btn";
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          li.remove();
+        };
+
+        li.appendChild(span);
+        li.appendChild(delBtn);
+        li.onclick = () => li.classList.toggle("done");
+
+        list.appendChild(li);
+        input.value = "";
+        input.focus();
+      }
+    }
+
+    addBtn.addEventListener("click", addTask);
+    input.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") addTask();
+    });
+
+    document.querySelectorAll(".del-btn").forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        btn.parentElement.remove();
+      };
+    });
+    document.querySelectorAll("#taskList li").forEach(li => {
+      li.onclick = () => li.classList.toggle("done");
+    });
+  </script>
+</body>
+</html>`,
+          type: 'html_preview',
+          htmlCode: `<div class="p-6 bg-slate-900 border border-slate-700 rounded-2xl max-w-sm mx-auto shadow-2xl font-sans" dir="rtl">
+  <h3 class="text-base font-bold text-amber-400 mb-3">قائمة مهامي التفاعلية 📝</h3>
+  <div class="flex gap-2 mb-3">
+    <input id="taskInput" type="text" placeholder="اكتب مهمتك..." value="مراجعة مسار جافاسكريبت" class="flex-1 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-slate-100 text-xs focus:outline-none focus:border-amber-400" />
+    <button id="addBtn" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs transition">إضافة</button>
+  </div>
+  <ul id="taskList" class="text-xs text-slate-200 space-y-1.5 list-disc list-inside bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
+    <li>فهم متغيرات let و const</li>
+    <li>إتقان الحلقات والدوال</li>
+    <li>ربط JavaScript بشجرة الـ DOM</li>
+  </ul>
+</div>`,
+        },
+      ],
+      exercises: [
+        {
+          id: 'ch31-ex1',
+          title: 'التمرين 1: تتبع قيمة المدخلات (input.value)',
+          code: `const input = document.getElementById("nameInput");
+console.log("النص المكتوب: " + input.value);`,
+          expectedOutput: 'قراءة القيمة الحالية المكتوبة داخل حقل الإدخال.',
+          explanation: 'خاصية value تُستخدم لقراءة محتوى حقول الإدخال input بعكس textContent المستخدم للعناوين والفقرات.',
+        },
+        {
+          id: 'ch31-ex2',
+          title: 'التمرين 2: تتبع تسلسل تنفيذ الأحداث',
+          code: `console.log("1. قبل تسجيل الحدث");
+document.getElementById("btn").addEventListener("click", () => {
+  console.log("3. تم النقر على الزر!");
+});
+console.log("2. بعد تسجيل الحدث");`,
+          expectedOutput: `1. قبل تسجيل الحدث\n2. بعد تسجيل الحدث`,
+          explanation: 'كود المستمع لا ينفذ فوراً بل ينتظر نقرة المستخدم في المستقبل.',
+        },
+      ],
+      quiz: [
+        {
+          id: 'ch31-q1',
+          question: 'ليه بنستخدم input.value لقراءة حقل الإدخال بدلاً من input.textContent يا صديقي؟',
+          options: [
+            {
+              id: 'a',
+              text: 'لأن حقول input عناصر إدخال ذاتية الإغلاق وتحفظ ما يكتبه المستخدم في خاصية value',
+              isCorrect: true,
+              explanation: 'تحليل هندسي ممتاز! 👏 textContent للعناصر التي لها وسم فتح وإغلاق كـ h1 و p، بينما value للمدخلات.',
+            },
+            {
+              id: 'b',
+              text: 'لأن textContent محذوفة من المتصفحات',
+              isCorrect: false,
+              explanation: 'textContent موجودة وتستخدم مع باقي الوسوم.',
+            },
+            {
+              id: 'c',
+              text: 'مفيش فرق والاثنان متطابقان',
+              isCorrect: false,
+              explanation: 'الفرق جوهري؛ محاولة قراءة textContent من input سترجع نصاً فارغاً.',
+            },
+          ],
+        },
+        {
+          id: 'ch31-q2',
+          question: 'ما هو السبب الأكثر شيوعاً لظهور خطأ "Cannot read properties of null" عند التعامل مع الـ DOM؟',
+          options: [
+            {
+              id: 'a',
+              text: 'تشغيل كود السكريبت قبل أن يرسم المتصفح عناصر HTML في الذاكرة، أو كتابة id خاطئ',
+              isCorrect: true,
+              explanation: 'إجابة نموذجية! 💡 المتصفح يبحث عن الـ ID فلا يجده فيرجع null وتفشل العمليات اللاحقة.',
+            },
+            {
+              id: 'b',
+              text: 'ضعف سرعة الإنترنت',
+              isCorrect: false,
+              explanation: 'الخطأ برمجي تنفيذي ولا علاقة له بالشبكة.',
+            },
+            {
+              id: 'c',
+              text: 'استخدام ألوان غير متوافقة في CSS',
+              isCorrect: false,
+              explanation: 'CSS لا يسبب أخطاء TypeErrors في JavaScript.',
+            },
+          ],
+        },
+        {
+          id: 'ch31-q3',
+          question: 'ما هي الطريقة الصحيحة لمنع إعادة تحميل الصفحة الافتراضي عند إرسال نموذج HTML؟',
+          options: [
+            {
+              id: 'a',
+              text: 'استدعاء e.preventDefault() داخل مستمع حدث submit',
+              isCorrect: true,
+              explanation: 'عاش يا بطل! 🌟 preventDefault توقف السلوك الافتراضي للمتصفح وتسمح لمعالجة البيانات بـ JavaScript بدون ريفريش.',
+            },
+            {
+              id: 'b',
+              text: 'مسح وسم form',
+              isCorrect: false,
+              explanation: 'مسح form يضر ببنية الصفحة الدلالية.',
+            },
+            {
+              id: 'c',
+              text: 'كتابة return 0',
+              isCorrect: false,
+              explanation: 'الطريقة القياسية الحديثة هي preventDefault().',
+            },
+          ],
+        },
+      ],
+      challenge: {
+        id: 'ch31-chal',
+        title: 'تحدي ختام مسار الويب: عداد الحروف الفوري 🔤',
+        prompt:
+          'اكتب كود صفحة HTML فيها حقل إدخال input وفقرة تعرض عدد الحروف. استخدم حدث "input" لتحديث نص الفقرة فوراً ليصبح: "عدد الحروف: X" حيث X هو طول النص المكتوب (input.value.length).',
+        hint: 'document.getElementById("myInput").addEventListener("input", (e) => { countDisplay.textContent = "عدد الحروف: " + e.target.value.length; });',
+        initialCode: `<!-- اكتب كود عداد الحروف الفوري هنا بنفسك... -->
+`,
+        solutionCode: `<!doctype html>
+<html lang="ar" dir="rtl">
+<body>
+  <input id="textInput" placeholder="اكتب هنا...">
+  <p id="charCount">عدد الحروف: 0</p>
+
+  <script>
+    const input = document.getElementById("textInput");
+    const countDisplay = document.getElementById("charCount");
+
+    input.addEventListener("input", () => {
+      countDisplay.textContent = "عدد الحروف: " + input.value.length;
+    });
+  </script>
+</body>
+</html>`,
       },
     },
   ],
