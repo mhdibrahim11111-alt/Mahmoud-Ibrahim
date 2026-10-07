@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Part, Chapter } from '../types';
+import { StandardEmptyState } from './ui/StateFeedback';
 import {
   ChevronDown,
   ChevronLeft,
@@ -43,7 +44,7 @@ const partIcons: Record<number, React.ReactNode> = {
   6: <Globe className="w-4 h-4 text-cyan-400" />,
 };
 
-export const Sidebar: React.FC<SidebarProps> = ({
+export const Sidebar = React.memo<SidebarProps>(({
   parts,
   selectedChapterId,
   onSelectChapter,
@@ -151,14 +152,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Parts & Chapters List */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
         {filteredParts.length === 0 && (
-          <div className="text-center py-10 space-y-2 text-slate-500 text-xs">
-            <p>لا توجد فصول مطابقة</p>
-            {onlyBookmarked && (
-              <p className="text-[11px] text-amber-400/80">
-                يمكنك الضغط على علامة النجمة داخل أي فصل لإضافته للمفضلة ⭐️
-              </p>
-            )}
-          </div>
+          onlyBookmarked ? (
+            <StandardEmptyState
+              type="bookmarks"
+              actionText="عرض كل الفصول"
+              onAction={() => setOnlyBookmarked(false)}
+            />
+          ) : (
+            <StandardEmptyState
+              type="search"
+              searchQuery={searchQuery}
+              actionText="مسح البحث"
+              onAction={() => setSearchQuery('')}
+            />
+          )
         )}
 
         {filteredParts.map((part) => {
@@ -315,4 +322,4 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
     </aside>
   );
-};
+});

@@ -1,5 +1,5 @@
-import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
-import type { ViewMode, Chapter, Part } from './types';
+import React, { lazy, Suspense, useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import type { ViewMode, Chapter, Part, PartComprehensiveExam } from './types';
 import { Header } from './components/Header';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { ALL_BADGES } from './types/achievements';
@@ -23,23 +23,32 @@ import {
 } from './utils/progressSync';
 import { Menu, X } from 'lucide-react';
 import { soundManager } from './utils/soundManager';
+import { bookParts, preloadAllCourseParts, loadPartExamsData } from './data/bookData';
+import { StudentDashboard } from './components/StudentDashboard';
+import { Sidebar } from './components/Sidebar';
+import { ChapterView } from './components/ChapterView';
+import { PartSummaryView } from './components/PartSummaryView';
+import {
+  StandardLoadingState,
+  StandardErrorState,
+  OfflineStatusIndicator,
+} from './components/ui/StateFeedback';
 
-const Sidebar = lazy(() => import('./components/Sidebar').then((module) => ({ default: module.Sidebar })));
-const ChapterView = lazy(() => import('./components/ChapterView').then((module) => ({ default: module.ChapterView })));
-const PartSummaryView = lazy(() => import('./components/PartSummaryView').then((module) => ({ default: module.PartSummaryView })));
 const CodePlayground = lazy(() => import('./components/CodePlayground').then((module) => ({ default: module.CodePlayground })));
 const BugHunter = lazy(() => import('./components/BugHunter').then((module) => ({ default: module.BugHunter })));
 const ChallengesList = lazy(() => import('./components/ChallengesList').then((module) => ({ default: module.ChallengesList })));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard').then((module) => ({ default: module.AdminDashboard })));
 const GlobalSearchModal = lazy(() => import('./components/GlobalSearchModal').then((module) => ({ default: module.GlobalSearchModal })));
 const AchievementsModal = lazy(() => import('./components/AchievementsModal').then((module) => ({ default: module.AchievementsModal })));
+const OnboardingModal = lazy(() => import('./components/OnboardingModal').then((module) => ({ default: module.OnboardingModal })));
 
 function ViewLoadingState() {
   return (
-    <div role="status" aria-live="polite" className="min-h-48 flex items-center justify-center gap-3 text-sm text-slate-300">
-      <span aria-hidden="true" className="w-5 h-5 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
-      <span>جارٍ تحميل المحتوى…</span>
-    </div>
+    <StandardLoadingState
+      variant="panel"
+      title="جارٍ تحميل القسم…"
+      subtitle="تجهيز المحتوى والتمارين التفاعلية"
+    />
   );
 }
 
@@ -52,36 +61,90 @@ interface PlatformAppProps {
 
 export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: PlatformAppProps) {
   const codeKey = activeCode.trim().toUpperCase();
+  const [partsList, setPartsList] = useState<Part[]>(() => bookParts);
 
-  const [bookParts, setBookParts] = useState<Part[]>([]);
-  const [bookLoadFailed, setBookLoadFailed] = useState(false);
+  // Deferred Promise for non-critical static assets and large data files (part exams & comprehensive summaries)
+  const deferredCourseDataPromiseRef = useRef<Promise<Record<number, PartComprehensiveExam>> | null>(null);
 
   useEffect(() => {
-    let isSubscribed = true;
-    import('./data/bookData').then(({ bookParts: loadedParts, preloadAllCourseParts }) => {
-      if (isSubscribed) {
-        setBookParts(loadedParts);
-        preloadAllCourseParts();
-      }
-    }).catch((error) => {
-      console.error('Failed to load course content:', error);
-      if (isSubscribed) setBookLoadFailed(true);
-    });
-    return () => { isSubscribed = false; };
+    let isCancelled = false;
+
+    // Prioritize core UI shell rendering: schedule deferred loading when the main thread is idle
+    const executeDeferredLoading = () => {
+      if (isCancelled) return;
+
+      const promise = loadPartExamsData();
+      deferredCourseDataPromiseRef.current = promise;
+
+      promise
+        .then((exams) => {
+          if (isCancelled) return;
+          setPartsList((prevParts) =>
+            prevParts.map((p) => {
+              if (exams[p.id] && (!p.summary || !p.comprehensiveExam)) {
+                return {
+                  ...p,
+                  summary: exams[p.id],
+                  comprehensiveExam: exams[p.id],
+                };
+              }
+              return p;
+            })
+          );
+        })
+        .catch((err) => {
+          console.error('Deferred course data load error:', err);
+        })
+        .finally(() => {
+          if (!isCancelled) {
+            preloadAllCourseParts();
+          }
+        });
+    };
+
+    if (typeof window === 'undefined') return;
+
+    if ('requestIdleCallback' in window) {
+      const idleHandle = (window as unknown as { requestIdleCallback: (cb: () => void, opts: { timeout: number }) => number })
+        .requestIdleCallback(executeDeferredLoading, { timeout: 2500 });
+      return () => {
+        isCancelled = true;
+        if ('cancelIdleCallback' in window) {
+          (window as unknown as { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(idleHandle);
+        }
+      };
+    } else {
+      const timer = setTimeout(executeDeferredLoading, 1000);
+      return () => {
+        isCancelled = true;
+        clearTimeout(timer);
+      };
+    }
   }, []);
+
+  const isStaffRole = role === 'master' || role === 'admin' || role === 'teacher';
 
   const [currentView, setCurrentView] = useState<ViewMode>(() => {
     try {
       const hash = window.location.hash.replace('#', '').toLowerCase();
-      if (['reader', 'playground', 'bughunter', 'challenges', 'admin'].includes(hash)) {
-        return hash as ViewMode;
+      if (['dashboard', 'reader', 'playground', 'bughunter', 'challenges', 'admin'].includes(hash)) {
+        if (hash === 'admin' || (hash !== 'dashboard' && ['reader', 'playground', 'bughunter', 'challenges'].includes(hash))) {
+          return hash as ViewMode;
+        }
+        if (hash === 'dashboard' && !isStaffRole) {
+          return 'dashboard';
+        }
       }
       const saved = localStorage.getItem(`codemasr_active_view_${codeKey}`);
-      if (saved && ['reader', 'playground', 'bughunter', 'challenges', 'admin'].includes(saved)) {
+      if (saved && ['dashboard', 'reader', 'playground', 'bughunter', 'challenges', 'admin'].includes(saved)) {
+        if (isStaffRole) {
+          if (saved === 'dashboard') return 'admin';
+          return saved as ViewMode;
+        }
         return saved as ViewMode;
       }
     } catch {}
-    return 'reader';
+    return isStaffRole ? 'admin' : 'dashboard';
   });
 
   const [selectedChapterId, setSelectedChapterId] = useState<number>(() => {
@@ -105,10 +168,10 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
 
   // Dynamically load the full detailed lessons for the active part on demand
   useEffect(() => {
-    if (!bookParts.length) return;
+    if (!partsList.length) return;
 
     // Find which part the selectedChapter belongs to
-    const targetPart = bookParts.find((p) => p.chapters.some((c) => c.id === selectedChapterId));
+    const targetPart = partsList.find((p) => p.chapters.some((c) => c.id === selectedChapterId));
     if (!targetPart) return;
 
     // Check if the chapter already has full contentSections loaded
@@ -123,7 +186,7 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
       return loadPartDetails(targetPart.id);
     }).then((fullPart) => {
       if (isCancelled) return;
-      setBookParts((prevParts) =>
+      setPartsList((prevParts) =>
         prevParts.map((p) => (p.id === fullPart.id ? fullPart : p))
       );
     }).catch((err) => {
@@ -133,25 +196,46 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
     return () => {
       isCancelled = true;
     };
-  }, [selectedChapterId, bookParts]);
+  }, [selectedChapterId, partsList]);
 
   // Also dynamically load full part if part summary/exam is selected
   useEffect(() => {
-    if (!bookParts.length || !selectedPartExamId) return;
-    const targetPart = bookParts.find((p) => p.id === selectedPartExamId);
+    if (!partsList.length || !selectedPartExamId) return;
+    const targetPart = partsList.find((p) => p.id === selectedPartExamId);
     if (!targetPart) return;
+
+    let isCancelled = false;
+
+    // Ensure exams data is loaded immediately if student navigates to exam
+    if (!targetPart.summary || !targetPart.comprehensiveExam) {
+      loadPartExamsData().then((exams) => {
+        if (isCancelled) return;
+        if (exams[selectedPartExamId]) {
+          setPartsList((prevParts) =>
+            prevParts.map((p) =>
+              p.id === selectedPartExamId
+                ? {
+                    ...p,
+                    summary: exams[selectedPartExamId],
+                    comprehensiveExam: exams[selectedPartExamId],
+                  }
+                : p
+            )
+          );
+        }
+      }).catch(() => {});
+    }
 
     const firstCh = targetPart.chapters[0];
     if (firstCh && firstCh.contentSections && firstCh.contentSections.length > 0) {
       return;
     }
 
-    let isCancelled = false;
     import('./data/bookData').then(({ loadPartDetails }) => {
       return loadPartDetails(targetPart.id);
     }).then((fullPart) => {
       if (isCancelled) return;
-      setBookParts((prevParts) =>
+      setPartsList((prevParts) =>
         prevParts.map((p) => (p.id === fullPart.id ? fullPart : p))
       );
     }).catch((err) => {
@@ -161,7 +245,7 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
     return () => {
       isCancelled = true;
     };
-  }, [selectedPartExamId, bookParts]);
+  }, [selectedPartExamId, partsList]);
 
   const [playgroundCode, setPlaygroundCode] = useState<string>('');
 
@@ -195,15 +279,40 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
   // New Modals States
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
 
   // Per-item timestamps let multiple devices merge edits and removals safely.
   const [progressEntries, setProgressEntries] = useState(() => readLocalProgressEntries(codeKey));
-  const completedChapterIds = getTrueProgressIds(progressEntries, 'completedChapter').map(Number);
-  const completedQuizIds = getTrueProgressIds(progressEntries, 'completedQuiz').map(String);
-  const completedExamPartIds = getTrueProgressIds(progressEntries, 'completedExam').map(Number);
-  const bookmarkedChapterIds = getTrueProgressIds(progressEntries, 'bookmarkedChapter').map(Number);
-  const chapterNotes = getStringProgressMap(progressEntries, 'chapterNote');
-  const challengeCodes = getStringProgressMap(progressEntries, 'chapterChallengeCode');
+
+  // Memoize progress selectors to prevent 7 new object/array allocations and child re-renders on every update
+  const completedChapterIds = useMemo(
+    () => getTrueProgressIds(progressEntries, 'completedChapter').map(Number),
+    [progressEntries]
+  );
+  const completedQuizIds = useMemo(
+    () => getTrueProgressIds(progressEntries, 'completedQuiz').map(String),
+    [progressEntries]
+  );
+  const completedExamPartIds = useMemo(
+    () => getTrueProgressIds(progressEntries, 'completedExam').map(Number),
+    [progressEntries]
+  );
+  const completedChallengeIds = useMemo(
+    () => getTrueProgressIds(progressEntries, 'completedChallenge').map(String),
+    [progressEntries]
+  );
+  const bookmarkedChapterIds = useMemo(
+    () => getTrueProgressIds(progressEntries, 'bookmarkedChapter').map(Number),
+    [progressEntries]
+  );
+  const chapterNotes = useMemo(
+    () => getStringProgressMap(progressEntries, 'chapterNote'),
+    [progressEntries]
+  );
+  const challengeCodes = useMemo(
+    () => getStringProgressMap(progressEntries, 'chapterChallengeCode'),
+    [progressEntries]
+  );
 
   // Guard to prevent saving to server before initial fetch finishes
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
@@ -297,11 +406,28 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
     } catch {}
   }, [selectedBugHunterPartId, codeKey]);
 
+  // First-use Onboarding check: Auto-open if 0 completed chapters and not yet dismissed
+  useEffect(() => {
+    try {
+      const shown = localStorage.getItem(`codemasr_onboarding_shown_${codeKey}`);
+      if (!shown && completedChapterIds.length === 0) {
+        setIsOnboardingOpen(true);
+      }
+    } catch {}
+  }, [codeKey, completedChapterIds.length]);
+
+  const handleDismissOnboarding = () => {
+    setIsOnboardingOpen(false);
+    try {
+      localStorage.setItem(`codemasr_onboarding_shown_${codeKey}`, 'true');
+    } catch {}
+  };
+
   // Listen to browser Back/Forward hash changes
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '').toLowerCase();
-      if (['reader', 'playground', 'bughunter', 'challenges', 'admin'].includes(hash)) {
+      if (['dashboard', 'reader', 'playground', 'bughunter', 'challenges', 'admin'].includes(hash)) {
         setCurrentView(hash as ViewMode);
       }
     };
@@ -350,113 +476,144 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
     return () => window.clearTimeout(timer);
   }, [progressEntries, isInitialLoadDone, codeKey, selectedChapterId]);
 
-  // Helper to find all chapters flat
-  const allChapters = bookParts.flatMap((p) => p.chapters);
-  const currentChapter =
-    allChapters.find((c) => c.id === selectedChapterId) || allChapters[0];
+  // Helper to find all chapters flat (memoized)
+  const allChapters = useMemo(() => partsList.flatMap((p) => p.chapters), [partsList]);
+  const currentChapter = useMemo(
+    () => allChapters.find((c) => c.id === selectedChapterId) || allChapters[0],
+    [allChapters, selectedChapterId]
+  );
 
-  const selectedPart = selectedPartExamId
-    ? bookParts.find((p) => p.id === selectedPartExamId)
-    : null;
+  const selectedPart = useMemo(
+    () => (selectedPartExamId ? partsList.find((p) => p.id === selectedPartExamId) : null),
+    [partsList, selectedPartExamId]
+  );
 
-  const isLastChapterInPart = (chapter: Chapter) => {
-    const part = bookParts.find((p) => p.id === chapter.partId);
-    if (!part) return false;
-    const lastCh = part.chapters[part.chapters.length - 1];
-    return lastCh?.id === chapter.id;
-  };
+  const isLastChapterInPart = useCallback(
+    (chapter: Chapter) => {
+      const part = partsList.find((p) => p.id === chapter.partId);
+      if (!part) return false;
+      const lastCh = part.chapters[part.chapters.length - 1];
+      return lastCh?.id === chapter.id;
+    },
+    [partsList]
+  );
 
-  const handleNextChapter = () => {
+  const handleNextChapter = useCallback(() => {
     const currentIndex = allChapters.findIndex((c) => c.id === selectedChapterId);
     if (currentIndex < allChapters.length - 1) {
       setSelectedChapterId(allChapters[currentIndex + 1].id);
       setSelectedPartExamId(null);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  };
+  }, [allChapters, selectedChapterId]);
 
-  const handlePrevChapter = () => {
+  const handlePrevChapter = useCallback(() => {
     const currentIndex = allChapters.findIndex((c) => c.id === selectedChapterId);
     if (currentIndex > 0) {
       setSelectedChapterId(allChapters[currentIndex - 1].id);
       setSelectedPartExamId(null);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  };
+  }, [allChapters, selectedChapterId]);
 
-  const toggleChapterCompleted = (chapterId: number) => {
-    const isNowCompleted = !completedChapterIds.includes(chapterId);
-    if (isNowCompleted) {
-      soundManager.playSuccess();
-    }
-    setProgressEntries((prev) => updateProgressEntry(prev, `completedChapter:${chapterId}`, isNowCompleted));
-  };
+  const toggleChapterCompleted = useCallback(
+    (chapterId: number) => {
+      const isNowCompleted = !completedChapterIds.includes(chapterId);
+      if (isNowCompleted) {
+        soundManager.playSuccess();
+      }
+      setProgressEntries((prev) => updateProgressEntry(prev, `completedChapter:${chapterId}`, isNowCompleted));
+    },
+    [completedChapterIds]
+  );
 
-  const toggleExamPartCompleted = (partId: number) => {
-    const isNowCompleted = !completedExamPartIds.includes(partId);
-    if (isNowCompleted) {
-      soundManager.playSuccess();
-    }
-    setProgressEntries((prev) => updateProgressEntry(prev, `completedExam:${partId}`, isNowCompleted));
-  };
+  const toggleExamPartCompleted = useCallback(
+    (partId: number) => {
+      const isNowCompleted = !completedExamPartIds.includes(partId);
+      if (isNowCompleted) {
+        soundManager.playSuccess();
+      }
+      setProgressEntries((prev) => updateProgressEntry(prev, `completedExam:${partId}`, isNowCompleted));
+    },
+    [completedExamPartIds]
+  );
 
-  const toggleBookmark = (chapterId: number) => {
-    const isNowBookmarked = !bookmarkedChapterIds.includes(chapterId);
-    if (isNowBookmarked) {
-      soundManager.playBookmark();
-    } else {
-      soundManager.playClick();
-    }
-    setProgressEntries((prev) => updateProgressEntry(prev, `bookmarkedChapter:${chapterId}`, isNowBookmarked));
-  };
+  const toggleBookmark = useCallback(
+    (chapterId: number) => {
+      const isNowBookmarked = !bookmarkedChapterIds.includes(chapterId);
+      if (isNowBookmarked) {
+        soundManager.playBookmark();
+      } else {
+        soundManager.playClick();
+      }
+      setProgressEntries((prev) => updateProgressEntry(prev, `bookmarkedChapter:${chapterId}`, isNowBookmarked));
+    },
+    [bookmarkedChapterIds]
+  );
 
-  const handleSaveNote = (chapterId: number, note: string) => {
+  const handleSaveNote = useCallback((chapterId: number, note: string) => {
     soundManager.playSuccess();
     setProgressEntries((prev) => updateProgressEntry(prev, `chapterNote:${chapterId}`, note));
-  };
+  }, []);
 
-  const handleOpenPlaygroundWithCode = (code: string) => {
+  const handleOpenPlaygroundWithCode = useCallback((code: string) => {
     soundManager.playClick();
     setPlaygroundCode(code);
     setCurrentView('playground');
-  };
+  }, []);
 
-  const handleSelectBugHunterFromPart = (partId: number) => {
+  const handleSelectBugHunterFromPart = useCallback((partId: number) => {
     soundManager.playClick();
     setSelectedBugHunterPartId(partId);
     setCurrentView('bughunter');
-  };
+  }, []);
 
-  const handleSelectPartExam = (partId: number) => {
+  const handleSelectPartExam = useCallback((partId: number) => {
     soundManager.playClick();
     setCurrentView('reader');
     setSelectedPartExamId(partId);
     setIsMobileSidebarOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, []);
 
-  const toggleQuizCompleted = (quizId: string) => {
-    const isNowCompleted = !completedQuizIds.includes(quizId);
-    if (isNowCompleted) {
-      soundManager.playSuccess();
-    }
-    setProgressEntries((prev) => updateProgressEntry(prev, `completedQuiz:${quizId}`, isNowCompleted));
-  };
+  const toggleQuizCompleted = useCallback(
+    (quizId: string) => {
+      const isNowCompleted = !completedQuizIds.includes(quizId);
+      if (isNowCompleted) {
+        soundManager.playSuccess();
+      }
+      setProgressEntries((prev) => updateProgressEntry(prev, `completedQuiz:${quizId}`, isNowCompleted));
+    },
+    [completedQuizIds]
+  );
 
-  const handleUpdateChallengeCode = (chapterId: number, code: string) => {
+  const handleUpdateChallengeCode = useCallback((chapterId: number, code: string) => {
     setProgressEntries((prev) => updateProgressEntry(prev, `chapterChallengeCode:${chapterId}`, code));
-  };
+  }, []);
 
-  // Calculate Student Achievements Stats
-  const studentStats: StudentStats = {
-    completedChaptersCount: completedChapterIds.length,
-    completedQuizzesCount: completedQuizIds.length,
-    completedExamPartsCount: completedExamPartIds.length,
-    savedSnippetsCount: 1,
-    notesCount: Object.values(chapterNotes).filter((n) => n.trim().length > 0).length,
-    bookmarkedCount: bookmarkedChapterIds.length,
-  };
-  const unlockedBadgesCount = ALL_BADGES.filter((b) => b.isUnlocked(studentStats)).length;
+  // Calculate Student Achievements Stats (memoized)
+  const studentStats: StudentStats = useMemo(
+    () => ({
+      completedChaptersCount: completedChapterIds.length,
+      completedQuizzesCount: completedQuizIds.length,
+      completedExamPartsCount: completedExamPartIds.length,
+      savedSnippetsCount: 1,
+      notesCount: Object.values(chapterNotes).filter((n) => n.trim().length > 0).length,
+      bookmarkedCount: bookmarkedChapterIds.length,
+    }),
+    [
+      completedChapterIds.length,
+      completedQuizIds.length,
+      completedExamPartIds.length,
+      chapterNotes,
+      bookmarkedChapterIds.length,
+    ]
+  );
+
+  const unlockedBadgesCount = useMemo(
+    () => ALL_BADGES.filter((b) => b.isUnlocked(studentStats)).length,
+    [studentStats]
+  );
 
   // Level-Up Audio Detection: play triumphant levelUp fanfare when new badge is unlocked
   const prevBadgesCountRef = useRef<number | null>(null);
@@ -468,73 +625,166 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
     prevBadgesCountRef.current = unlockedBadgesCount;
   }, [unlockedBadgesCount, isInitialLoadDone]);
 
-  if (!bookParts.length) {
-    return (
-      <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6" dir="rtl">
-        <div role={bookLoadFailed ? 'alert' : 'status'} aria-live="polite" className="text-center space-y-3">
-          {bookLoadFailed ? (
-            <>
-              <p className="text-rose-300">تعذر تحميل محتوى المنصة.</p>
-              <button type="button" onClick={() => window.location.reload()} className="rounded-lg bg-amber-400 px-4 py-2 font-bold text-slate-950">
-                إعادة المحاولة
-              </button>
-            </>
-          ) : (
-            <div className="flex items-center justify-center gap-3 text-sm text-slate-300">
-              <span aria-hidden="true" className="w-5 h-5 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
-              <span>جارٍ تحميل محتوى المنصة…</span>
-            </div>
-          )}
-        </div>
-      </main>
-    );
-  }
+  // Memoized derived stats for Header and StudentDashboard
+  const totalCompletedCount = useMemo(
+    () => completedChapterIds.length + completedExamPartIds.length,
+    [completedChapterIds.length, completedExamPartIds.length]
+  );
+  const totalItemsCount = useMemo(
+    () => allChapters.length + partsList.length,
+    [allChapters.length, partsList.length]
+  );
+  const totalQuizzesCount = useMemo(() => partsList.length, [partsList.length]);
+
+  // Stabilized View Navigation and Modal Callbacks
+  const handleSelectView = useCallback((view: ViewMode) => {
+    soundManager.playClick();
+    setCurrentView(view);
+    setIsMobileSidebarOpen(false);
+  }, []);
+
+  const handleOpenSearch = useCallback(() => {
+    soundManager.playClick();
+    setIsSearchOpen(true);
+  }, []);
+
+  const handleOpenAchievements = useCallback(() => {
+    soundManager.playBadge();
+    setIsAchievementsOpen(true);
+  }, []);
+
+  const handleOpenOnboarding = useCallback(() => {
+    soundManager.playClick();
+    setIsOnboardingOpen(true);
+  }, []);
+
+  const handleToggleMobileSidebar = useCallback(() => {
+    setIsMobileSidebarOpen((prev) => !prev);
+  }, []);
+
+  const handleCloseMobileSidebar = useCallback(() => {
+    setIsMobileSidebarOpen(false);
+  }, []);
+
+  // Stabilized Chapter Navigation Callbacks
+  const handleSelectChapterFromSidebar = useCallback((ch: Chapter) => {
+    setSelectedChapterId(ch.id);
+    setSelectedPartExamId(null);
+    setIsMobileSidebarOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const handleSelectBugHunterFromMobile = useCallback((partId: number) => {
+    handleSelectBugHunterFromPart(partId);
+    setIsMobileSidebarOpen(false);
+  }, [handleSelectBugHunterFromPart]);
+
+  const handleSelectChapterFromDashboard = useCallback((chId: number) => {
+    setSelectedChapterId(chId);
+    setSelectedPartExamId(null);
+    setCurrentView('reader');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const handleSelectViewFromDashboard = useCallback((v: ViewMode) => {
+    setCurrentView(v);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  // Stabilized ChapterView callbacks
+  const handleToggleCurrentChapterCompleted = useCallback(() => {
+    toggleChapterCompleted(currentChapter.id);
+  }, [toggleChapterCompleted, currentChapter.id]);
+
+  const handleToggleCurrentChapterBookmark = useCallback(() => {
+    toggleBookmark(currentChapter.id);
+  }, [toggleBookmark, currentChapter.id]);
+
+  const handleUpdateCurrentChapterChallengeCode = useCallback((code: string) => {
+    handleUpdateChallengeCode(currentChapter.id, code);
+  }, [handleUpdateChallengeCode, currentChapter.id]);
+
+  const handleSaveCurrentChapterNote = useCallback((note: string) => {
+    handleSaveNote(currentChapter.id, note);
+  }, [handleSaveNote, currentChapter.id]);
+
+  const handleCompleteCurrentChapterQuiz = useCallback((chId: number) => {
+    toggleQuizCompleted(chId.toString());
+  }, [toggleQuizCompleted]);
+
+  // Stabilized PartSummaryView callbacks
+  const handleToggleCurrentExamCompleted = useCallback(() => {
+    if (selectedPart) toggleExamPartCompleted(selectedPart.id);
+  }, [toggleExamPartCompleted, selectedPart]);
+
+  const handlePrevChapterFromExam = useCallback(() => {
+    if (!selectedPart) return;
+    const lastCh = selectedPart.chapters[selectedPart.chapters.length - 1];
+    if (lastCh) {
+      setSelectedChapterId(lastCh.id);
+      setSelectedPartExamId(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [selectedPart]);
+
+  const handleNextPartFromExam = useCallback(() => {
+    if (!selectedPart) return;
+    const nextPart = partsList.find((p) => p.id === selectedPart.id + 1);
+    if (nextPart && nextPart.chapters[0]) {
+      setSelectedChapterId(nextPart.chapters[0].id);
+      setSelectedPartExamId(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [selectedPart, partsList]);
+
+  // Stabilized ChallengesList Callbacks
+  const handleOpenChapterFromChallenges = useCallback((chId: number) => {
+    setSelectedChapterId(chId);
+    setSelectedPartExamId(null);
+    setCurrentView('reader');
+  }, []);
+
+  const handleOpenPlaygroundFromChallenges = useCallback(() => {
+    setCurrentView('playground');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-['Cairo',sans-serif] overflow-x-clip">
       {/* Top Header */}
       <Header
         currentView={currentView}
-        onSelectView={(view) => {
-          soundManager.playClick();
-          setCurrentView(view);
-          setIsMobileSidebarOpen(false);
-        }}
-        completedChaptersCount={completedChapterIds.length + completedExamPartIds.length}
-        totalChaptersCount={allChapters.length + bookParts.length}
+        onSelectView={handleSelectView}
+        completedChaptersCount={totalCompletedCount}
+        totalChaptersCount={totalItemsCount}
         completedQuizzesCount={completedQuizIds.length}
-        totalQuizzesCount={bookParts.length}
+        totalQuizzesCount={totalQuizzesCount}
         role={role}
         activeCode={activeCode}
         studentName={studentName}
         onLockPlatform={onLockPlatform}
-        onOpenSearch={() => {
-          soundManager.playClick();
-          setIsSearchOpen(true);
-        }}
-        onOpenAchievements={() => {
-          soundManager.playBadge();
-          setIsAchievementsOpen(true);
-        }}
+        onOpenSearch={handleOpenSearch}
+        onOpenAchievements={handleOpenAchievements}
+        onOpenOnboarding={handleOpenOnboarding}
         unlockedBadgesCount={unlockedBadgesCount}
       />
 
-      {/* Mobile Drawer Toggle (Only in Reader Mode) */}
+      {/* Mobile Drawer Toggle (Only in Reader Mode - Styled like Figma) */}
       {currentView === 'reader' && (
-        <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-3 py-1.5 flex items-center justify-between gap-2 min-w-0 min-h-[52px]">
-          <button
-            type="button"
-            onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
-            aria-expanded={isMobileSidebarOpen}
-            aria-controls="mobile-content-drawer"
-            className="min-h-[44px] shrink-0 flex items-center gap-2 text-xs sm:text-sm font-semibold text-amber-400 bg-slate-800 hover:bg-slate-700 active:scale-95 px-3.5 py-2 rounded-xl border border-slate-700 transition touch-manipulation"
-          >
-            {isMobileSidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-            <span>الفهرس</span>
-          </button>
-          <span className="min-w-0 truncate text-xs text-slate-400 font-medium text-left">
+        <div className="lg:hidden bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 px-4 py-2.5 flex items-center justify-between gap-3 min-w-0 min-h-[56px] sticky top-0 z-40">
+          <span className="min-w-0 truncate text-xs sm:text-sm text-slate-300 font-bold text-right">
             {selectedPartExamId ? `ملخص الجزء ${selectedPartExamId}` : currentChapter.title}
           </span>
+          <button
+            type="button"
+            onClick={handleToggleMobileSidebar}
+            aria-expanded={isMobileSidebarOpen}
+            aria-controls="mobile-content-drawer"
+            className="min-h-[40px] shrink-0 flex items-center gap-2 text-xs sm:text-sm font-black text-slate-950 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 active:scale-95 px-4 py-2 rounded-xl transition-all shadow-md shadow-amber-500/20 touch-manipulation"
+          >
+            {isMobileSidebarOpen ? <X className="w-4 h-4 stroke-[2.5]" /> : <Menu className="w-4 h-4 stroke-[2.5]" />}
+            <span>الفهرس</span>
+          </button>
         </div>
       )}
 
@@ -545,26 +795,20 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
           <>
             {/* Desktop Sidebar */}
             <div className="hidden lg:block shrink-0">
-              <Suspense fallback={<div aria-hidden="true" className="w-72 min-h-screen bg-slate-950" />}>
-                <Sidebar
-                  parts={bookParts}
-                  selectedChapterId={selectedPartExamId ? -1 : currentChapter.id}
-                  onSelectChapter={(ch) => {
-                    setSelectedChapterId(ch.id);
-                    setSelectedPartExamId(null);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  onSelectBugHunter={handleSelectBugHunterFromPart}
-                  completedChapterIds={completedChapterIds}
-                  onToggleChapterCompleted={toggleChapterCompleted}
-                  completedQuizIds={completedQuizIds}
-                  onSelectPartExam={handleSelectPartExam}
-                  selectedPartExamId={selectedPartExamId}
-                  completedExamIds={completedExamPartIds}
-                  bookmarkedChapterIds={bookmarkedChapterIds}
-                  notesMap={chapterNotes}
-                />
-              </Suspense>
+              <Sidebar
+                parts={partsList}
+                selectedChapterId={selectedPartExamId ? -1 : currentChapter.id}
+                onSelectChapter={handleSelectChapterFromSidebar}
+                onSelectBugHunter={handleSelectBugHunterFromPart}
+                completedChapterIds={completedChapterIds}
+                onToggleChapterCompleted={toggleChapterCompleted}
+                completedQuizIds={completedQuizIds}
+                onSelectPartExam={handleSelectPartExam}
+                selectedPartExamId={selectedPartExamId}
+                completedExamIds={completedExamPartIds}
+                bookmarkedChapterIds={bookmarkedChapterIds}
+                notesMap={chapterNotes}
+              />
             </div>
 
             {/* Mobile Sidebar Modal/Overlay */}
@@ -574,14 +818,14 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
                   type="button"
                   aria-label="إغلاق فهرس المحتوى"
                   className="fixed inset-0 bg-black/70 backdrop-blur-sm"
-                  onClick={() => setIsMobileSidebarOpen(false)}
+                  onClick={handleCloseMobileSidebar}
                 />
                 <div id="mobile-content-drawer" role="dialog" aria-modal="true" aria-label="فهرس المحتوى" className="relative z-10 w-80 max-w-[85%] bg-slate-950 h-full flex flex-col border-l border-slate-800">
                   <div className="p-3.5 border-b border-slate-800 flex items-center justify-between min-h-[56px]">
                     <span className="font-bold text-amber-400 text-sm">فهرس المحتوى</span>
                     <button
                       type="button"
-                      onClick={() => setIsMobileSidebarOpen(false)}
+                      onClick={handleCloseMobileSidebar}
                       aria-label="إغلاق الفهرس"
                       className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/80 active:scale-90 transition touch-manipulation"
                     >
@@ -589,30 +833,20 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
                     </button>
                   </div>
                   <div className="flex-1 overflow-y-auto">
-                    <Suspense fallback={<ViewLoadingState />}>
-                      <Sidebar
-                        parts={bookParts}
-                        selectedChapterId={selectedPartExamId ? -1 : currentChapter.id}
-                        onSelectChapter={(ch) => {
-                          setSelectedChapterId(ch.id);
-                          setSelectedPartExamId(null);
-                          setIsMobileSidebarOpen(false);
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                        onSelectBugHunter={(partId) => {
-                          handleSelectBugHunterFromPart(partId);
-                          setIsMobileSidebarOpen(false);
-                        }}
-                        completedChapterIds={completedChapterIds}
-                        onToggleChapterCompleted={toggleChapterCompleted}
-                        completedQuizIds={completedQuizIds}
-                        onSelectPartExam={handleSelectPartExam}
-                        selectedPartExamId={selectedPartExamId}
-                        completedExamIds={completedExamPartIds}
-                        bookmarkedChapterIds={bookmarkedChapterIds}
-                        notesMap={chapterNotes}
-                      />
-                    </Suspense>
+                    <Sidebar
+                      parts={partsList}
+                      selectedChapterId={selectedPartExamId ? -1 : currentChapter.id}
+                      onSelectChapter={handleSelectChapterFromSidebar}
+                      onSelectBugHunter={handleSelectBugHunterFromMobile}
+                      completedChapterIds={completedChapterIds}
+                      onToggleChapterCompleted={toggleChapterCompleted}
+                      completedQuizIds={completedQuizIds}
+                      onSelectPartExam={handleSelectPartExam}
+                      selectedPartExamId={selectedPartExamId}
+                      completedExamIds={completedExamPartIds}
+                      bookmarkedChapterIds={bookmarkedChapterIds}
+                      notesMap={chapterNotes}
+                    />
                   </div>
                 </div>
               </div>
@@ -622,31 +856,36 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
 
         {/* Dynamic Views */}
         <main className="flex-1 min-w-0 bg-slate-950">
-          <Suspense fallback={<ViewLoadingState />}>
+          {currentView === 'dashboard' && (
+            <StudentDashboard
+              role={role}
+              studentName={studentName}
+              parts={partsList}
+              completedChapterIds={completedChapterIds}
+              completedQuizIds={completedQuizIds}
+              completedChallengeIds={completedChallengeIds}
+              completedExamPartIds={completedExamPartIds}
+              unlockedBadgesCount={unlockedBadgesCount}
+              bookmarkedCount={bookmarkedChapterIds.length}
+              notesCount={studentStats.notesCount}
+              currentChapterId={selectedChapterId}
+              onSelectChapter={handleSelectChapterFromDashboard}
+              onSelectView={handleSelectViewFromDashboard}
+              onOpenAchievements={handleOpenAchievements}
+              onOpenOnboarding={handleOpenOnboarding}
+            />
+          )}
+
           {currentView === 'reader' && (
             selectedPartExamId && (selectedPart?.summary || selectedPart?.comprehensiveExam) ? (
               <PartSummaryView
                 part={selectedPart}
                 summary={selectedPart.summary || selectedPart.comprehensiveExam!}
                 isCompleted={completedExamPartIds.includes(selectedPart.id)}
-                onToggleCompleted={() => toggleExamPartCompleted(selectedPart.id)}
+                onToggleCompleted={handleToggleCurrentExamCompleted}
                 onOpenInPlayground={handleOpenPlaygroundWithCode}
-                onPrevChapter={() => {
-                  const lastCh = selectedPart.chapters[selectedPart.chapters.length - 1];
-                  if (lastCh) {
-                    setSelectedChapterId(lastCh.id);
-                    setSelectedPartExamId(null);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }
-                }}
-                onNextPart={() => {
-                  const nextPart = bookParts.find((p) => p.id === selectedPart.id + 1);
-                  if (nextPart && nextPart.chapters[0]) {
-                    setSelectedChapterId(nextPart.chapters[0].id);
-                    setSelectedPartExamId(null);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }
-                }}
+                onPrevChapter={handlePrevChapterFromExam}
+                onNextPart={handleNextPartFromExam}
               />
             ) : (
               <ChapterView
@@ -654,77 +893,78 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
                 onNextChapter={handleNextChapter}
                 onPrevChapter={handlePrevChapter}
                 isCompleted={completedChapterIds.includes(currentChapter.id)}
-                onToggleCompleted={() => toggleChapterCompleted(currentChapter.id)}
+                onToggleCompleted={handleToggleCurrentChapterCompleted}
                 onOpenInPlayground={handleOpenPlaygroundWithCode}
                 savedChallengeCode={challengeCodes[currentChapter.id.toString()]}
-                onUpdateChallengeCode={(code) => handleUpdateChallengeCode(currentChapter.id, code)}
+                onUpdateChallengeCode={handleUpdateCurrentChapterChallengeCode}
                 onOpenPartExam={handleSelectPartExam}
                 isLastChapterInPart={isLastChapterInPart(currentChapter)}
                 isBookmarked={bookmarkedChapterIds.includes(currentChapter.id)}
-                onToggleBookmark={() => toggleBookmark(currentChapter.id)}
+                onToggleBookmark={handleToggleCurrentChapterBookmark}
                 userNote={chapterNotes[currentChapter.id.toString()] || ''}
-                onSaveUserNote={(note) => handleSaveNote(currentChapter.id, note)}
-                onCompleteQuiz={(chId) => toggleQuizCompleted(chId.toString())}
+                onSaveUserNote={handleSaveCurrentChapterNote}
+                onCompleteQuiz={handleCompleteCurrentChapterQuiz}
               />
             )
           )}
 
-          {currentView === 'playground' && (
-            <CodePlayground
-              initialCode={playgroundCode || undefined}
-              activeCode={activeCode}
-              studentName={studentName}
-            />
-          )}
+          {(currentView === 'playground' ||
+            currentView === 'bughunter' ||
+            currentView === 'challenges' ||
+            currentView === 'admin') && (
+            <Suspense fallback={<ViewLoadingState />}>
+              {currentView === 'playground' && (
+                <CodePlayground
+                  initialCode={playgroundCode || undefined}
+                  activeCode={activeCode}
+                  studentName={studentName}
+                />
+              )}
 
-          {currentView === 'bughunter' && (
-            <BugHunter
-              parts={bookParts}
-              initialPartId={selectedBugHunterPartId}
-              completedQuizIds={completedQuizIds}
-              onToggleQuizCompleted={toggleQuizCompleted}
-            />
-          )}
+              {currentView === 'bughunter' && (
+                <BugHunter
+                  parts={partsList}
+                  initialPartId={selectedBugHunterPartId}
+                  completedQuizIds={completedQuizIds}
+                  onToggleQuizCompleted={toggleQuizCompleted}
+                />
+              )}
 
-          {currentView === 'challenges' && (
-            <ChallengesList
-              key={`challenges-${codeKey}`}
-              parts={bookParts}
-              activeCode={activeCode}
-              onOpenChapter={(chId) => {
-                setSelectedChapterId(chId);
-                setSelectedPartExamId(null);
-                setCurrentView('reader');
-              }}
-              onOpenPlayground={() => {
-                setCurrentView('playground');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-            />
-          )}
+              {currentView === 'challenges' && (
+                <ChallengesList
+                  key={`challenges-${codeKey}`}
+                  parts={partsList}
+                  activeCode={activeCode}
+                  onOpenChapter={handleOpenChapterFromChallenges}
+                  onOpenPlayground={handleOpenPlaygroundFromChallenges}
+                />
+              )}
 
-          {currentView === 'admin' && (
-            <AdminDashboard
-              key={`admin-dash-${codeKey}`}
-              activeCode={activeCode}
-              role={role}
-              studentName={studentName}
-              onSelectView={setCurrentView}
-            />
+              {currentView === 'admin' && (
+                <AdminDashboard
+                  key={`admin-dash-${codeKey}`}
+                  activeCode={activeCode}
+                  role={role}
+                  studentName={studentName}
+                  onSelectView={setCurrentView}
+                />
+              )}
+            </Suspense>
           )}
-          </Suspense>
         </main>
       </div>
 
-      {/* Feature 6: Mobile Bottom Navigation Bar (4-5 primary items) */}
+      {/* Feature 6: Mobile Bottom Navigation Bar (5 primary items max) */}
       <MobileBottomNav
         currentView={currentView}
         role={role}
-        onSelectView={(view) => {
-          setCurrentView(view);
-          setIsMobileSidebarOpen(false);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
+        studentName={studentName}
+        onSelectView={handleSelectView}
+        onOpenSearch={handleOpenSearch}
+        onOpenAchievements={handleOpenAchievements}
+        onOpenOnboarding={handleOpenOnboarding}
+        onLockPlatform={onLockPlatform}
+        unlockedBadgesCount={unlockedBadgesCount}
       />
 
       {/* Feature 2: Global Search Modal */}
@@ -732,7 +972,7 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
         <GlobalSearchModal
           isOpen={isSearchOpen}
           onClose={() => setIsSearchOpen(false)}
-          parts={bookParts}
+          parts={partsList}
           onSelectChapter={(chId) => {
             setSelectedChapterId(chId);
             setSelectedPartExamId(null);
@@ -756,6 +996,25 @@ export function PlatformApp({ activeCode, role, studentName, onLockPlatform }: P
           studentName={studentName}
         />
       </Suspense>
+
+      {/* Feature 4: First-use Onboarding Modal */}
+      <Suspense fallback={null}>
+        <OnboardingModal
+          isOpen={isOnboardingOpen}
+          studentName={studentName}
+          onClose={handleDismissOnboarding}
+          onStartFirstLesson={() => {
+            handleDismissOnboarding();
+            setSelectedChapterId(1);
+            setSelectedPartExamId(null);
+            setCurrentView('reader');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      </Suspense>
+
+      {/* Feature 5: Real-time Offline & Sync Indicator */}
+      <OfflineStatusIndicator />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-export type ViewMode = 'reader' | 'playground' | 'bughunter' | 'challenges' | 'admin';
+export type ViewMode = 'dashboard' | 'reader' | 'playground' | 'bughunter' | 'challenges' | 'admin';
 
 export interface Exercise {
   id: string;

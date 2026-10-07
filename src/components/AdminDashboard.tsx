@@ -528,6 +528,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  // Global Escape key dismissal for open sub-modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (editingCode) setEditingCode(null);
+        else if (deleteTarget) setDeleteTarget(null);
+        else if (inspectingStudent) setInspectingStudent(null);
+        else if (feedbackTarget) setFeedbackTarget(null);
+        else if (isMasterCodeModalOpen) setIsMasterCodeModalOpen(false);
+        else if (isRevokeConfirmOpen) setIsRevokeConfirmOpen(false);
+        else if (pendingBackup) setPendingBackup(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    editingCode,
+    deleteTarget,
+    inspectingStudent,
+    feedbackTarget,
+    isMasterCodeModalOpen,
+    isRevokeConfirmOpen,
+    pendingBackup,
+  ]);
+
   const isCurrentlyActive = (code: CodeRecord) =>
     code.status === 'active' && (!code.expiresAt || Date.parse(code.expiresAt) >= Date.now());
   const pageStart = (currentPage - 1) * pageSize;
@@ -662,22 +687,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <span className="text-xs text-slate-400 font-medium block">
             {isMaster ? 'إجمالي الأكواد' : 'إجمالي طلابك'}
           </span>
-          <span className="text-2xl sm:text-3xl font-black text-white font-mono">{totalCount}</span>
+          <span className="text-2xl sm:text-3xl font-black text-white font-mono" dir="ltr">{totalCount}</span>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 text-center space-y-1 shadow-lg">
           <span className="text-xs text-emerald-400 font-medium block">الأكواد النشطة</span>
-          <span className="text-2xl sm:text-3xl font-black text-emerald-300 font-mono">{activeCount}</span>
+          <span className="text-2xl sm:text-3xl font-black text-emerald-300 font-mono" dir="ltr">{activeCount}</span>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 text-center space-y-1 shadow-lg">
           <span className="text-xs text-rose-400 font-medium block">الأكواد المنتهية</span>
-          <span className="text-2xl sm:text-3xl font-black text-rose-300 font-mono">{expiredCount}</span>
+          <span className="text-2xl sm:text-3xl font-black text-rose-300 font-mono" dir="ltr">{expiredCount}</span>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 text-center space-y-1 shadow-lg">
           <span className="text-xs text-amber-400 font-medium block">
             {isMaster ? 'المعلمون / الطلاب' : 'الفصول التفاعلية'}
           </span>
           <span className="text-lg sm:text-xl font-black text-amber-300 font-mono">
-            {isMaster ? `${teachersCount} 👨‍🏫 / ${studentsCount} 🎓` : 'مفعل ✓'}
+            {isMaster ? (
+              <>
+                <span dir="ltr">{teachersCount}</span> 👨‍🏫 / <span dir="ltr">{studentsCount}</span> 🎓
+              </>
+            ) : (
+              'مفعل ✓'
+            )}
           </span>
         </div>
       </div>
@@ -936,78 +967,80 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               {/* Filters & Search */}
-              <div className="flex flex-wrap items-center gap-2.5">
-                <div className="relative">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 w-full lg:w-auto">
+                <div className="relative w-full sm:w-56">
                   <Search className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="search"
                     value={searchQuery}
                     onChange={(e) => handleSearchChange(e.target.value)}
                     placeholder="ابحث بالاسم أو الكود..."
-                    className="w-full sm:w-56 bg-slate-950 border border-slate-800 rounded-2xl pr-9 pl-4 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-amber-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl pr-9 pl-4 py-2 text-xs sm:text-sm text-white focus:outline-none focus:border-amber-500 shadow-inner"
                   />
                 </div>
 
-                {isMaster && (
-                  <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-2xl border border-slate-800 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  {isMaster && (
+                    <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-2xl border border-slate-800 text-xs overflow-x-auto">
+                      <button
+                        type="button"
+                        onClick={() => handleRoleFilterChange('all')}
+                        className={`px-3 py-1.5 rounded-xl transition ${
+                          roleFilter === 'all' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        الكل
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRoleFilterChange('teacher')}
+                        className={`px-3 py-1.5 rounded-xl transition ${
+                          roleFilter === 'teacher' ? 'bg-purple-950 text-purple-300 font-bold border border-purple-800' : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        المعلمون ({teachersCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRoleFilterChange('student')}
+                        className={`px-3 py-1.5 rounded-xl transition ${
+                          roleFilter === 'student' ? 'bg-amber-950 text-amber-300 font-bold border border-amber-800' : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        الطلاب ({studentsCount})
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-2xl border border-slate-800 text-xs overflow-x-auto">
                     <button
                       type="button"
-                      onClick={() => handleRoleFilterChange('all')}
+                      onClick={() => handleFilterChange('all')}
                       className={`px-3 py-1.5 rounded-xl transition ${
-                        roleFilter === 'all' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
+                        filter === 'all' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      الكل
+                      الكل ({totalCount})
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleRoleFilterChange('teacher')}
+                      onClick={() => handleFilterChange('active')}
                       className={`px-3 py-1.5 rounded-xl transition ${
-                        roleFilter === 'teacher' ? 'bg-purple-950 text-purple-300 font-bold border border-purple-800' : 'text-slate-400 hover:text-white'
+                        filter === 'active' ? 'bg-emerald-950 text-emerald-300 font-bold border border-emerald-800' : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      المعلمون ({teachersCount})
+                      فعال ({activeCount})
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleRoleFilterChange('student')}
+                      onClick={() => handleFilterChange('expired')}
                       className={`px-3 py-1.5 rounded-xl transition ${
-                        roleFilter === 'student' ? 'bg-amber-950 text-amber-300 font-bold border border-amber-800' : 'text-slate-400 hover:text-white'
+                        filter === 'expired' ? 'bg-rose-950 text-rose-300 font-bold border border-rose-800' : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      الطلاب ({studentsCount})
+                      منتهي ({expiredCount})
                     </button>
                   </div>
-                )}
-
-                <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-2xl border border-slate-800 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => handleFilterChange('all')}
-                    className={`px-3 py-1.5 rounded-xl transition ${
-                      filter === 'all' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    الكل ({totalCount})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleFilterChange('active')}
-                    className={`px-3 py-1.5 rounded-xl transition ${
-                      filter === 'active' ? 'bg-emerald-950 text-emerald-300 font-bold border border-emerald-800' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    فعال ({activeCount})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleFilterChange('expired')}
-                    className={`px-3 py-1.5 rounded-xl transition ${
-                      filter === 'expired' ? 'bg-rose-950 text-rose-300 font-bold border border-rose-800' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    منتهي ({expiredCount})
-                  </button>
                 </div>
               </div>
             </div>
@@ -1023,7 +1056,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {searchQuery.trim() ? 'لا توجد نتائج تطابق بحثك.' : 'لا توجد أكواد مسجلة في هذا القسم.'}
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3.5">
                 {codes.map((c) => {
                   const isActive = isCurrentlyActive(c);
                   const isExpired = c.status === 'expired' || (c.status === 'active' && !isActive);
@@ -1033,75 +1066,109 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   return (
                     <div
                       key={c.id}
-                      className={`p-4 rounded-2xl border transition space-y-3 ${
+                      className={`p-4 sm:p-5 rounded-2xl border transition space-y-3.5 overflow-hidden ${
                         isActive
                           ? isTeacherRow
-                            ? 'bg-slate-950/90 border-purple-900/40 hover:border-purple-800'
-                            : 'bg-slate-950/80 border-slate-800 hover:border-slate-700'
-                          : 'bg-slate-950/40 border-slate-800/50 opacity-80'
+                            ? 'bg-slate-950/90 border-purple-900/50 hover:border-purple-800 shadow-md shadow-purple-950/20'
+                            : 'bg-slate-950/85 border-slate-800 hover:border-slate-700 shadow-md shadow-black/30'
+                          : 'bg-slate-950/50 border-slate-800/60 opacity-85'
                       }`}
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        {/* Code Details */}
-                        <div className="flex items-center gap-3">
-                          <span className={`font-mono font-black text-base sm:text-lg tracking-wider px-3 py-1 rounded-xl border ${
-                            isTeacherRow
-                              ? 'bg-purple-950/60 text-purple-300 border-purple-800/60'
-                              : 'bg-slate-900 text-amber-300 border-slate-800'
-                          }`}>
-                            {c.code}
-                          </span>
-
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-white text-sm">
+                      {/* Card Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-w-0">
+                        {/* User identity and metadata */}
+                        <div className="space-y-1.5 min-w-0 flex-1">
+                          <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 min-w-0">
+                              <span className="font-black text-white text-base sm:text-lg truncate">
                                 {c.studentName || (isTeacherRow ? 'معلم جديد' : 'طالب جديد')}
                               </span>
                               {isTeacherRow ? (
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
+                                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/40 shrink-0">
                                   👨‍🏫 معلم
                                 </span>
                               ) : (
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20">
+                                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-bold border border-amber-500/30 shrink-0">
                                   🎓 طالب
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+
+                            {/* Mobile status pill */}
+                            <div className="sm:hidden shrink-0">
+                              {isActive && (
+                                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                  ✓ نشط
+                                </span>
+                              )}
+                              {isExpired && (
+                                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                                  منتهي
+                                </span>
+                              )}
+                              {isRevoked && (
+                                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                                  ملغي
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Metadata row */}
+                          <div className="text-xs text-slate-400 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                               <span>
                                 {c.expiresAt
                                   ? `ينتهي: ${new Date(c.expiresAt).toLocaleDateString('ar-EG')}`
                                   : 'صلاحية دائمة'}
                               </span>
-                              <span>•</span>
+                            </span>
+                            <span className="text-slate-600 hidden xs:inline">•</span>
+                            <span className="flex items-center gap-1">
+                              <Users className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                               <span>استُخدم {c.usedCount || 0} مرة</span>
-                              {isTeacherRow && c.maxStudentsLimit && (
-                                <>
-                                  <span>•</span>
-                                  <span className="text-purple-300 font-bold">حد الطلاب: {c.maxStudentsLimit}</span>
-                                </>
-                              )}
-                            </div>
+                            </span>
+                            {isTeacherRow && c.maxStudentsLimit && (
+                              <>
+                                <span className="text-slate-600 hidden xs:inline">•</span>
+                                <span className="text-purple-300 font-bold">حد الطلاب: {c.maxStudentsLimit}</span>
+                              </>
+                            )}
                           </div>
                         </div>
 
-                        {/* Status badge */}
-                        <div>
-                          {isActive && (
-                            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                              ✓ نشط وفعال
-                            </span>
-                          )}
-                          {isExpired && (
-                            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/30">
-                              منتهي الصلاحية
-                            </span>
-                          )}
-                          {isRevoked && (
-                            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
-                              ملغي من الإدارة
-                            </span>
-                          )}
+                        {/* Code badge & Desktop Status */}
+                        <div className="flex items-center justify-between sm:justify-end gap-2.5 min-w-0 pt-1 sm:pt-0">
+                          <div
+                            dir="ltr"
+                            className={`font-mono font-black text-sm sm:text-base tracking-wider px-3.5 py-1.5 rounded-xl border flex items-center gap-2 select-all break-all ${
+                              isTeacherRow
+                                ? 'bg-purple-950/70 text-purple-200 border-purple-800/70 shadow-inner'
+                                : 'bg-slate-900 text-amber-300 border-slate-800 shadow-inner'
+                            }`}
+                          >
+                            <span>{c.code}</span>
+                          </div>
+
+                          {/* Desktop status pill */}
+                          <div className="hidden sm:block shrink-0">
+                            {isActive && (
+                              <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 whitespace-nowrap">
+                                ✓ نشط وفعال
+                              </span>
+                            )}
+                            {isExpired && (
+                              <span className="text-xs font-bold px-3 py-1 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30 whitespace-nowrap">
+                                منتهي الصلاحية
+                              </span>
+                            )}
+                            {isRevoked && (
+                              <span className="text-xs font-bold px-3 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700 whitespace-nowrap">
+                                ملغي من الإدارة
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -1117,10 +1184,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <span className="text-slate-300 font-medium flex items-center gap-2">
                                 <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
                                 <span>تقدم التعلم:</span>
-                                <strong className="text-amber-300 font-bold">{completedChs} من {totalChapterCount} فصل</strong>
-                                <span className="text-emerald-400 text-xs">({completedQz} اختبارات)</span>
+                                <strong className="text-amber-300 font-bold">
+                                  <span dir="ltr">{completedChs}/{totalChapterCount}</span> فصل
+                                </strong>
+                                <span className="text-emerald-400 text-xs">
+                                  (<span dir="ltr">{completedQz}</span> اختبارات)
+                                </span>
                               </span>
-                              <span className="font-mono font-bold text-white text-xs">{percent}%</span>
+                              <span className="font-mono font-bold text-white text-xs" dir="ltr">{percent}%</span>
                             </div>
                             <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
                               <div
@@ -1133,21 +1204,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       })()}
 
                       {/* Actions Toolbar */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-900 text-xs">
-                        <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-3 border-t border-slate-800/70 text-xs">
+                        {/* Primary action tools (Copy, Invite, Edit, Student Codes) */}
+                        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() => handleCopy(c.code, `code-${c.id}`)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition"
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition active:scale-95 touch-manipulation min-h-[38px]"
                           >
                             {copiedKey === `code-${c.id}` ? (
                               <>
-                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                                 <span className="text-emerald-400">تم النسخ</span>
                               </>
                             ) : (
                               <>
-                                <Copy className="w-3.5 h-3.5 text-slate-400" />
+                                <Copy className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                                 <span>نسخ الكود</span>
                               </>
                             )}
@@ -1156,19 +1228,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <button
                             type="button"
                             onClick={() => handleCopyInvite(c)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-800/60 text-emerald-300 text-xs font-bold transition"
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-800/60 text-emerald-300 text-xs font-bold transition active:scale-95 touch-manipulation min-h-[38px]"
                           >
-                            <Send className="w-3.5 h-3.5 text-emerald-400" />
+                            <Send className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                             <span>دعوة واتساب 💬</span>
                           </button>
 
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(c)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-950/60 hover:bg-sky-900/80 border border-sky-800/60 text-sky-300 text-xs font-bold transition"
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-sky-950/60 hover:bg-sky-900/80 border border-sky-800/60 text-sky-300 text-xs font-bold transition active:scale-95 touch-manipulation min-h-[38px]"
                             title="تعديل الكود والاسم والرتبة والصلاحيات"
                           >
-                            <Pencil className="w-3.5 h-3.5 text-sky-400" />
+                            <Pencil className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                             <span>تعديل ✏️</span>
                           </button>
 
@@ -1176,25 +1248,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <button
                               type="button"
                               onClick={() => setInspectingStudent(c)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-950/60 hover:bg-indigo-900/80 border border-indigo-800/60 text-indigo-300 text-xs font-bold transition"
+                              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-950/60 hover:bg-indigo-900/80 border border-indigo-800/60 text-indigo-300 text-xs font-bold transition active:scale-95 touch-manipulation min-h-[38px]"
                               title="عرض وفحص الأكواد والمشاريع التي كتبها هذا الطالب"
                             >
-                              <Code2 className="w-3.5 h-3.5 text-indigo-400" />
+                              <Code2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                               <span>أكواد الطالب 💻</span>
                             </button>
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        {/* Secondary Status & Delete Actions */}
+                        <div className="flex items-center justify-between sm:justify-end gap-2 pt-1 sm:pt-0">
                           {isActive ? (
                             <button
                               type="button"
                               onClick={() => handleExpire(c.id)}
                               disabled={busyCodeId === c.id}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-950/40 hover:bg-amber-900/60 border border-amber-900/50 text-amber-300 text-xs font-bold transition"
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-950/40 hover:bg-amber-900/60 border border-amber-900/50 text-amber-300 text-xs font-bold transition active:scale-95 touch-manipulation min-h-[38px]"
                               title="إنهاء صلاحية هذا الكود فوراً"
                             >
-                              <PowerOff className="w-3.5 h-3.5 text-amber-400" />
+                              <PowerOff className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                               <span>إنهاء الصلاحية</span>
                             </button>
                           ) : (
@@ -1202,10 +1275,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               type="button"
                               onClick={() => handleReactivate(c.id, 30)}
                               disabled={busyCodeId === c.id}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-900/50 text-emerald-300 text-xs font-bold transition"
+                              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-900/50 text-emerald-300 text-xs font-bold transition active:scale-95 touch-manipulation min-h-[38px]"
                               title="إعادة تفعيل الكود لمدة 30 يوماً"
                             >
-                              <RotateCcw className="w-3.5 h-3.5 text-emerald-400" />
+                              <RotateCcw className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                               <span>إعادة تفعيل 🔄</span>
                             </button>
                           )}
@@ -1214,10 +1287,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             type="button"
                             onClick={() => setDeleteTarget({ id: c.id, code: c.code, studentName: c.studentName })}
                             disabled={busyCodeId === c.id}
-                            className="p-2 rounded-xl bg-slate-900 hover:bg-rose-950 hover:text-rose-400 text-slate-500 border border-slate-800 transition"
+                            className="min-w-[38px] min-h-[38px] flex items-center justify-center p-2 rounded-xl bg-slate-900 hover:bg-rose-950 hover:text-rose-400 text-slate-500 border border-slate-800 transition active:scale-95 touch-manipulation"
                             title="حذف نهائي من قاعدة البيانات"
+                            aria-label="حذف الكود نهائياً"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-4 h-4 shrink-0" />
                           </button>
                         </div>
                       </div>
@@ -1483,7 +1557,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* Edit Code Dialog Modal */}
       {editingCode && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="تعديل بيانات الكود"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+        >
           <div className="bg-slate-900 border border-sky-500/40 w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-5 text-right dir-rtl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center gap-3">
@@ -1709,7 +1788,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* Master Code Customization Modal */}
       {isMasterCodeModalOpen && isMaster && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="إعدادات كود المالك"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+        >
           <div className="bg-slate-900 border border-yellow-500/40 w-full max-w-lg rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 text-right dir-rtl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center gap-3">
@@ -1786,7 +1870,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-fadeIn">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="تأكيد حذف الكود"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-fadeIn"
+        >
           <div className="bg-slate-900 border border-rose-500/30 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden p-6 space-y-5 animate-scaleUp text-right dir-rtl">
             <div className="flex flex-col items-center text-center space-y-2">
               <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center shadow-lg shadow-rose-500/10 mb-1">
@@ -1851,7 +1940,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* Inspect Student Modal */}
       {inspectingStudent && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="أكواد ومشاريع الطالب"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+        >
           <div className="bg-slate-900 border border-indigo-500/40 w-full max-w-2xl rounded-3xl p-6 shadow-2xl space-y-5 text-right dir-rtl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center gap-3">
@@ -1917,7 +2011,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* Send Feedback Modal */}
       {feedbackTarget && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="إرسال تشجيع وتوجيه للطالب"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+        >
           <div className="bg-slate-900 border border-amber-500/40 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 text-right dir-rtl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2 text-amber-400 font-bold">
@@ -1969,7 +2068,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* Restore Confirmation Modal */}
       {pendingBackup && isMaster && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="استعادة نسخة احتياطية"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+        >
           <div className="bg-slate-900 border border-cyan-500/40 w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-5 text-right dir-rtl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center gap-3">
@@ -2058,7 +2162,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* Global Session Revocation Confirmation Modal */}
       {isRevokeConfirmOpen && isMaster && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="تأكيد إبطال جميع الجلسات النشطة"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+        >
           <div className="bg-slate-900 border border-rose-500/40 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-5 text-right dir-rtl">
             <div className="flex flex-col items-center text-center space-y-2">
               <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center shadow-lg shadow-rose-500/10 mb-1">

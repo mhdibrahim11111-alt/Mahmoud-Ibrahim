@@ -1,17 +1,43 @@
-import { Part } from '../types';
-import { partExamsData } from './partExamsData';
+import { Part, PartComprehensiveExam } from '../types';
 import { lightweightBookParts } from './lightweightBookOutline';
 
-// Lightweight outline initially for zero-delay sidebar, navigation, and counters
+// Lightweight outline initially for zero-delay sidebar, navigation, and UI shell counters
 export const bookParts: Part[] = lightweightBookParts;
 
-// Attach Part Comprehensive Exams & Capstone Challenges & Summaries
-bookParts.forEach((part) => {
-  if (partExamsData[part.id]) {
-    part.summary = partExamsData[part.id];
-    part.comprehensiveExam = partExamsData[part.id];
+// Memory cache for deferred part comprehensive exams
+let cachedPartExamsData: Record<number, PartComprehensiveExam> | null = null;
+let partExamsDeferredPromise: Promise<Record<number, PartComprehensiveExam>> | null = null;
+
+/**
+ * Deferred loader for non-critical large exam and summary datasets.
+ * Prioritizes the initial UI shell rendering by loading exams in the background.
+ */
+export function loadPartExamsData(): Promise<Record<number, PartComprehensiveExam>> {
+  if (cachedPartExamsData) {
+    return Promise.resolve(cachedPartExamsData);
   }
-});
+
+  if (!partExamsDeferredPromise) {
+    partExamsDeferredPromise = import('./partExamsData')
+      .then((module) => {
+        cachedPartExamsData = module.partExamsData;
+        // Attach exams to static bookParts reference
+        bookParts.forEach((part) => {
+          if (cachedPartExamsData && cachedPartExamsData[part.id]) {
+            part.summary = cachedPartExamsData[part.id];
+            part.comprehensiveExam = cachedPartExamsData[part.id];
+          }
+        });
+        return cachedPartExamsData;
+      })
+      .catch((err) => {
+        console.error('Failed to load deferred part exams data:', err);
+        return {} as Record<number, PartComprehensiveExam>;
+      });
+  }
+
+  return partExamsDeferredPromise;
+}
 
 // Cache for dynamically loaded full parts
 const loadedPartsCache = new Map<number, Part>();
@@ -61,9 +87,17 @@ export async function loadPartDetails(partId: number): Promise<Part> {
       throw new Error(`Unknown part ID: ${partId}`);
   }
 
-  if (partExamsData[fullPart.id]) {
-    fullPart.summary = partExamsData[fullPart.id];
-    fullPart.comprehensiveExam = partExamsData[fullPart.id];
+  if (cachedPartExamsData && cachedPartExamsData[fullPart.id]) {
+    fullPart.summary = cachedPartExamsData[fullPart.id];
+    fullPart.comprehensiveExam = cachedPartExamsData[fullPart.id];
+  } else {
+    // If exams are not yet loaded, asynchronously attach when deferred promise resolves
+    loadPartExamsData().then((exams) => {
+      if (exams[fullPart.id]) {
+        fullPart.summary = exams[fullPart.id];
+        fullPart.comprehensiveExam = exams[fullPart.id];
+      }
+    }).catch(() => {});
   }
 
   loadedPartsCache.set(partId, fullPart);

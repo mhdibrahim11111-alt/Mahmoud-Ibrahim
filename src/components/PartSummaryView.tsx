@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Part, PartComprehensiveExam } from '../types';
 import { ChapterQuiz } from './ChapterQuiz';
-import { CodeEditor } from './CodeEditor';
 import { CodeBlock } from './CodeBlock';
 import { FormattedArabicText } from './FormattedArabicText';
 import { runJavaScript } from '../utils/codeRunner';
 import { validateChallenge, ChallengeValidationResult } from '../utils/challengeValidator';
 import { partSummaryDetails, RuleDetail } from '../data/partSummaryDetails';
 import { useSoundManager } from '../hooks/useSoundManager';
+
+const CodeEditor = lazy(() =>
+  import('./CodeEditor').then((module) => ({ default: module.CodeEditor }))
+);
 import {
   Trophy,
   CheckCircle2,
@@ -66,7 +69,7 @@ interface PartSummaryViewProps {
   onOpenInPlayground?: (code: string) => void;
 }
 
-export const PartSummaryView: React.FC<PartSummaryViewProps> = ({
+export const PartSummaryView = React.memo<PartSummaryViewProps>(({
   part,
   summary,
   onPrevChapter,
@@ -418,13 +421,22 @@ export const PartSummaryView: React.FC<PartSummaryViewProps> = ({
             )}
 
             <div className="rounded-2xl overflow-hidden border border-slate-800 shadow-xl">
-              <CodeEditor
-                value={challengeCode}
-                onChange={setChallengeCode}
-                onRun={handleRunChallenge}
-                placeholder="// اكتب كود التحدي الشامل هنا..."
-                className="h-64 sm:h-72"
-              />
+              <Suspense
+                fallback={
+                  <div className="h-64 sm:h-72 bg-slate-950/80 flex flex-col items-center justify-center gap-2 text-slate-400 text-sm">
+                    <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                    <span>تجهيز محرر الأكواد...</span>
+                  </div>
+                }
+              >
+                <CodeEditor
+                  value={challengeCode}
+                  onChange={setChallengeCode}
+                  onRun={handleRunChallenge}
+                  placeholder="// اكتب كود التحدي الشامل هنا..."
+                  className="h-64 sm:h-72"
+                />
+              </Suspense>
             </div>
 
             {/* Actions Bar */}
@@ -543,7 +555,7 @@ export const PartSummaryView: React.FC<PartSummaryViewProps> = ({
       </div>
     </article>
   );
-};
+});
 
 // Export alias for backward compatibility
 export const PartExamView = PartSummaryView;

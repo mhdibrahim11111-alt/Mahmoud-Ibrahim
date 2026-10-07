@@ -13,6 +13,20 @@ export const InstallAppButton: React.FC = () => {
   const [isInstalled, setIsInstalled] = useState(false);
   const [showIosModal, setShowIosModal] = useState(false);
 
+  const [showGuideModal, setShowGuideModal] = useState(false);
+
+  useEffect(() => {
+    if (!showIosModal && !showGuideModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowIosModal(false);
+        setShowGuideModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showIosModal, showGuideModal]);
+
   // Detect iOS Safari
   const isIos =
     typeof window !== 'undefined' &&
@@ -63,8 +77,7 @@ export const InstallAppButton: React.FC = () => {
     } else if (isIos) {
       setShowIosModal(true);
     } else {
-      // Direct instruction for desktop/other
-      alert('لتثبيت التطبيق على جهازك: اضغط على أيقونة التثبيت (Install) بجوار شريط العنوان في متصفحك.');
+      setShowGuideModal(true);
     }
   };
 
@@ -74,17 +87,59 @@ export const InstallAppButton: React.FC = () => {
 
   return (
     <>
-     <button
-  onClick={handleInstallClick}
-  className="flex items-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition active:scale-95 shadow shadow-emerald-500/10 shrink-0"
-  title="تثبيت منصة زكي كود كتطبيق على هاتفك أو حاسوبك"
->
-  <Download className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-  <span className="hidden sm:inline">تثبيت التطبيق 📲</span>
-</button>
+      <button
+        type="button"
+        onClick={handleInstallClick}
+        className="flex items-center gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition active:scale-95 shadow shadow-emerald-500/10 shrink-0"
+        title="تثبيت منصة زكي كود كتطبيق على هاتفك أو حاسوبك"
+      >
+        <Download className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+        <span className="hidden sm:inline">تثبيت التطبيق 📲</span>
+      </button>
+
+      {/* General / Desktop instructions modal */}
+      {showGuideModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="تثبيت تطبيق زكي كود"
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
+        >
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl text-center">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 mx-auto flex items-center justify-center">
+              <Download className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-base font-bold text-white">تثبيت منصة زكي كود</h3>
+
+            <div className="text-xs text-slate-300 space-y-2 text-right bg-slate-950 p-4 rounded-2xl border border-slate-800 leading-relaxed">
+              <p>
+                لتثبيت المنصة كتطبيق يعمل دون إنترنت على جهازك:
+              </p>
+              <p className="text-emerald-300 font-semibold">
+                اضغط على أيقونة التثبيت (Install 📲) بجوار شريط العنوان أو من قائمة المتصفح الرئيسية.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowGuideModal(false)}
+              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition"
+            >
+              فهمت، حسناً
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* iOS Safari instructions modal */}
       {showIosModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="تثبيت التطبيق على iPhone و iPad"
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
+        >
           <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl text-center">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 mx-auto flex items-center justify-center">
               <Share className="w-6 h-6" />
@@ -108,6 +163,7 @@ export const InstallAppButton: React.FC = () => {
             </div>
 
             <button
+              type="button"
               onClick={() => setShowIosModal(false)}
               className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition"
             >

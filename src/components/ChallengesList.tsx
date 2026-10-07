@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { Part, Challenge } from '../types';
 import { runJavaScript } from '../utils/codeRunner';
 import { detectCodeLanguage, buildHtmlPreviewDocument } from '../utils/codePreview';
@@ -6,8 +6,12 @@ import { validateChallenge, ChallengeValidationResult } from '../utils/challenge
 import { saveProgressEntry, sessionHeaders } from '../utils/activation';
 import { markChallengeCompleted } from '../utils/challengesAndTts';
 import { CodeBlock } from './CodeBlock';
-import { CodeEditor } from './CodeEditor';
 import { LiveBrowserPreview } from './LiveBrowserPreview';
+import { soundManager } from '../utils/soundManager';
+
+const CodeEditor = lazy(() =>
+  import('./CodeEditor').then((module) => ({ default: module.CodeEditor }))
+);
 import {
   Trophy,
   CheckCircle,
@@ -186,6 +190,7 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
   const handleRun = async () => {
     if (!currentItem) return;
     setIsRunning(true);
+    soundManager.playRun();
 
     const lang = detectCodeLanguage(userCode);
     const isWeb =
@@ -243,6 +248,7 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
       setOutput({ logs: feedbackLogs, errors: feedbackErrors });
       setFeedback({ passed: isValid, message: msg });
       if (isValid) {
+        soundManager.playCompletion();
         setSolvedMap((prev) => {
           const next = { ...prev, [currentItem.challenge.id]: true };
           try {
@@ -252,6 +258,7 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
         });
         markChallengeCompleted(currentItem.challenge.id).catch(() => {});
       } else {
+        soundManager.playError();
         setSolvedMap((prev) => {
           const next = { ...prev };
           delete next[currentItem.challenge.id];
@@ -280,6 +287,7 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
     setIsRunning(false);
 
     if (validation.passed) {
+      soundManager.playCompletion();
       setSolvedMap((prev) => {
         const next = { ...prev, [currentItem.challenge.id]: true };
         try {
@@ -289,6 +297,7 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
       });
       markChallengeCompleted(currentItem.challenge.id).catch(() => {});
     } else {
+      soundManager.playError();
       setSolvedMap((prev) => {
         const next = { ...prev };
         delete next[currentItem.challenge.id];
@@ -336,7 +345,10 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
         {/* Horizontal Part Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 scroll-smooth w-full min-w-0">
           <button
-            onClick={() => setFilterPartId('all')}
+            onClick={() => {
+              soundManager.playClick();
+              setFilterPartId('all');
+            }}
             className={`px-3 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap shrink-0 ${
               filterPartId === 'all'
                 ? 'bg-orange-500 text-slate-950 shadow-sm'
@@ -348,7 +360,10 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
           {parts.map((p) => (
             <button
               key={p.id}
-              onClick={() => setFilterPartId(p.id)}
+              onClick={() => {
+                soundManager.playClick();
+                setFilterPartId(p.id);
+              }}
               className={`px-2.5 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap shrink-0 ${
                 filterPartId === p.id
                   ? 'bg-orange-500 text-slate-950 shadow-sm'
@@ -363,7 +378,10 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
         {/* 4. Direct route to Playground for freeform coding */}
         {onOpenPlayground && (
           <button
-            onClick={onOpenPlayground}
+            onClick={() => {
+              soundManager.playClick();
+              onOpenPlayground();
+            }}
             className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-300 border border-orange-500/30 text-xs font-bold transition shrink-0 self-end sm:self-auto active:scale-95"
             title="انتقل لكتابة كود حر بدون قيود التحدي"
           >
@@ -404,7 +422,10 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
             return (
               <button
                 key={item.challenge.id}
-                onClick={() => setSelectedChallengeId(item.challenge.id)}
+                onClick={() => {
+                  soundManager.playClick();
+                  setSelectedChallengeId(item.challenge.id);
+                }}
                 className={`w-full text-right p-2.5 rounded-xl border transition duration-200 flex items-center justify-between gap-2.5 ${cardStyles}`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -468,7 +489,12 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
               <div className="flex items-center justify-between gap-1.5 sm:gap-2 w-full min-w-0">
                 {/* Prev Challenge Button */}
                 <button
-                  onClick={() => prevChallenge && setSelectedChallengeId(prevChallenge.challenge.id)}
+                  onClick={() => {
+                    if (prevChallenge) {
+                      soundManager.playClick();
+                      setSelectedChallengeId(prevChallenge.challenge.id);
+                    }
+                  }}
                   disabled={!prevChallenge}
                   className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 disabled:opacity-30 disabled:pointer-events-none transition flex items-center gap-1 text-[11px] sm:text-xs font-bold shrink-0 active:scale-95"
                   title="التحدي السابق"
@@ -479,7 +505,10 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
 
                 {/* Center: Open All Challenges Drawer */}
                 <button
-                  onClick={() => setIsMobileDrawerOpen(true)}
+                  onClick={() => {
+                    soundManager.playClick();
+                    setIsMobileDrawerOpen(true);
+                  }}
                   className="flex-1 min-w-0 px-2 py-1.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-center transition flex items-center justify-center gap-1 group active:scale-95 shadow-sm overflow-hidden"
                 >
                   <div className="text-center truncate min-w-0 w-full">
@@ -495,7 +524,12 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
 
                 {/* Next Challenge Button */}
                 <button
-                  onClick={() => nextChallenge && setSelectedChallengeId(nextChallenge.challenge.id)}
+                  onClick={() => {
+                    if (nextChallenge) {
+                      soundManager.playClick();
+                      setSelectedChallengeId(nextChallenge.challenge.id);
+                    }
+                  }}
                   disabled={!nextChallenge}
                   className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 disabled:opacity-30 disabled:pointer-events-none transition flex items-center gap-1 text-[11px] sm:text-xs font-bold shrink-0 active:scale-95"
                   title="التحدي التالي"
@@ -578,7 +612,10 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
               <div className="flex items-center justify-between sm:justify-end gap-2 text-xs pt-1 font-sans w-full min-w-0">
                 {currentItem.challenge.hint && (
                   <button
-                    onClick={() => setShowHint(!showHint)}
+                    onClick={() => {
+                      soundManager.playClick();
+                      setShowHint(!showHint);
+                    }}
                     className="text-orange-400 hover:text-orange-300 flex items-center gap-1 font-semibold text-xs"
                   >
                     <HelpCircle className="w-3.5 h-3.5 shrink-0" />
@@ -587,7 +624,10 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
                 )}
                 {currentItem.challenge.solutionCode && (
                   <button
-                    onClick={() => setShowSolution(!showSolution)}
+                    onClick={() => {
+                      soundManager.playClick();
+                      setShowSolution(!showSolution);
+                    }}
                     className="text-slate-400 hover:text-slate-200 flex items-center gap-1 text-xs"
                   >
                     <Eye className="w-3.5 h-3.5 shrink-0" />
@@ -616,22 +656,32 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
             {/* Code Editor */}
             <div className="space-y-2.5 sm:space-y-3 w-full min-w-0">
               <div className="rounded-2xl overflow-hidden border border-slate-800 shadow-2xl w-full min-w-0">
-                <CodeEditor
-                  value={userCode}
-                  onChange={setUserCode}
-                  onRun={handleRun}
-                  isWebMode={
-                    currentItem.challenge.id === 'ch18-chal' ||
-                    currentItem.challenge.id === 'ch19-chal'
+                <Suspense
+                  fallback={
+                    <div className="h-52 sm:h-72 bg-slate-950/80 flex flex-col items-center justify-center gap-2 text-slate-400 text-sm">
+                      <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                      <span>تجهيز محرر الأكواد الذكي...</span>
+                    </div>
                   }
-                  className="h-52 sm:h-72"
-                />
+                >
+                  <CodeEditor
+                    value={userCode}
+                    onChange={setUserCode}
+                    onRun={handleRun}
+                    isWebMode={
+                      currentItem.challenge.id === 'ch18-chal' ||
+                      currentItem.challenge.id === 'ch19-chal'
+                    }
+                    className="h-52 sm:h-72"
+                  />
+                </Suspense>
               </div>
 
               {/* Actions Toolbar - Highly responsive and prominent on mobile */}
               <div className="flex items-center justify-between gap-2 pt-1 w-full min-w-0">
                 <button
                   onClick={() => {
+                    soundManager.playClick();
                     setUserCode(currentItem.challenge.initialCode);
                     setOutput(null);
                     setFeedback(null);
@@ -823,6 +873,7 @@ export const ChallengesList: React.FC<ChallengesListProps> = ({
                   <button
                     key={item.challenge.id}
                     onClick={() => {
+                      soundManager.playClick();
                       setSelectedChallengeId(item.challenge.id);
                       setIsMobileDrawerOpen(false);
                       window.scrollTo({ top: 0, behavior: 'smooth' });

@@ -3,7 +3,7 @@
 // Offline Caching & Course Assets Pre-caching System
 // ============================================================================
 
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v6';
 const SHELL_CACHE = `zakicode-shell-${CACHE_VERSION}`;
 const COURSE_CACHE = `zakicode-course-${CACHE_VERSION}`;
 const FONTS_CACHE = `zakicode-fonts-${CACHE_VERSION}`;
@@ -16,10 +16,12 @@ const CORE_SHELL_ASSETS = [
   '/icons/icon.svg',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
-  '/icons/icon-maskable-192.png',
-  '/icons/icon-maskable-512.png',
+  '/icons/maskable-192.png',
+  '/icons/maskable-512.png',
   '/icons/apple-touch-icon.png',
   '/icons/favicon.ico',
+  '/splash/apple_splash_portrait.png',
+  '/splash/splash_landscape.png',
 ];
 
 // External assets that can be pre-cached (e.g. Google Fonts)
@@ -31,12 +33,18 @@ const EXTERNAL_CORE_ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
-      // 1. Precache App Shell
+      // 1. Precache App Shell with resilient Promise.allSettled
       const shellCache = await caches.open(SHELL_CACHE);
       try {
-        await shellCache.addAll(CORE_SHELL_ASSETS);
+        await Promise.allSettled(
+          CORE_SHELL_ASSETS.map((asset) =>
+            shellCache.add(asset).catch((err) => {
+              console.warn(`PWA: Could not pre-cache asset ${asset}:`, err);
+            })
+          )
+        );
       } catch (err) {
-        console.warn('PWA: Some core shell assets could not be cached immediately:', err);
+        console.warn('PWA: Error during core shell caching:', err);
       }
 
       // 2. Discover and Precache production hashed bundles from /index.html

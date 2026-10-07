@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { runJavaScript } from '../utils/codeRunner';
 import { detectCodeLanguage, buildHtmlPreviewDocument } from '../utils/codePreview';
 import { generateSmartLocalHint, SmartHintResponse } from '../utils/smartHints';
 import { LiveBrowserPreview } from './LiveBrowserPreview';
-import { CodeEditor } from './CodeEditor';
+import { StandardEmptyState } from './ui/StateFeedback';
+
+const CodeEditor = lazy(() =>
+  import('./CodeEditor').then((module) => ({ default: module.CodeEditor }))
+);
 import {
   fetchStudentWork,
   saveStudentDraftToServer,
@@ -37,6 +41,8 @@ import {
   MessageSquareHeart,
   Target,
   MoreHorizontal,
+  AlertTriangle,
+  PanelRight,
 } from 'lucide-react';
 import { CODING_CHALLENGES, CodingChallenge } from '../data/codingChallenges';
 import { markChallengeCompleted } from '../utils/challengesAndTts';
@@ -199,6 +205,7 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
   const [previewTheme, setPreviewTheme] = useState<'dark' | 'light'>('dark');
   const [previewRefreshTrigger, setPreviewRefreshTrigger] = useState(0);
   const [showMoreActions, setShowMoreActions] = useState(false);
+  const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<'code' | 'output'>('code');
   const { playSuccess, playCompletion, playError, playRun } = useSoundManager();
 
   // Student Saved Code & Snippets
@@ -332,6 +339,7 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
 
   const handleRun = async () => {
     playRun();
+    setMobileWorkspaceTab('output');
     if (isWebMode) {
       setPreviewRefreshTrigger((prev) => prev + 1);
       playSuccess();
@@ -390,6 +398,8 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
   // Delete snippet
   const handleDeleteSnippet = async (snippetId: string) => {
     if (!activeCode) return;
+    const snippet = snippets.find((item) => item.id === snippetId);
+    if (!window.confirm(`هل تريد حذف "${snippet?.title || 'هذا الكود'}" نهائياً؟`)) return;
     const clean = activeCode.trim().toUpperCase();
 
     const success = await deleteStudentSnippetFromServer(clean, snippetId);
@@ -536,17 +546,17 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
+    <div className="mx-auto max-w-[1480px] space-y-4 px-3 py-4 pb-28 sm:px-5 sm:py-6 lg:px-6 lg:pb-8">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-emerald-950 border border-emerald-500/40 text-emerald-200 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce text-xs sm:text-sm font-semibold">
+        <div role="status" aria-live="polite" className="fixed bottom-24 right-4 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-950 px-4 py-3 text-xs font-semibold text-emerald-200 shadow-2xl animate-fadeIn sm:bottom-6 sm:right-6 sm:text-sm">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Top Bar */}
-      <div className="bg-slate-900/80 p-3 sm:p-4 rounded-2xl border border-slate-800 space-y-3">
+      <div className="ui-card p-3 sm:p-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
@@ -562,19 +572,27 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
             </p>
           </div>
 
-          {/* Auto-save Status Badge */}
-          {activeCode && (
-            <span className="shrink-0 text-[10px] px-2 py-1 rounded-full font-bold bg-slate-950 border border-slate-800 flex items-center gap-1">
-              {autoSaveStatus === 'saving' ? (
-                <span className="text-amber-400 animate-pulse">جاري الحفظ</span>
-              ) : (
-                <span className="text-emerald-400 flex items-center gap-1">
-                  <Check className="w-3 h-3" />
-                  <span>محفوظ</span>
-                </span>
-              )}
+          <div className="flex shrink-0 items-center gap-2">
+            <span className={`hidden rounded-full border px-2 py-1 font-mono text-[10px] font-bold sm:inline-flex ${
+              isWebMode
+                ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300'
+                : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+            }`} dir="ltr">
+              {isWebMode ? (detectedLang === 'css' ? 'CSS' : 'HTML') : 'JavaScript'}
             </span>
-          )}
+            {activeCode && (
+              <span className="flex shrink-0 items-center gap-1 rounded-full border border-slate-800 bg-slate-950 px-2 py-1 text-[10px] font-bold" role="status" aria-live="polite">
+                {autoSaveStatus === 'saving' ? (
+                  <span className="animate-pulse text-amber-400">جاري الحفظ</span>
+                ) : (
+                  <span className="flex items-center gap-1 text-emerald-400">
+                    <Check className="w-3 h-3" />
+                    <span>محفوظ</span>
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Main editor controls: language, example, run, and save */}
@@ -1014,28 +1032,89 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
       )}
 
       {/* Editor & Console / Preview Grid */}
-      <div className="flex flex-col lg:grid lg:grid-cols-2 gap-4 min-h-[650px] lg:h-[720px]">
+      <div className="sticky top-14 z-30 -mx-1 flex items-center gap-2 rounded-2xl border border-slate-700/80 bg-slate-950/92 p-2 shadow-xl backdrop-blur-xl sm:top-16 lg:hidden">
+        <div role="tablist" aria-label="مساحة العمل" className="grid min-w-0 flex-1 grid-cols-2 rounded-xl bg-slate-900 p-1">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileWorkspaceTab === 'code'}
+            onClick={() => setMobileWorkspaceTab('code')}
+            className={`flex min-h-10 items-center justify-center gap-2 rounded-lg text-xs font-bold transition ${
+              mobileWorkspaceTab === 'code'
+                ? 'bg-slate-700 text-white shadow-sm'
+                : 'text-slate-400'
+            }`}
+          >
+            <Code2 className="h-4 w-4" />
+            الكود
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileWorkspaceTab === 'output'}
+            onClick={() => setMobileWorkspaceTab('output')}
+            className={`flex min-h-10 items-center justify-center gap-2 rounded-lg text-xs font-bold transition ${
+              mobileWorkspaceTab === 'output'
+                ? isWebMode
+                  ? 'bg-cyan-500/20 text-cyan-200 shadow-sm'
+                  : 'bg-emerald-500/15 text-emerald-200 shadow-sm'
+                : 'text-slate-400'
+            }`}
+          >
+            {isWebMode ? <PanelRight className="h-4 w-4" /> : <Terminal className="h-4 w-4" />}
+            {isWebMode ? 'المعاينة' : 'الكونسول'}
+            {!isWebMode && errors.length > 0 && (
+              <span className="grid h-5 min-w-5 place-items-center rounded-full bg-rose-500 px-1 font-mono text-[10px] text-white" dir="ltr">
+                {errors.length}
+              </span>
+            )}
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={handleRun}
+          disabled={isRunning}
+          className={`flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl px-4 text-xs font-black text-slate-950 shadow-lg transition active:scale-95 disabled:opacity-60 ${
+            isWebMode ? 'bg-cyan-400 shadow-cyan-950/40' : 'bg-amber-400 shadow-amber-950/40'
+          }`}
+          aria-label={isWebMode ? 'تحديث معاينة الصفحة' : 'تشغيل الكود'}
+        >
+          {isWebMode ? <Globe className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
+          <span className="hidden min-[390px]:inline">{isRunning ? 'جاري التشغيل' : 'تشغيل'}</span>
+        </button>
+      </div>
+
+      <div className="flex min-h-[520px] flex-col gap-4 lg:grid lg:h-[calc(100vh-9rem)] lg:min-h-[660px] lg:grid-cols-2">
         {/* Code Editor Panel */}
-        <div className="h-[460px] lg:h-full">
-          <CodeEditor
-            value={code}
-            onChange={setCode}
-            onRun={handleRun}
-            isWebMode={isWebMode}
-            studentName={studentName}
-            activeCode={activeCode}
-            placeholder={
-              isWebMode
-                ? '<!-- اكتب كود HTML أو CSS هنا وستظهر المعاينة الحية فوراً -->'
-                : '// اكتب كود جافاسكريبت هنا ودوس تشغيل...'
+        <div className={`${mobileWorkspaceTab === 'code' ? 'block' : 'hidden'} h-[calc(100vh-13rem)] min-h-[480px] lg:block lg:h-full lg:min-h-0`}>
+          <Suspense
+            fallback={
+              <div className="h-full bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-400 text-sm">
+                <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                <span>تجهيز محرر الأكواد الشامل...</span>
+              </div>
             }
-            className="h-full"
-          />
+          >
+            <CodeEditor
+              value={code}
+              onChange={setCode}
+              onRun={handleRun}
+              isWebMode={isWebMode}
+              studentName={studentName}
+              activeCode={activeCode}
+              placeholder={
+                isWebMode
+                  ? '<!-- اكتب كود HTML أو CSS هنا وستظهر المعاينة الحية فوراً -->'
+                  : '// اكتب كود جافاسكريبت هنا ودوس تشغيل...'
+              }
+              className="h-full"
+            />
+          </Suspense>
         </div>
 
         {/* Right Output Panel: Console OR Live Web Browser Preview */}
         {isWebMode ? (
-          <div className="min-h-[520px] lg:h-full flex flex-col">
+          <div className={`${mobileWorkspaceTab === 'output' ? 'flex' : 'hidden'} h-[calc(100vh-13rem)] min-h-[480px] flex-col lg:flex lg:h-full lg:min-h-0`}>
             <LiveBrowserPreview
               key={previewRefreshTrigger}
               htmlContent={buildHtmlPreviewDocument(
@@ -1052,15 +1131,24 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
             />
           </div>
         ) : (
-          <div className="min-h-[460px] lg:h-full bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex flex-col shadow-2xl">
+          <div className={`${mobileWorkspaceTab === 'output' ? 'flex' : 'hidden'} h-[calc(100vh-13rem)] min-h-[480px] flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl lg:flex lg:h-full lg:min-h-0`}>
             <div className="bg-slate-900/90 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-slate-300 flex items-center gap-1.5">
                   <Terminal className="w-4 h-4 text-emerald-400" />
                   شاشة الـ Console
                 </span>
+                {(logs.length > 0 || errors.length > 0) && (
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    errors.length > 0
+                      ? 'bg-rose-500/15 text-rose-300'
+                      : 'bg-emerald-500/15 text-emerald-300'
+                  }`}>
+                    {errors.length > 0 ? 'يحتاج مراجعة' : 'تم التشغيل بنجاح'}
+                  </span>
+                )}
                 {execTime !== null && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
+                  <span dir="ltr" className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
                     {execTime}ms
                   </span>
                 )}
@@ -1078,11 +1166,19 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
               </div>
             </div>
 
-            <div className="flex-1 p-4 overflow-y-auto space-y-2 font-mono text-xs custom-scrollbar">
+            <div className="flex-1 p-4 overflow-y-auto space-y-2 font-mono text-xs custom-scrollbar" role="log" aria-live="polite" aria-label="نتيجة تشغيل الكود">
               {logs.length === 0 && errors.length === 0 && (
-                <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-2 select-none">
-                  <Terminal className="w-8 h-8 opacity-40" />
-                  <p className="text-xs">المخرجات ستظهر هنا عند النقر على "تشغيل الكود"</p>
+                <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-3 select-none text-center">
+                  <span className="grid h-14 w-14 place-items-center rounded-2xl border border-slate-800 bg-slate-900/70">
+                    <Terminal className="w-6 h-6 text-slate-600" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-slate-400">جاهز لتشغيل الكود</p>
+                    <p className="mt-1 max-w-xs font-sans text-xs leading-5 text-slate-600">
+                      اضغط تشغيل أو استخدم الاختصار
+                      <kbd dir="ltr" className="mx-1 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">Ctrl+Enter</kbd>
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -1103,20 +1199,24 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
               {errors.map((err, idx) => (
                 <div
                   key={idx}
-                  className="text-rose-400 bg-rose-950/20 p-3.5 rounded-xl border border-rose-900/50 text-right dir-rtl leading-relaxed animate-fadeIn space-y-1.5"
+                  className="space-y-2 rounded-xl border border-rose-900/50 bg-rose-950/20 p-3.5 text-right leading-relaxed text-rose-400 animate-fadeIn"
+                  dir="rtl"
                 >
                   <div className="flex items-center gap-1.5 font-bold text-rose-300">
-                    <span>👻 ماتتخضش! الكمبيوتر بيقولك:</span>
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>الكود محتاج مراجعة بسيطة</span>
                   </div>
 
-                  <div className="text-xs font-sans text-rose-200/90 leading-relaxed">{err}</div>
+                  <div dir="ltr" className="rounded-lg bg-slate-950/60 p-2.5 text-left font-mono text-xs leading-relaxed text-rose-200/90">{err}</div>
                 </div>
               ))}
             </div>
 
             <div className="p-2.5 bg-slate-900/50 border-t border-slate-800/80 text-[11px] text-slate-500 flex items-center justify-between">
               <span>البيئة: JavaScript Sandbox آمن ومحمي ضد الحلقات اللانهائية</span>
-              <span className="text-emerald-400 font-bold">جاهز</span>
+              <span className={`font-bold ${isRunning ? 'text-amber-300' : errors.length > 0 ? 'text-rose-300' : 'text-emerald-400'}`}>
+                {isRunning ? 'جاري التشغيل' : errors.length > 0 ? 'تحقق من الأخطاء' : 'جاهز'}
+              </span>
             </div>
           </div>
         )}
@@ -1208,20 +1308,18 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
                 onClick={() => setShowSavedSnippetsModal(false)}
                 className="text-slate-400 hover:text-white p-1 rounded-lg"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
               {snippets.length === 0 ? (
-                <div className="p-8 text-center text-slate-500 space-y-2">
-                  <FileCode2 className="w-10 h-10 mx-auto opacity-30 text-indigo-400" />
-                  <p className="text-sm font-semibold">لم تقم بحفظ أي كود بعد في حسابك</p>
-                  <p className="text-xs text-slate-600">
-                    اكتب كودك في المحرر ثم اضغط على زر "حفظ الكود 💾" ليظل محفوظاً دائماً
-                  </p>
-                </div>
+                <StandardEmptyState
+                  type="snippets"
+                  actionText="إغلاق والبدء في كتابة كود"
+                  onAction={() => setShowSavedSnippetsModal(false)}
+                />
               ) : (
                 snippets.map((snip) => (
                   <div
@@ -1285,7 +1383,7 @@ export const CodePlayground: React.FC<CodePlaygroundProps> = ({
                           className="px-2.5 py-1 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/40 text-rose-300 text-xs flex items-center gap-1 transition"
                           title="حذف هذا الكود"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2 className="w-3.5 h-3.5" />
                           <span className="text-[11px]">حذف</span>
                         </button>
                       </div>

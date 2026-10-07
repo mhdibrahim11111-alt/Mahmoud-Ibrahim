@@ -9,6 +9,7 @@ import { LiveBrowserPreview } from './LiveBrowserPreview';
 import { FormattedArabicText } from './FormattedArabicText';
 import { ChapterQuiz } from './ChapterQuiz';
 import { soundManager } from '../utils/soundManager';
+import { StandardLoadingState } from './ui/StateFeedback';
 
 const CodeEditor = lazy(() =>
   import('./CodeEditor').then((module) => ({ default: module.CodeEditor }))
@@ -24,7 +25,6 @@ import {
   Terminal,
   BookOpen,
   CheckCircle2,
-  Copy,
   Globe,
   Eye,
   Bookmark,
@@ -32,6 +32,15 @@ import {
   Brain,
   Lightbulb,
   Zap,
+  Clock,
+  Layers,
+  ListOrdered,
+  AlertTriangle,
+  AlertCircle,
+  Award,
+  Undo2,
+  X,
+  ChevronDown,
 } from 'lucide-react';
 
 interface ChapterViewProps {
@@ -93,7 +102,7 @@ const sectionFadeVariants: Variants = {
   }),
 };
 
-export const ChapterView: React.FC<ChapterViewProps> = ({
+export const ChapterView = React.memo<ChapterViewProps>(({
   chapter,
   onPrevChapter,
   onNextChapter,
@@ -124,6 +133,138 @@ export const ChapterView: React.FC<ChapterViewProps> = ({
     if (onSaveUserNote) {
       onSaveUserNote(text);
     }
+  };
+
+  // Phase 5: Lesson Reading Experience & Table of Contents
+  const articleRef = useRef<HTMLElement | null>(null);
+  const [readingProgress, setReadingProgress] = useState(0);
+  const [activeSectionId, setActiveSectionId] = useState<string>('');
+  const [isMobileTocOpen, setIsMobileTocOpen] = useState(false);
+
+  // Calculate estimated reading time based on actual lesson word count
+  const estimatedReadingMinutes = React.useMemo(() => {
+    if (!chapter?.contentSections) return 3;
+    let totalWords = 0;
+    for (const sec of chapter.contentSections) {
+      totalWords += (sec.heading || '').split(/\s+/).filter(Boolean).length;
+      totalWords += (sec.text || '').split(/\s+/).filter(Boolean).length;
+    }
+    if (chapter.summaryPoints) {
+      totalWords += chapter.summaryPoints.join(' ').split(/\s+/).filter(Boolean).length;
+    }
+    return Math.max(2, Math.round(totalWords / 160));
+  }, [chapter]);
+
+  // Generated table of contents items
+  const tocItems = React.useMemo(() => {
+    const items: Array<{
+      id: string;
+      title: string;
+      number?: number;
+      type: 'section' | 'exercises' | 'quiz' | 'notes' | 'challenge';
+    }> = [];
+
+    chapter.contentSections?.forEach((sec, idx) => {
+      items.push({
+        id: `sec-${idx}`,
+        title: sec.heading || `الموضوع ${idx + 1}`,
+        number: idx + 1,
+        type: 'section',
+      });
+    });
+
+    if (chapter.exercises && chapter.exercises.length > 0) {
+      items.push({
+        id: 'chapter-exercises',
+        title: 'جرّب بنفسك: توقّع الناتج',
+        type: 'exercises',
+      });
+    }
+
+    if (chapter.quiz && chapter.quiz.length > 0) {
+      items.push({
+        id: 'chapter-quiz-section',
+        title: 'كويز الفصل السريع',
+        type: 'quiz',
+      });
+    }
+
+    items.push({
+      id: 'chapter-notes-section',
+      title: 'ملاحظاتي وتلخيصي الخاص',
+      type: 'notes',
+    });
+
+    if (chapter.challenge) {
+      items.push({
+        id: 'chapter-challenge-section',
+        title: chapter.challenge.title || 'تحدي الفصل البرمجي',
+        type: 'challenge',
+      });
+    }
+
+    return items;
+  }, [chapter]);
+
+  // Track scroll position for reading progress bar
+  useEffect(() => {
+    const handleScroll = () => {
+      const el = articleRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const scrollableDistance = rect.height - window.innerHeight;
+      if (scrollableDistance <= 0) {
+        setReadingProgress(100);
+        return;
+      }
+      const scrolled = -rect.top;
+      const pct = Math.min(100, Math.max(0, (scrolled / scrollableDistance) * 100));
+      setReadingProgress(pct);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [chapter.id]);
+
+  // IntersectionObserver for tracking active section
+  useEffect(() => {
+    if (!('IntersectionObserver' in window)) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntries = entries.filter((e) => e.isIntersecting);
+        if (visibleEntries.length > 0) {
+          const topVisible = visibleEntries.reduce((prev, curr) =>
+            curr.boundingClientRect.top < prev.boundingClientRect.top ? curr : prev
+          );
+          setActiveSectionId(topVisible.target.id);
+        }
+      },
+      {
+        rootMargin: '-80px 0px -40% 0px',
+        threshold: 0.1,
+      }
+    );
+
+    const sectionNodes = document.querySelectorAll('[data-chapter-target]');
+    sectionNodes.forEach((node) => observer.observe(node));
+
+    return () => observer.disconnect();
+  }, [chapter.id, tocItems]);
+
+  const scrollToTarget = (id: string) => {
+    const target = document.getElementById(id);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setActiveSectionId(id);
+    }
+    setIsMobileTocOpen(false);
   };
   // Local states for interactive exercise runner
   const [runningSnippetIndex, setRunningSnippetIndex] = useState<number | null>(null);
@@ -279,6 +420,7 @@ function evaluateChapterChallenge(
 
   const handleTestChallenge = async () => {
     if (!challengeCode.trim()) return;
+    soundManager.playRun();
     const lang = detectCodeLanguage(challengeCode);
     const isWeb = lang === 'html' || lang === 'css' || (chapter.partId === 6 && chapter.id !== 29);
 
@@ -287,44 +429,33 @@ function evaluateChapterChallenge(
       const previewDoc = buildHtmlPreviewDocument(challengeCode, effectiveLang);
       setChallengeHtmlPreview(previewDoc);
 
+      let isSuccess = false;
+      let resultMsg = '';
+
       if (chapter.id === 23) {
         const hasH1 = /<h1\b[^>]*>.*?<\/h1>/is.test(challengeCode);
         const hasP = /<p\b[^>]*>.*?<\/p>/is.test(challengeCode);
         const hasUl = /<ul\b[^>]*>[\s\S]*?<\/ul>/is.test(challengeCode);
         if (hasH1 && hasP && hasUl) {
-          setChallengeOutput({
-            logs: ['🎉 ممتاز جداً! كتبت هيكل بطاقة الـ HTML بالكامل، والمعاينة الحية ظاهرة أمامك في المتصفح.'],
-            errors: [],
-          });
-          setChallengeSuccess(true);
-          setChallengeFeedback('🎉 ممتاز جداً! كتبت هيكل بطاقة الـ HTML بالكامل، والمعاينة الحية ظاهرة أمامك في المتصفح.');
+          isSuccess = true;
+          resultMsg = '🎉 ممتاز جداً! كتبت هيكل بطاقة الـ HTML بالكامل، والمعاينة الحية ظاهرة أمامك في المتصفح.';
+          setChallengeOutput({ logs: [resultMsg], errors: [] });
         } else {
-          const msg = 'فاضل بعض الوسوم: تأكد من إضافة <h1> للعنوان، و <p> للتعريف، و <ul> للهوايات.';
-          setChallengeOutput({
-            logs: [],
-            errors: [msg],
-          });
-          setChallengeSuccess(false);
-          setChallengeFeedback(msg);
+          isSuccess = false;
+          resultMsg = 'فاضل بعض الوسوم: تأكد من إضافة <h1> للعنوان، و <p> للتعريف، و <ul> للهوايات.';
+          setChallengeOutput({ logs: [], errors: [resultMsg] });
         }
       } else if (chapter.id === 24) {
         const highlightRule = challengeCode.match(/\.highlight\s*\{([\s\S]*?)\}/i)?.[1] ?? '';
         const hasHighlight = /(?:^|;)\s*color\s*:\s*yellow\s*(?:;|$)/i.test(highlightRule);
         if (hasHighlight) {
-          setChallengeOutput({
-            logs: ['🎉 رائع! تم تطبيق قاعدة كلاس .highlight على النص في المعاينة الحية.'],
-            errors: [],
-          });
-          setChallengeSuccess(true);
-          setChallengeFeedback('🎉 رائع! تم تطبيق قاعدة كلاس .highlight على النص في المعاينة الحية.');
+          isSuccess = true;
+          resultMsg = '🎉 رائع! تم تطبيق قاعدة كلاس .highlight على النص في المعاينة الحية.';
+          setChallengeOutput({ logs: [resultMsg], errors: [] });
         } else {
-          const msg = 'تأكد من كتابة قاعدة .highlight { ... } وتحديد اللون الأصفر color: yellow;';
-          setChallengeOutput({
-            logs: [],
-            errors: [msg],
-          });
-          setChallengeSuccess(false);
-          setChallengeFeedback(msg);
+          isSuccess = false;
+          resultMsg = 'تأكد من كتابة قاعدة .highlight { ... } وتحديد اللون الأصفر color: yellow;';
+          setChallengeOutput({ logs: [], errors: [resultMsg] });
         }
       } else if (chapter.id === 25) {
         const labelFor = challengeCode.match(/<label\b[^>]*\bfor=["']([^"']+)["']/i)?.[1];
@@ -332,54 +463,55 @@ function evaluateChapterChallenge(
         const valid = /<form\b/i.test(challengeCode) && labelFor && labelFor === inputId &&
           /<input\b[^>]*\btype=["']email["']/i.test(challengeCode) &&
           /<button\b[^>]*\btype=["']submit["']/i.test(challengeCode);
-        const msg = valid ? 'ممتاز! النموذج فيه تسمية مربوطة بحقل البريد وزر إرسال.' : 'ضيف form، واربط label بالحقل بـ for وid، واستخدم input type="email" وزر type="submit".';
-        setChallengeOutput({ logs: valid ? [msg] : [], errors: valid ? [] : [msg] });
-        setChallengeSuccess(Boolean(valid));
-        setChallengeFeedback(msg);
+        isSuccess = Boolean(valid);
+        resultMsg = valid ? 'ممتاز! النموذج فيه تسمية مربوطة بحقل البريد وزر إرسال.' : 'ضيف form، واربط label بالحقل بـ for وid، واستخدم input type="email" وزر type="submit".';
+        setChallengeOutput({ logs: valid ? [resultMsg] : [], errors: valid ? [] : [resultMsg] });
       } else if (chapter.id === 26) {
         const hasRule = /button\s*\{[\s\S]*?border-radius\s*:\s*12px\s*;?[\s\S]*?\}/i.test(challengeCode);
-        const msg = hasRule ? 'حلو! قاعدة button بتدوّر الحواف بمقدار 12px.' : 'اكتب قاعدة button فيها border-radius: 12px;.';
-        setChallengeOutput({ logs: hasRule ? [msg] : [], errors: hasRule ? [] : [msg] });
-        setChallengeSuccess(hasRule);
-        setChallengeFeedback(msg);
+        isSuccess = Boolean(hasRule);
+        resultMsg = hasRule ? 'حلو! قاعدة button بتدوّر الحواف بمقدار 12px.' : 'اكتب قاعدة button فيها border-radius: 12px;.';
+        setChallengeOutput({ logs: hasRule ? [resultMsg] : [], errors: hasRule ? [] : [resultMsg] });
       } else if (chapter.id === 27) {
         const hasRule = /body\s*\{[\s\S]*?background-color\s*:\s*#ffffff\s*;?[\s\S]*?\}/i.test(challengeCode);
-        const msg = hasRule ? 'تمام! خليت خلفية body بيضا بكود Hex.' : 'اكتب body { background-color: #ffffff; }.';
-        setChallengeOutput({ logs: hasRule ? [msg] : [], errors: hasRule ? [] : [msg] });
-        setChallengeSuccess(hasRule);
-        setChallengeFeedback(msg);
+        isSuccess = Boolean(hasRule);
+        resultMsg = hasRule ? 'تمام! خليت خلفية body بيضا بكود Hex.' : 'اكتب body { background-color: #ffffff; }.';
+        setChallengeOutput({ logs: hasRule ? [resultMsg] : [], errors: hasRule ? [] : [resultMsg] });
       } else if (chapter.id === 28) {
         const valid = /class=["']product-card["']/i.test(challengeCode) && /<h2\b/i.test(challengeCode) &&
           /<p\b/i.test(challengeCode) && /<button\b/i.test(challengeCode) && /\.product-card\s*\{/i.test(challengeCode);
-        const msg = valid ? 'بطاقة المنتج كاملة: HTML للمحتوى وقاعدة CSS للشكل.' : 'ضيف بطاقة class="product-card" فيها h2 وفقرة وزر، واكتب قاعدة CSS للمحدد .product-card.';
-        setChallengeOutput({ logs: valid ? [msg] : [], errors: valid ? [] : [msg] });
-        setChallengeSuccess(valid);
-        setChallengeFeedback(msg);
+        isSuccess = Boolean(valid);
+        resultMsg = valid ? 'بطاقة المنتج كاملة: HTML للمحتوى وقاعدة CSS للشكل.' : 'ضيف بطاقة class="product-card" فيها h2 وفقرة وزر، واكتب قاعدة CSS للمحدد .product-card.';
+        setChallengeOutput({ logs: valid ? [resultMsg] : [], errors: valid ? [] : [resultMsg] });
       } else if (chapter.id === 30) {
         const valid = /<button\b/i.test(challengeCode) && /<p\b[^>]*\bid=["']status["']/i.test(challengeCode) &&
           /addEventListener\s*\(\s*["']click["']/i.test(challengeCode) && /isOn\s*=\s*!isOn/.test(challengeCode) &&
           /textContent/.test(challengeCode) && /النور مضاء/.test(challengeCode) && /النور مطفي/.test(challengeCode);
-        const msg = valid ? 'ممتاز! الزر بيبدّل قيمة Boolean وبيغيّر نص الفقرة لما نضغط عليه.' : 'ضيف زر وفقرة id="status"، واربط click عشان يبدّل isOn ويغيّر textContent للنصين المطلوبين.';
-        setChallengeOutput({ logs: valid ? [msg] : [], errors: valid ? [] : [msg] });
-        setChallengeSuccess(valid);
-        setChallengeFeedback(msg);
+        isSuccess = Boolean(valid);
+        resultMsg = valid ? 'ممتاز! الزر بيبدّل قيمة Boolean وبيغيّر نص الفقرة لما نضغط عليه.' : 'ضيف زر وفقرة id="status"، واربط click عشان يبدّل isOn ويغيّر textContent للنصين المطلوبين.';
+        setChallengeOutput({ logs: valid ? [resultMsg] : [], errors: valid ? [] : [resultMsg] });
       } else if (chapter.id === 31) {
         const valid = /addEventListener\s*\(\s*["']input["']/i.test(challengeCode) &&
           /<input\b/i.test(challengeCode) && (/<p\b/i.test(challengeCode) || /<span\b/i.test(challengeCode));
-        const msg = valid ? '🎉 رائع جداً! ربطت حدث input بتحديث عدد الحروف على الفور!' : 'تأكد من إضافة حقل input وفقرة لعرض العداد، وربط حدث input بـ addEventListener لتحديث طول النص.';
-        setChallengeOutput({ logs: valid ? [msg] : [], errors: valid ? [] : [msg] });
-        setChallengeSuccess(valid);
-        setChallengeFeedback(msg);
+        isSuccess = Boolean(valid);
+        resultMsg = valid ? '🎉 رائع جداً! ربطت حدث input بتحديث عدد الحروف على الفور!' : 'تأكد من إضافة حقل input وفقرة لعرض العداد، وربط حدث input بـ addEventListener لتحديث طول النص.';
+        setChallengeOutput({ logs: valid ? [resultMsg] : [], errors: valid ? [] : [resultMsg] });
       } else {
-        setChallengeOutput({ logs: ['✓ تم تفعيل المعاينة الحية في المتصفح بنجاح.'], errors: [] });
-        setChallengeSuccess(true);
-        setChallengeFeedback('✓ تم تفعيل المعاينة الحية في المتصفح بنجاح.');
+        isSuccess = true;
+        resultMsg = '✓ تم تفعيل المعاينة الحية في المتصفح بنجاح.';
+        setChallengeOutput({ logs: [resultMsg], errors: [] });
+      }
+
+      setChallengeSuccess(isSuccess);
+      setChallengeFeedback(resultMsg);
+      if (isSuccess) {
+        soundManager.playCompletion();
+      } else {
+        soundManager.playError();
       }
       return;
     }
 
     setChallengeHtmlPreview(null);
-    soundManager.playRun();
     const res = await runJavaScript(challengeCode);
     setChallengeOutput({ logs: res.logs, errors: res.errors });
 
@@ -431,12 +563,28 @@ function evaluateChapterChallenge(
 
   return (
     <motion.article
+      ref={articleRef}
       key={`chapter-article-${chapter.id}`}
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: 'easeOut' }}
-      className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-6 sm:space-y-8 overflow-hidden w-full pb-32 sm:pb-36 lg:pb-12"
+      className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6 sm:space-y-8 w-full pb-32 sm:pb-36 lg:pb-16 relative"
     >
+      {/* 1. Thin Reading Progress Indicator */}
+      <div
+        className="sticky top-0 z-30 w-full h-1 bg-slate-900/90 backdrop-blur-sm -mt-4 sm:-mt-8 mb-4 overflow-hidden border-b border-slate-800/40 rounded-full"
+        role="progressbar"
+        aria-valuenow={Math.round(readingProgress)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="نسبة قراءة الدرس"
+      >
+        <div
+          className="h-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-400 transition-[width] duration-150 ease-out shadow-sm shadow-amber-500/50"
+          style={{ width: `${readingProgress}%` }}
+        />
+      </div>
+
       {/* Analytical Review Glow Banner */}
       {isAnalyticalReview && (
         <motion.div
@@ -497,49 +645,88 @@ function evaluateChapterChallenge(
         </motion.div>
       )}
 
-      {/* Chapter Top Breadcrumb & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
-        <div>
-          <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-orange-500/15 text-orange-300 border border-orange-500/30 inline-block mb-2 shadow-sm">
-            {chapter.partTitle}
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            {chapter.title}
-          </h1>
-          <p className="text-sm sm:text-base text-slate-400 mt-1 font-medium">
-            <FormattedArabicText text={chapter.subtitle} />
-          </p>
+      {/* Chapter Top Breadcrumb, Metadata & Actions (Matched to Figma screenshot) */}
+      <div className="space-y-4 pb-6 border-b border-slate-800/80">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div className="space-y-2">
+            <div>
+              <span className="inline-block text-xs sm:text-sm font-black px-3.5 py-1.5 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/30 shadow-sm">
+                {chapter.partTitle}
+              </span>
+            </div>
+
+            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
+              {chapter.title}
+            </h1>
+            <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed">
+              <FormattedArabicText text={chapter.subtitle} />
+            </p>
+
+            {/* Reading metadata */}
+            <div className="flex items-center gap-4 text-xs sm:text-sm text-slate-400 pt-1 font-medium">
+              <span className="flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-slate-400" />
+                <span>حوالي {estimatedReadingMinutes} دقائق قراءة</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <ListOrdered className="w-4 h-4 text-slate-400" />
+                <span>{chapter.contentSections.length} موضوعات</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Action buttons (Completed + Bookmark) */}
+          <div className="flex items-center gap-2.5 self-start sm:self-center shrink-0">
+            <button
+              onClick={onToggleCompleted}
+              className={`flex items-center gap-2 min-h-[44px] px-5 py-2 rounded-2xl text-xs sm:text-sm font-black transition-all shadow-md active:scale-95 ${
+                isCompleted
+                  ? 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-2 border-emerald-500/40 shadow-emerald-500/10'
+                  : 'bg-slate-900 hover:bg-slate-800 text-slate-200 border-2 border-slate-700/80 hover:border-amber-400'
+              }`}
+            >
+              <span>{isCompleted ? '✓ مكتمل ومقروء' : 'تحديد كمكتمل'}</span>
+              <CheckCircle2 className={`w-4 h-4 ${isCompleted ? 'text-emerald-400' : 'text-slate-400'}`} />
+            </button>
+
+            {onToggleBookmark && (
+              <button
+                onClick={onToggleBookmark}
+                className={`flex items-center justify-center min-h-[44px] min-w-[44px] p-2.5 rounded-2xl text-xs sm:text-sm font-bold transition border active:scale-95 ${
+                  isBookmarked
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
+                    : 'bg-slate-900/90 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800'
+                }`}
+                title={isBookmarked ? 'إزالة من المفضلة' : 'حفظ في المفضلة'}
+                aria-label="حفظ في المفضلة"
+              >
+                <Star className={`w-4 h-4 ${isBookmarked ? 'fill-amber-400 text-amber-400' : 'text-slate-400'}`} />
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-center">
-          {onToggleBookmark && (
-            <button
-              onClick={onToggleBookmark}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition border active:scale-95 ${
-                isBookmarked
-                  ? 'bg-orange-500/20 text-orange-300 border-orange-500/40 shadow-sm'
-                  : 'bg-slate-800/90 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700'
-              }`}
-              title={isBookmarked ? 'إزالة من المفضلة' : 'حفظ في المفضلة'}
-            >
-              <Star className={`w-4 h-4 ${isBookmarked ? 'fill-orange-400 text-orange-400' : 'text-slate-400'}`} strokeWidth={2.3} />
-              <span className="hidden xs:inline">{isBookmarked ? 'في المفضلة' : 'حفظ'}</span>
-            </button>
-          )}
-
+        {/* Mobile Dedicated Table of Contents Button Bar (Figma layout) */}
+        <div className="xl:hidden pt-2">
           <button
-            onClick={onToggleCompleted}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition shadow-md active:scale-95 ${
-              isCompleted
-                ? 'bg-emerald-500/20 text-emerald-300 border-2 border-emerald-500/50 hover:bg-emerald-500/30'
-                : 'bg-slate-800/90 hover:bg-slate-700 text-white border-2 border-slate-600 hover:border-orange-500 shadow-md'
-            }`}
+            onClick={() => setIsMobileTocOpen(true)}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-900/90 hover:bg-slate-800/90 text-slate-200 border border-slate-800 transition active:scale-[0.99] shadow-lg"
           >
-            <CheckCircle2 className={`w-4 h-4 ${isCompleted ? 'text-emerald-400' : 'text-orange-400'}`} strokeWidth={2.3} />
-            <span>{isCompleted ? 'مكتمل ومقروء ✓' : 'تحديد كمكتمل'}</span>
+            <span className="text-xs text-slate-400 truncate max-w-[50%] text-right font-medium">
+              {chapter.contentSections?.find((s, idx) => `sec-${idx}` === activeSectionId)?.heading || chapter.contentSections?.[0]?.heading || ''}
+            </span>
+            <div className="flex items-center gap-2 font-bold text-sm text-white">
+              <span>محتويات الدرس</span>
+              <ListOrdered className="w-4 h-4 text-amber-400" />
+            </div>
           </button>
         </div>
       </div>
+
+      {/* Two-Column Grid: Reading Column + Desktop Sticky TOC */}
+      <div className="xl:grid xl:grid-cols-[1fr_270px] gap-8 items-start">
+        {/* Main Reading Column */}
+        <div className="min-w-0 space-y-6 sm:space-y-8">
 
       {/* Chapter Summary / Conclusions Cards with Framer Motion Stagger */}
       {chapter.summaryPoints.length > 0 && (
@@ -625,11 +812,13 @@ function evaluateChapterChallenge(
         {chapter.contentSections.map((sec, idx) => (
           <motion.section
             key={idx}
+            id={`sec-${idx}`}
+            data-chapter-target
             custom={idx}
             initial="hidden"
             animate="visible"
             variants={sectionFadeVariants}
-            className="space-y-4"
+            className="scroll-mt-24 space-y-4"
           >
             <h2 className="text-base sm:text-xl font-bold text-slate-100 flex items-start gap-2.5 leading-snug sm:leading-relaxed">
               <span className="w-1.5 sm:w-2 h-5 bg-orange-500 rounded-full shrink-0 mt-0.5 sm:mt-1 shadow-sm shadow-orange-500/40"></span>
@@ -786,13 +975,13 @@ function evaluateChapterChallenge(
               );
             })()}
 
-            {/* Callout Box */}
+            {/* Standardized Informational Callout Box (Phase 5: semantic Lucide icons) */}
             {sec.callout && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.97 }}
+                initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ type: 'spring', bounce: 0.2, duration: 0.4 }}
-                className={`p-4 rounded-2xl border flex items-start gap-3 ${
+                transition={{ type: 'spring', bounce: 0.2, duration: 0.35 }}
+                className={`p-4 sm:p-5 rounded-2xl border flex items-start gap-3 sm:gap-4 ${
                   sec.callout.type === 'celebration'
                     ? 'bg-amber-950/20 border-amber-500/40 text-amber-200'
                     : sec.callout.type === 'warning'
@@ -802,10 +991,28 @@ function evaluateChapterChallenge(
                     : 'bg-sky-950/20 border-sky-500/40 text-sky-200'
                 }`}
               >
-                <div className="text-xl shrink-0 mt-0.5">
-                  {sec.callout.type === 'celebration' ? '💥' : sec.callout.type === 'warning' ? '👻' : '🔍'}
+                <div
+                  className={`p-2 rounded-xl shrink-0 mt-0.5 ${
+                    sec.callout.type === 'celebration'
+                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      : sec.callout.type === 'warning'
+                      ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                      : sec.callout.type === 'common_mistake'
+                      ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                      : 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                  }`}
+                >
+                  {sec.callout.type === 'celebration' ? (
+                    <Sparkles className="w-5 h-5 text-amber-400" />
+                  ) : sec.callout.type === 'warning' ? (
+                    <AlertTriangle className="w-5 h-5 text-rose-400" />
+                  ) : sec.callout.type === 'common_mistake' ? (
+                    <AlertCircle className="w-5 h-5 text-orange-400" />
+                  ) : (
+                    <Lightbulb className="w-5 h-5 text-sky-400" />
+                  )}
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 flex-1 min-w-0">
                   <h4 className="font-bold text-sm sm:text-base text-white">
                     <FormattedArabicText text={sec.callout.title} />
                   </h4>
@@ -821,7 +1028,11 @@ function evaluateChapterChallenge(
 
       {/* Exercises Section: "جرّب بنفسك: توقّع الناتج" */}
       {chapter.exercises.length > 0 && (
-        <section className="bg-slate-900/60 rounded-2xl border border-slate-800 p-6 space-y-6">
+        <section
+          id="chapter-exercises"
+          data-chapter-target
+          className="scroll-mt-24 bg-slate-900/60 rounded-2xl border border-slate-800 p-6 space-y-6"
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
@@ -961,21 +1172,27 @@ function evaluateChapterChallenge(
 
       {/* Chapter Interactive Quiz: "كويز الفصل السريع" */}
       {chapter.quiz && chapter.quiz.length > 0 && (
-        <ChapterQuiz
-          key={`chapter-quiz-${chapter.id}`}
-          chapterId={chapter.id}
-          quiz={chapter.quiz}
-          chapterTitle={chapter.title}
-          onComplete={onCompleteQuiz ? () => onCompleteQuiz(chapter.id) : undefined}
-          onScrollToChallenge={() => {
-            const el = document.getElementById('chapter-challenge-section');
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-          }}
-        />
+        <div id="chapter-quiz-section" data-chapter-target className="scroll-mt-24">
+          <ChapterQuiz
+            key={`chapter-quiz-${chapter.id}`}
+            chapterId={chapter.id}
+            quiz={chapter.quiz}
+            chapterTitle={chapter.title}
+            onComplete={onCompleteQuiz ? () => onCompleteQuiz(chapter.id) : undefined}
+            onScrollToChallenge={() => {
+              const el = document.getElementById('chapter-challenge-section');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }}
+          />
+        </div>
       )}
 
       {/* Student Personal Notes Card */}
-      <section className="bg-slate-900/80 rounded-2xl border border-slate-800 p-4 sm:p-5 space-y-2.5 shadow-md">
+      <section
+        id="chapter-notes-section"
+        data-chapter-target
+        className="scroll-mt-24 bg-slate-900/80 rounded-2xl border border-slate-800 p-4 sm:p-5 space-y-2.5 shadow-md"
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-white font-bold text-sm sm:text-base">
             <span className="text-amber-400">📝</span>
@@ -1001,7 +1218,8 @@ function evaluateChapterChallenge(
       {chapter.challenge && (
         <section
           id="chapter-challenge-section"
-          className="bg-gradient-to-b from-amber-950/20 via-slate-900 to-slate-950 rounded-2xl border border-amber-500/30 p-6 space-y-4 shadow-xl"
+          data-chapter-target
+          className="scroll-mt-24 bg-gradient-to-b from-amber-950/20 via-slate-900 to-slate-950 rounded-2xl border border-amber-500/30 p-6 space-y-4 shadow-xl"
         >
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-amber-500 text-slate-950 font-black text-lg">
@@ -1069,10 +1287,7 @@ function evaluateChapterChallenge(
               {isEditorActivated ? (
                 <Suspense
                   fallback={
-                    <div className="h-60 sm:h-72 bg-slate-950 flex flex-col items-center justify-center gap-2 text-slate-500 font-mono text-xs">
-                      <Terminal className="w-6 h-6 animate-pulse text-amber-500/60" />
-                      <span>جاري تشغيل محرر الأكواد...</span>
-                    </div>
+                    <StandardLoadingState variant="editor" />
                   }
                 >
                   <CodeEditor
@@ -1205,40 +1420,241 @@ function evaluateChapterChallenge(
         </section>
       )}
 
-      {/* Navigation Footer */}
-      <div className="flex items-center justify-between pt-8 border-t border-slate-800">
-        {onPrevChapter ? (
-          <button
-            onClick={onPrevChapter}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs sm:text-sm font-semibold transition"
-          >
-            <ArrowRight className="w-4 h-4" />
-            الفصل السابق
-          </button>
-        ) : (
-          <div></div>
-        )}
+          {/* 5. End-of-Lesson Dedicated Completion Panel (Phase 5) */}
+          <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-slate-950 p-5 sm:p-7 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+              <div className="flex items-start sm:items-center gap-4">
+                <div
+                  className={`p-3 rounded-2xl shrink-0 ${
+                    isCompleted
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-slate-800 text-slate-400 border border-slate-700'
+                  }`}
+                >
+                  {isCompleted ? (
+                    <CheckCircle2 className="w-7 h-7 text-emerald-400" />
+                  ) : (
+                    <BookOpen className="w-7 h-7 text-amber-400" />
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-bold text-white">
+                      {isCompleted
+                        ? 'أتممت قراءة وتطبيق هذا الفصل بنجاح 🎉'
+                        : 'أنهيت قراءة جميع موضوعات هذا الفصل؟'}
+                    </h3>
+                    {isCompleted && (
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        مكتمل
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                    {isCompleted
+                      ? 'تم حفظ إنجازك في ملفك التعليمي، وجاهز للمتابعة إلى الخطوة التالية.'
+                      : 'علّم الفصل كمكتمل لحفظ تقدمك وفتح مسارات التقييم والإحصائيات.'}
+                  </p>
+                </div>
+              </div>
 
-        {isLastChapterInPart && onOpenPartExam ? (
-          <button
-            onClick={() => onOpenPartExam(chapter.partId)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-500 hover:brightness-110 text-slate-950 text-xs sm:text-sm font-black transition shadow-lg shadow-amber-500/20"
-          >
-            <span>ملخص وتحدي الجزء {chapter.partId} الشامل 📋</span>
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-        ) : onNextChapter ? (
-          <button
-            onClick={onNextChapter}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-bold transition shadow-lg shadow-amber-500/20"
-          >
-            الفصل التالي
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-        ) : (
-          <div></div>
-        )}
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  onClick={onToggleCompleted}
+                  className={`min-h-[48px] px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md active:scale-95 flex items-center gap-2 ${
+                    isCompleted
+                      ? 'bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                      : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
+                  }`}
+                >
+                  {isCompleted ? (
+                    <>
+                      <Undo2 className="w-4 h-4 text-slate-400" />
+                      <span>تحديد كغير مكتمل (تراجع)</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 fill-slate-950 text-emerald-500" />
+                      <span>تحديد الفصل كمكتمل وحفظ التقدم</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* 6. Navigation Footer (Phase 5: Touch-friendly min-h-[48px], clean semantics) */}
+          <div className="flex items-center justify-between pt-8 border-t border-slate-800 gap-3">
+            {onPrevChapter ? (
+              <button
+                onClick={onPrevChapter}
+                className="min-h-[48px] flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs sm:text-sm font-semibold transition"
+              >
+                <ArrowRight className="w-4 h-4" />
+                <span>الفصل السابق</span>
+              </button>
+            ) : (
+              <div></div>
+            )}
+
+            {isLastChapterInPart && onOpenPartExam ? (
+              <button
+                onClick={() => onOpenPartExam(chapter.partId)}
+                className="min-h-[48px] flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-500 hover:brightness-110 text-slate-950 text-xs sm:text-sm font-black transition shadow-lg shadow-amber-500/20"
+              >
+                <Award className="w-4 h-4" />
+                <span>ملخص وتحدي الجزء {chapter.partId} الشامل</span>
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            ) : onNextChapter ? (
+              <button
+                onClick={onNextChapter}
+                className="min-h-[48px] flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-bold transition shadow-lg shadow-amber-500/20"
+              >
+                <span>الفصل التالي</span>
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            ) : (
+              <div></div>
+            )}
+          </div>
+        </div>
+
+        {/* 7. Desktop Sticky Lesson-Outline (TOC) Panel */}
+        <aside className="hidden xl:block sticky top-20 z-10 space-y-4">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-xl backdrop-blur-sm">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-3">
+              <div className="flex items-center gap-2 font-bold text-sm text-white">
+                <ListOrdered className="w-4 h-4 text-amber-400" />
+                <span>محتويات الدرس</span>
+              </div>
+              <span
+                className="text-[11px] font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20"
+                dir="ltr"
+              >
+                {Math.round(readingProgress)}%
+              </span>
+            </div>
+
+            {/* Mini Progress Bar */}
+            <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden mb-3">
+              <div
+                className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-150"
+                style={{ width: `${readingProgress}%` }}
+              />
+            </div>
+
+            <nav className="space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto pr-1 text-xs">
+              {tocItems.map((item) => {
+                const isActive = activeSectionId === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => scrollToTarget(item.id)}
+                    className={`w-full text-right px-3 py-2 rounded-xl transition flex items-center gap-2.5 text-xs ${
+                      isActive
+                        ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    }`}
+                  >
+                    {item.number ? (
+                      <span
+                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono shrink-0 ${
+                          isActive
+                            ? 'bg-amber-500 text-slate-950 font-black'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {item.number}
+                      </span>
+                    ) : (
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                    )}
+                    <span className="truncate">{item.title}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </aside>
       </div>
+
+      {/* 8. Mobile & Tablet TOC Modal Bottom Sheet */}
+      <AnimatePresence>
+        {isMobileTocOpen && (
+          <div className="fixed inset-0 z-50 xl:hidden flex items-end justify-center">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileTocOpen(false)}
+              className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm"
+            />
+
+            {/* Bottom Sheet */}
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 250 }}
+              className="relative z-10 w-full max-w-lg bg-slate-900 border-t border-slate-700/80 rounded-t-3xl p-5 shadow-2xl max-h-[80vh] flex flex-col"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2 font-bold text-white text-base">
+                  <ListOrdered className="w-5 h-5 text-amber-400" />
+                  <span>محتويات الدرس</span>
+                  <span
+                    className="text-xs text-amber-400 font-mono bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20"
+                    dir="ltr"
+                  >
+                    {Math.round(readingProgress)}%
+                  </span>
+                </div>
+                <button
+                  onClick={() => setIsMobileTocOpen(false)}
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+                  aria-label="إغلاق قائمة المحتويات"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <nav className="overflow-y-auto py-3 space-y-1.5 flex-1">
+                {tocItems.map((item) => {
+                  const isActive = activeSectionId === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => scrollToTarget(item.id)}
+                      className={`w-full min-h-[44px] text-right px-3.5 py-2.5 rounded-xl transition flex items-center gap-3 text-sm ${
+                        isActive
+                          ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
+                          : 'text-slate-300 hover:bg-slate-800/80'
+                      }`}
+                    >
+                      {item.number ? (
+                        <span
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-mono shrink-0 ${
+                            isActive
+                              ? 'bg-amber-500 text-slate-950 font-black'
+                              : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {item.number}
+                        </span>
+                      ) : (
+                        <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                      )}
+                      <span className="truncate">{item.title}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.article>
   );
-};
+});

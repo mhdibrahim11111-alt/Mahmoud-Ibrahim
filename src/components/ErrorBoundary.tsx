@@ -91,9 +91,45 @@ export class ErrorBoundary extends Component<Props, State> {
               </p>
             </div>
 
+            {/* 3-Point Clarification Boxes */}
+            <div className="space-y-2.5 text-right text-xs">
+              {/* 1. What Happened */}
+              <div className="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-3 space-y-0.5">
+                <span className="text-rose-400 font-bold text-xs flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>ماذا حدث؟</span>
+                </span>
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  واجهت واجهة المنصة استثناءً غير متوقع أثناء عرض المكون الحالي.
+                </p>
+              </div>
+
+              {/* 2. Data Safety */}
+              <div className="bg-emerald-950/20 border border-emerald-500/20 rounded-2xl p-3 space-y-0.5">
+                <span className="text-emerald-400 font-bold text-xs flex items-center gap-1.5">
+                  <span className="text-sm">🛡️</span>
+                  <span>هل بياناتك في أمان؟</span>
+                </span>
+                <p className="text-emerald-200/90 text-xs leading-relaxed">
+                  نعم، جميع أكوادك ومشاريعك ونقاط تقدمك مخزنة بأمان على جهازك ولن تفقد أي خطوة أنجزتها.
+                </p>
+              </div>
+
+              {/* 3. What to do next */}
+              <div className="bg-amber-950/20 border border-amber-500/20 rounded-2xl p-3 space-y-0.5">
+                <span className="text-amber-400 font-bold text-xs flex items-center gap-1.5">
+                  <span className="text-sm">💡</span>
+                  <span>ما الخطوة التالية؟</span>
+                </span>
+                <p className="text-amber-200/90 text-xs leading-relaxed">
+                  اضغط على زر إعادة التحميل أدناه، أو أعد ضبط الحالة المؤقتة للمتابعة.
+                </p>
+              </div>
+            </div>
+
             {/* Error Message Box */}
-            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 text-right font-mono text-xs text-rose-300/90 overflow-x-auto select-all">
-              <span className="text-slate-500 text-[10px] block font-sans mb-1">تفاصيل الخطأ:</span>
+            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 text-right font-mono text-xs text-rose-300/90 overflow-x-auto select-all">
+              <span className="text-slate-500 text-[10px] block font-sans mb-0.5">تفاصيل الخطأ:</span>
               <p className="break-words">{errorMessage}</p>
             </div>
 
